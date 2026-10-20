@@ -221,13 +221,38 @@ fi
 PULL_POLICY="${CHROMIE_PULL_POLICY:-never}"
 echo "[start] Starting containers without building (pull policy: ${PULL_POLICY})..."
 UP_ARGS=(-d --no-build --pull "$PULL_POLICY")
-if [[ "${BUILD:-0}" == "1" ]]; then
-  # A successful image build can replace the image ID beneath an otherwise
-  # unchanged running container. Recreate every owned service before profile
-  # verification so Docker never has to inspect a removed image reference.
-  UP_ARGS+=(--force-recreate)
-fi
 docker compose "${COMPOSE_ARGS[@]}" up "${UP_ARGS[@]}" "${SERVICES[@]}"
+
+if [[ "${BUILD:-0}" == "1" ]]; then
+  # A build that changed an image leaves its container on the replaced image ID.
+  # Recreate exactly those services before profile verification, so no container
+  # keeps a replaced image reference while an unchanged service (the model server
+  # above all) keeps running instead of reloading.
+  declare -A SERVICE_IMAGES=()
+  while IFS=$'\t' read -r service image_ref; do
+    SERVICE_IMAGES["$service"]="$image_ref"
+  done < <(docker compose "${COMPOSE_ARGS[@]}" config --format json | python3 -c '
+import json, sys
+for name, spec in json.load(sys.stdin)["services"].items():
+    print(name, spec.get("image", ""), sep="\t")')
+  STALE_SERVICES=()
+  for service in "${SERVICES[@]}"; do
+    container="$(docker compose "${COMPOSE_ARGS[@]}" ps -a -q "$service" 2>/dev/null | head -n 1 || true)"
+    image_ref="${SERVICE_IMAGES[$service]:-}"
+    [[ -n "$container" && -n "$image_ref" ]] || continue
+    running_image="$(docker inspect -f '{{.Image}}' "$container" 2>/dev/null || true)"
+    current_image="$(docker image inspect -f '{{.Id}}' "$image_ref" 2>/dev/null || true)"
+    if [[ -n "$current_image" && "$running_image" != "$current_image" ]]; then
+      STALE_SERVICES+=("$service")
+    fi
+  done
+  if (( ${#STALE_SERVICES[@]} > 0 )); then
+    echo "[start] Recreating services whose image changed: ${STALE_SERVICES[*]}"
+    docker compose "${COMPOSE_ARGS[@]}" up "${UP_ARGS[@]}" --no-deps --force-recreate "${STALE_SERVICES[@]}"
+  else
+    echo "[start] No service image changed; running containers are kept."
+  fi
+fi
 
 echo "[start] Verifying container environment against the auto-detected profile..."
 ./scripts/verify_runtime_profile.sh

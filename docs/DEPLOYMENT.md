@@ -67,7 +67,13 @@ From the Chromie checkout:
 ./scripts/start_voice_mujoco.sh --soridormi-repo ../soridormi
 ```
 
-Use `--build` on the start script only when images changed after deployment.
+Use `--build` on the start script only when images changed after deployment. It
+rebuilds with the Docker layer cache: a code-only change rebuilds only the code
+layers, and package downloads come from BuildKit cache mounts when a dependency
+layer must rerun. Afterwards it recreates only the containers whose image ID
+changed, so an unchanged model server keeps running. Proxy settings are Docker's
+predefined build args and do not affect the cache. `--rebuild-no-cache` still
+rebuilds every layer.
 
 ## Useful Variants
 

@@ -7,7 +7,9 @@ ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
 
 COPY agent/requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+# Package downloads live in BuildKit cache mounts outside the image: a changed
+# dependency layer reinstalls from them instead of downloading every package again.
+RUN --mount=type=cache,target=/root/.cache/pip pip install -r requirements.txt
 
 COPY agent/app ./app
 COPY agent-skills ./agent-skills

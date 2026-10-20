@@ -28,6 +28,9 @@ ordered open work are in [STATUS](docs/STATUS.md).
   `main-03974435e-20261020/`. Bundles `~/Downloads/chromie_debug_bundle_20261020_*.tar.gz`.
   Earlier runs: `.chromie/acceptance/everyday-20261016/`.
 - Last gate and strict replay (this delivery's source, GPU host): pytest 3,990 passed + 5 skipped (`xgrammar` not installed), benchmarks 172, legacy Agent tests 20; policies, docs, test ownership, ruff, mypy and runtime-structure ratchets pass; `scripts/run_workflow_replay.py` 6,000 cases passed. The gate needs `anthropic==1.15.0` from `requirements-test.txt` (`INSTALL_TEST_DEPS=1`).
+- `start_chromie.sh --build` reuses the layer cache, takes package downloads from BuildKit
+  cache mounts, and recreates only the services whose image changed. The first build
+  after this change reruns the cache-mount layers once.
 - Live runs use the local `chromie-gemma4-12b`. Restart `chromie-llm` before a cohort, never
   during one: SGLang greedy output depends on earlier traffic in one server lifetime.
 - The main checkout's ignored `workflow_scenarios/` copy was stale on 2026-10-20 and the

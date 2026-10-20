@@ -6,19 +6,15 @@ ARG COSYVOICE3_SOURCE_REVISION
 ARG PYTORCH_INDEX_URL=https://download.pytorch.org/whl/cu128
 ARG TTS_CUDA_ARCH=89
 ARG CHROMIE_BUILD_PROFILE=unknown
-ARG HTTP_PROXY
-ARG HTTPS_PROXY
-ARG http_proxy
-ARG https_proxy
-ARG NO_PROXY
-ARG no_proxy
+# Proxies arrive as Docker's predefined build args (HTTP_PROXY, NO_PROXY, ...): RUN sees
+# them without an ARG line, and undeclared they stay out of the layer cache key and
+# the image history, so building with or without a proxy reuses the same layers.
 
 LABEL org.chromie.hardware-profile="${CHROMIE_BUILD_PROFILE}" \
       org.chromie.tts-cuda-arch="${TTS_CUDA_ARCH}"
 
 ENV DEBIAN_FRONTEND=noninteractive \
     PYTHONUNBUFFERED=1 \
-    PIP_NO_CACHE_DIR=1 \
     HF_HUB_DISABLE_TELEMETRY=1 \
     TOKENIZERS_PARALLELISM=false
 
@@ -42,14 +38,17 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # newest 3.11 build in uv 0.12.20's embedded download list, so changing either
 # pin is a deliberate image change.
 ENV UV_PYTHON_INSTALL_DIR=/opt/uv-python
-RUN python3 -m pip install --no-cache-dir uv==0.12.20 && \
+# Package downloads live in BuildKit cache mounts outside the image: a changed
+# dependency layer reinstalls from them instead of downloading every package again.
+RUN --mount=type=cache,target=/root/.cache/pip --mount=type=cache,target=/root/.cache/uv \
+    python3 -m pip install uv==0.12.20 && \
     uv python install 3.11.16 && \
     uv venv --seed --python 3.11.16 /opt/venv && \
     /opt/venv/bin/python -c "import sys; assert sys.version_info[:3] == (3, 11, 16), sys.version"
 ENV PATH=/opt/venv/bin:$PATH
-RUN pip install pip==25.1.1 setuptools==80.9.0 wheel==0.45.1
+RUN --mount=type=cache,target=/root/.cache/pip pip install pip==25.1.1 setuptools==80.9.0 wheel==0.45.1
 
-RUN pip install --index-url "${PYTORCH_INDEX_URL}" \
+RUN --mount=type=cache,target=/root/.cache/pip pip install --index-url "${PYTORCH_INDEX_URL}" \
     torch==2.10.0 torchaudio==2.10.0
 
 RUN git init /opt/CosyVoice && \
@@ -68,7 +67,7 @@ RUN git init /opt/CosyVoice && \
 # websockets, whose pin matches tts/requirements.txt. The CosyVoice server
 # dependencies (fastapi, uvicorn) are not installed: candidate_server.py serves
 # WebSockets itself.
-RUN pip install \
+RUN --mount=type=cache,target=/root/.cache/pip pip install \
       conformer==0.3.2 \
       diffusers==0.29.0 \
       gdown==5.1.0 \
@@ -93,12 +92,12 @@ RUN pip install \
 
 # TorchCodec 0.10 is the official match for Torch 2.10. Decode the shared
 # reference WAV on CPU; candidate inference remains on CUDA.
-RUN pip install --no-deps torchcodec==0.10.0
+RUN --mount=type=cache,target=/root/.cache/pip pip install --no-deps torchcodec==0.10.0
 
 # Both imports are resolved while HyperPyYAML constructs the inference model:
 # Matcha's logger uses Lightning and the referenced dataset processor imports
 # PyWorld even though training data isn't opened by the service.
-RUN pip install \
+RUN --mount=type=cache,target=/root/.cache/pip pip install \
       lightning==2.2.4 \
       matplotlib==3.7.5 \
       pytorch-lightning==2.2.4 \
@@ -110,11 +109,11 @@ RUN pip install \
 # Upstream 20231117 metadata imports pkg_resources during its build. Current
 # isolated build environments no longer provide it, so build against the
 # already pinned runtime environment.
-RUN pip install --no-build-isolation --no-deps \
+RUN --mount=type=cache,target=/root/.cache/pip pip install --no-build-isolation --no-deps \
       openai-whisper==20231117 \
       tiktoken==0.13.0
 
-RUN pip install \
+RUN --mount=type=cache,target=/root/.cache/pip pip install \
     --extra-index-url https://aiinfra.pkgs.visualstudio.com/PublicPackages/_packaging/onnxruntime-cuda-12/pypi/simple/ \
     onnxruntime-gpu==1.18.1
 
