@@ -7,13 +7,13 @@ ordered open work are in [STATUS](docs/STATUS.md).
 
 ## Current snapshot — 2026-10-20
 
-- Checkout `/home/chromie/github/chromie`. This delivery is on branch
-  `claude/everyday-live-repairs-20261020` (pushed, merge pending); after the merge, resume
-  from the latest `origin/main` commit containing this file.
-- Soridormi `/home/chromie/github/soridormi` on branch `claude/gaze-body-turn` at `51a2afa`
-  (pushed, merge pending), the revision pinned by `capabilities/soridormi.json` and
-  `release/compatibility.json`; the MCP container mounts its `src`, so a
-  `docker restart soridormi-runtime-mcp` loads it and resets the scene (user at -90 degrees, 1.5 m).
+- Checkout `/home/chromie/github/chromie`, branch `main`; the expected resume revision is
+  the latest `origin/main` commit containing this file (the 2026-10-20 repair and build
+  branches are merged; the owner merged them without a post-merge gate).
+- Soridormi `/home/chromie/github/soridormi` on `main` at `e6257f4`, which contains `51a2afa`, the
+  revision pinned by `capabilities/soridormi.json` and `release/compatibility.json`. The
+  MCP container mounts its `src`, so a `docker restart soridormi-runtime-mcp` loads it and
+  resets the scene (user at -90 degrees, 1.5 m).
 - Live Agent: `chromie-agent:latest` = `answer-source-20261020`, built from the source this
   delivery records; `--verify-agent-source` matches. Rollback image:
   `main-03974435e-20261020` (with Soridormi `3766c79`). LLM: `chromie-sglang:latest` = `gemma4-fp8`

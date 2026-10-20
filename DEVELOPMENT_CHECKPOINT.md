@@ -25,7 +25,7 @@ Evidence and per-run judgments: `.chromie/acceptance/playback-race-20261020/` (l
 
 - Agent `answer-source-20261020` (= `chromie-agent:latest`) is built from the source this
   delivery records and deployed; the Host playback fix runs in the host Orchestrator.
-  Soridormi `51a2afa` (branch `claude/gaze-body-turn`, pinned) runs in the MCP container.
+  Soridormi `main` (`e6257f4`, containing the pinned `51a2afa`) runs in the MCP container.
   Rollback: `main-03974435e-20261020` and Soridormi `3766c79`.
 - Seven live runs on the local gemma4 12B (owner: Claude deferred for cost). Each stop
   kept one bundle, and the earliest boundary was repaired:
