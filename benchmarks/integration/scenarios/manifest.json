@@ -1,18 +1,18 @@
 {
   "schema_version": 1,
-  "frozen_on": "2026-10-18",
+  "frozen_on": "2026-10-21",
   "author_model": "gpt-6-astra",
   "reference_kind": "assistant-authored and contract-reviewed, not independent ground truth",
   "independent_review": false,
   "model_ability_evaluated": false,
   "case_sha256": {
     "workflow-cancellation.json": "33923052b958edb96b0dee07f6f699bb34e3bd3b1d0bb9de81f2cddd9a12ae2f",
-    "workflow-conditional-dry.json": "a2ae2050a890f460074644c8a4070c1d4713cdffa6e90bb1a3a8fe9dec935a7c",
-    "workflow-conditional-rain.json": "5212c2797679a5358c0d0ec9e4fc842ca23e833601ad08164249e4b6f10922f2",
+    "workflow-conditional-dry.json": "4954c81123f94ddd3e8f3c9e74dfe89c08e3eb22d2ed66e1c445c239f11b35a4",
+    "workflow-conditional-rain.json": "e0d3112dbecab73dba1f95b5bf1b3ce278394771b2cd9a690f5867478b14d4d2",
     "workflow-delayed.json": "94dc82d792940fd21e810f37ac2ee84272db710eb7d28d280a06fb5eca2183fb",
     "workflow-normal.json": "3648489d13cc17ae734312723a67b33f531f65ceae7ceae887e9bd6c9de007a1"
   },
-  "freeze_revision": 45,
-  "freeze_note": "Host-derived Planner aggregate goal_satisfaction (2026-10-18). Every fast Planner request recaptured: the Plan-level goal_satisfaction left the model contract, satisfaction is required on every Goal outcome, and Host folds the aggregate from the per-Goal judgments. Only the Planner prompt and format schema changed; the retired key is projected out of stored fast replies; no reply otherwise re-authored; inputs, provider outcomes and expectations unchanged; every episode passes; no candidate calls.",
+  "freeze_revision": 46,
+  "freeze_note": "Re-entry ownership repair (2026-10-21). Every Evidence re-entry request recaptured: with up to two Goals each decision assignment is a native decoder state in Goal order, an execute opens new_work owned only by executing Goals and no execute closes it (live: 帮我拿瓶水，顺便告诉我现在几点。 re-listed executed Work under respond decisions). No reply re-authored; every recorded reply keeps its schema validity; inputs, provider outcomes, expectations and splits unchanged; every case reaches its expected verdict; no candidate calls.",
   "migration": "Work-only contracts and separate SC fixtures; unchanged expectations, complete request recapture."
 }

@@ -14,23 +14,23 @@ ordered open work are in [STATUS](docs/STATUS.md).
   revision pinned by `capabilities/soridormi.json` and `release/compatibility.json`. The
   MCP container mounts its `src`, so a `docker restart soridormi-runtime-mcp` loads it and
   resets the scene (user at -90 degrees, 1.5 m).
-- Live Agent: `chromie-agent:latest` = `answer-source-20261020`, built from the source this
-  delivery records; `--verify-agent-source` matches. Rollback image:
-  `main-03974435e-20261020` (with Soridormi `3766c79`). LLM: `chromie-sglang:latest` = `gemma4-fp8`
+- Live Agent: `chromie-agent:latest` = `reentry-ownership-20261021`, built from the source this
+  delivery records; `--verify-agent-source` matches. Rollback image: `answer-source-20261020`. LLM: `chromie-sglang:latest` = `gemma4-fp8`
   (`f59a042e6973`); compose resolves `chromie-sglang:${CHROMIE_IMAGE_TAG}`, so the
   `latest` tag must exist for `start_chromie.sh`.
-- Workflow corpus: freeze 45 (`019d7726…`). Restore it with
+- Workflow corpus: freeze 46 (`36b7702b…`; scripts in `.chromie/acceptance/main-3178a822c-20261021/freeze46/`). Restore it with
   `python -m benchmarks.regression restore-fixtures`; do not untar `frozen.tar.xz` over
   `workflow_scenarios/` (its inner `manifest.json` lacks the storage identity).
-- Evidence (README in each): `.chromie/acceptance/playback-race-20261020/` (gate, replay; run 6
-  stopped at a transient weather timeout, `run2/` stopped by the owner), `answer-source-20261020/`,
-  `gaze-turn-20261020/`, `said-now-20261020/`, `decided-activity-20261020/`,
-  `main-03974435e-20261020/`. Bundles `~/Downloads/chromie_debug_bundle_20261020_*.tar.gz`.
-  Earlier runs: `.chromie/acceptance/everyday-20261016/`.
-- Last gate and strict replay (this delivery's source, GPU host): pytest 3,990 passed + 5 skipped (`xgrammar` not installed), benchmarks 172, legacy Agent tests 20; policies, docs, test ownership, ruff, mypy and runtime-structure ratchets pass; `scripts/run_workflow_replay.py` 6,000 cases passed. The gate needs `anthropic==1.15.0` from `requirements-test.txt` (`INSTALL_TEST_DEPS=1`).
+- Evidence (README in each): `.chromie/acceptance/main-3178a822c-20261021/` (2026-10-21 run stopped at
+  `mix_water_time_zh`; freeze 46 scripts), `playback-race-20261020/`, `answer-source-20261020/`,
+  `gaze-turn-20261020/`, `said-now-20261020/`, `decided-activity-20261020/`, `main-03974435e-20261020/`.
+  Bundles `~/Downloads/chromie_debug_bundle_2026102*.tar.gz`. Earlier runs: `.chromie/acceptance/everyday-20261016/`.
+- Last gate and strict replay (this delivery's source, GPU host): pytest 3,992 passed + 5 skipped (`xgrammar` not installed), benchmarks 172, legacy Agent tests 20; policies, docs, test ownership, ruff, mypy and runtime-structure ratchets pass; `scripts/run_workflow_replay.py` 6,000 cases passed on freeze 46. The gate needs `anthropic==1.15.0` from `requirements-test.txt` (`INSTALL_TEST_DEPS=1`).
 - `start_chromie.sh --build` reuses the layer cache, takes package downloads from BuildKit
   cache mounts, and recreates only the services whose image changed. The first build
   after this change reruns the cache-mount layers once.
+- After a host reboot start the Soridormi water scene (command below); its runner also starts
+  `soridormi-runtime-mcp`. `/tmp` (scratch probes) does not survive a reboot.
 - Live runs use the local `chromie-gemma4-12b`. Restart `chromie-llm` before a cohort, never
   during one: SGLang greedy output depends on earlier traffic in one server lifetime.
 - The main checkout's ignored `workflow_scenarios/` copy was stale on 2026-10-20 and the

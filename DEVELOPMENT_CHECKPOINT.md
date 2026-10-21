@@ -21,32 +21,30 @@ Evidence and per-run judgments: `.chromie/acceptance/playback-race-20261020/` (l
 `answer-source-20261020/`, `gaze-turn-20261020/`, `said-now-20261020/`, `decided-activity-20261020/`,
 `main-03974435e-20261020/` and `everyday-20261016/` (README.md in each).
 
-## Resume point — 2026-10-20
+## Resume point — 2026-10-21
 
-- Agent `answer-source-20261020` (= `chromie-agent:latest`) is built from the source this
-  delivery records and deployed; the Host playback fix runs in the host Orchestrator.
+- Agent `reentry-ownership-20261021` (= `chromie-agent:latest`) is built from the source this
+  delivery records and deployed; the Situation repair runs in the host Orchestrator.
   Soridormi `main` (`e6257f4`, containing the pinned `51a2afa`) runs in the MCP container.
-  Rollback: `main-03974435e-20261020` and Soridormi `3766c79`.
-- Seven live runs on the local gemma4 12B (owner: Claude deferred for cost). Each stop
-  kept one bundle, and the earliest boundary was repaired:
-  1. celebrate: Planner Activity crowded out (repair 1);
-  2. backflip: SC limitation unbound, 422 (repair 2);
-  3. look: requester beyond the head range (owner: Soridormi turns the body first);
-  4. water + time: the time question cited the scene (repair 3);
-  5. time: Host playback-start race (repair 4);
-  6. weather timeout at core case 18 (transient egress, not a defect; smoke 15/15, core 12/18);
-  7. a rerun stopped by the owner after 9 smoke passes.
-- Next: rerun the complete cohort on this revision, then repair the semantic failures in
-  STATUS open work 2 by earliest boundary.
+  Rollback: `answer-source-20261020`.
+- The 2026-10-20 branches are merged to `main` (owner request, no post-merge gate). On
+  `main` `3178a822c` (2026-10-21) the everyday run reached smoke 15/15 and core 13/14. It then
+  stopped at `mix_water_time_zh`: both Goals were decided respond with their Evidence, and the
+  re-entry re-listed the executed fetch and clock read as new Work. Replaying the recorded
+  request gave the valid output 3/3, so the decoder now makes that shape impossible. The same
+  run logged twice that ambient perception stopped updating (stale scene revisions crowded out
+  the new one).
+- The rerun with these repairs reached smoke 15/15 and core 12/14, with no ambient perception
+  error. It stopped at `mix_water_time_zh`: UMI typed the time question as speech (STATUS open
+  work 1).
+- Next: implement the owner's decision for a question that needs a current fact, then rerun
+  the complete cohort and repair STATUS open work 2 by earliest boundary.
 
-Verification: each repaired request was recorded and replayed on the live LLM before and
-after (celebrate 3/3, backflip SC 3/3, water + time 2/2 fixed; solo time, weather,
-weekday and two perception answers unchanged). Gate on the GPU host: pytest 3,990 passed
-+ 5 skipped (`xgrammar` not installed), benchmarks 172, legacy Agent tests 20; policies,
-docs, test ownership, ruff, mypy and runtime-structure ratchets pass;
-`scripts/run_workflow_replay.py` 6,000 cases passed with freeze 45 unchanged (`019d7726…`).
-Soridormi: 91 gaze/body/runtime tests, governance and compileall pass; the full suite shows
-only its 15 pre-existing container-environment failures.
+Verification: the new regressions are red without their fixes. XGrammar compiles the
+two-Goal re-entry schema in 0.38 s, against 0.28 s before on identical inputs. Gate on the GPU
+host: pytest 3,992 passed + 5 skipped (`xgrammar` not installed), benchmarks 172, legacy Agent tests 20; policies, docs, test ownership, ruff, mypy and runtime-structure ratchets
+pass. Workflow corpus freeze 46 (`36b7702b…`) recaptures the 200 re-entry requests;
+`scripts/run_workflow_replay.py` 6,000 cases passed, verdict counts equal to freeze 45.
 
 ## Repairs in force from this Issue
 
@@ -85,6 +83,12 @@ only its 15 pre-existing container-environment failures.
   cite the scene.
 - Host playback waits take a waiter settled at the deadline as settled (live: playback
   started 7 ms before the 3.5 s timeout fired and played speech was reported undelivered).
+- Evidence re-entry with up to two Goals: each decision assignment is a native decoder
+  state in Goal order. An execute opens `new_work` owned only by the executing Goals, and no
+  execute closes it (live: executed Work re-listed under respond decisions).
+- Situation: a newer perception observation from the same owner replaces the one it
+  supersedes, and the caller's sources and interpretations outrank inherited ones in the
+  bounds (live: ambient perception kept stale objects, then stopped updating).
 
 ## Owner decisions in force
 
@@ -104,6 +108,9 @@ only its 15 pre-existing container-environment failures.
   decoration may use expressive gestures Soridormi declares low-risk; locomotion stays
   excluded (owner decision 2026-10-17).
 - UMI never authors `bindings`; Planner alone extracts Capability parameters.
+- A question about a current fact ("告诉我现在几点") is answered from a fresh read even when UMI
+  types it as speech. SC says it will check, the Planner reads, and SC tells the result after
+  Evidence (owner decision 2026-10-21, implementation pending).
 - A person beyond the head's turning range is looked at by turning the body first, inside
   Soridormi (owner decision 2026-10-20). A standalone `look_at_person` turns on a walking
   arc at the slowest gait pace, because pure in-place yaw barely turns this gait. It keeps

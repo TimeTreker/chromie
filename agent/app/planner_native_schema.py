@@ -7,7 +7,8 @@ from __future__ import annotations
 
 import copy
 import json
-from typing import Any
+from itertools import product
+from typing import Any, Callable
 
 
 def native_goal_outcome_branches(schema: dict[str, Any]) -> dict[str, Any]:
@@ -222,3 +223,74 @@ def _goal_outcome_disposition_branches(outcome: dict[str, Any]) -> dict[str, Any
                     fields[name]["maxItems"] = 0
         branches.append(branch)
     return {"oneOf": branches} if len(branches) > 1 else branches[0]
+
+
+REENTRY_DECISION_STATE_MAX_GOALS = 2
+
+
+def reentry_assignment_states(
+    schema: dict[str, Any],
+    goals: list[str],
+    allowed_actions: list[str],
+    held: list[str],
+    subset_branches: Callable[..., list[dict[str, Any]]],
+) -> list[dict[str, Any]]:
+    """Each Goal's decision fixes whether new Work follows and which Goals own it.
+
+    Host accepts new Work only for Goals decided execute, but native decoders cannot
+    relate ``new_work`` to the decisions before it (live 2026-10-21: "帮我拿瓶水，顺便
+    告诉我现在几点。" decided both Goals respond with their Evidence, then re-listed the
+    executed fetch and clock read as new Work; Host rejected the turn). With up to two
+    Goals every decision assignment is its own state, in the Goals' order: an execute
+    opens new Work owned only by executing Goals, and no execute closes it.
+    """
+
+    definitions = schema["$defs"]
+    groups = [[action] for action in ("respond", "execute", "clarify") if action in allowed_actions]
+    if rest := [action for action in allowed_actions if action not in {"respond", "execute", "clarify"}]:
+        groups.append(rest)
+
+    def decided(goal: str, group: list[str]) -> dict[str, Any] | None:
+        key = f"ReentryGoal{goals.index(goal)}{group[0].title()}Decision"
+        if key not in definitions:
+            branches = subset_branches(group, [goal], holds_effect=goal in held)
+            if not branches:
+                return None
+            for branch in branches:
+                branch["properties"]["goal_id"] = {"type": "string", "const": goal}
+            definitions[key] = {"anyOf": branches}
+        return {"$ref": f"#/$defs/{key}"}
+
+    def owned_step(owners: list[str]) -> dict[str, Any]:
+        key = "ReentryStepOwnedBy" + "And".join(str(goals.index(goal)) for goal in owners)
+        if key not in definitions:
+            step = copy.deepcopy(definitions["PlannerModelStep"])
+            step["properties"]["source_goal_ids"] = {
+                "type": "array", "uniqueItems": True, "minItems": 1, "maxItems": len(owners),
+                "items": {"type": "string", "enum": list(owners)},
+            }
+            definitions[key] = step
+        return {"$ref": f"#/$defs/{key}"}
+
+    states = []
+    for assignment in product(groups, repeat=len(goals)):
+        prefix = [decided(goal, group) for goal, group in zip(goals, assignment)]
+        if any(item is None for item in prefix):
+            continue
+        executing = [goal for goal, group in zip(goals, assignment) if group == ["execute"]]
+        relations = ([(["exact"], [False, True]), (["safe_adjustment", "alternative"], [True])]
+                     if executing else [(["exact"], [False])])
+        for relation, confirmation in relations:
+            state = {key: copy.deepcopy(value) for key, value in schema.items()
+                     if key in {"type", "properties", "required", "additionalProperties"}}
+            fields = state["properties"]
+            fields["goal_decisions"] = {"type": "array", "prefixItems": prefix,
+                                        "minItems": len(goals), "maxItems": len(goals)}
+            fields["plan_relation"] = {"type": "string", "enum": relation}
+            fields["user_confirmation_required"] = {"type": "boolean", "enum": confirmation}
+            if executing:
+                fields["new_work"] = {**fields["new_work"], "minItems": 1, "items": owned_step(executing)}
+            else:
+                fields["new_work"] = {**fields["new_work"], "maxItems": 0}
+            states.append(state)
+    return states

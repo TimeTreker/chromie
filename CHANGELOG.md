@@ -5,6 +5,19 @@ remains available in Git history.
 
 ## Unreleased
 
+### Evidence re-entry ownership and fresh ambient perception (freeze 46, 2026-10-21)
+
+- With up to two Goals, the Evidence re-entry decoder makes each decision assignment
+  its own native state. New Work can belong only to Goals decided execute; on
+  `main` the turn "帮我拿瓶水，顺便告诉我现在几点。" had answered both Goals and still
+  re-listed the executed fetch and clock read, and Host rejected it.
+- A newer perception observation from the same owner now replaces the one it
+  supersedes in the Situation projection. Ambient refreshes used to carry every earlier
+  scene revision forward, so Chromie kept stale object positions and, after 16
+  revisions, stopped updating.
+- Workflow corpus freeze 46 recaptures the 200 re-entry requests. No reply is
+  re-authored, and every reply's schema validity and every verdict are unchanged.
+
 ### Incremental image builds (2026-10-20)
 
 - `--build` (`BUILD=1 ./scripts/start_services.sh`) now recreates only the

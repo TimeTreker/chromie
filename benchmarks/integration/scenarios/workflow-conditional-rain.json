@@ -14140,6 +14140,1129 @@
                   "type": "object"
                 }
               ]
+            },
+            "ReentryGoal0RespondDecision": {
+              "anyOf": [
+                {
+                  "additionalProperties": false,
+                  "description": "One post-execution decision over an already-owned canonical Goal.\n\nThis is intentionally not a CanonicalPlan/PlannerModelGoalOutcome shape. Re-entry\nanswers one narrow question: given fresh trusted Evidence, what should the same\nPlanner do next for this Goal? Host later lifts the decision into the canonical\nPlanner DTO and re-runs the ordinary trusted validators.",
+                  "properties": {
+                    "goal_id": {
+                      "type": "string",
+                      "const": "${goal}"
+                    },
+                    "next_action": {
+                      "enum": [
+                        "respond"
+                      ],
+                      "title": "Next Action",
+                      "type": "string"
+                    },
+                    "satisfaction_status": {
+                      "enum": [
+                        "exact"
+                      ],
+                      "title": "Satisfaction Status",
+                      "type": "string"
+                    },
+                    "satisfaction_score": {
+                      "maximum": 1.0,
+                      "minimum": 0.0,
+                      "title": "Satisfaction Score",
+                      "type": "number",
+                      "allOf": [
+                        {
+                          "minimum": 0.95,
+                          "maximum": 1.0
+                        }
+                      ]
+                    },
+                    "evidence_refs": {
+                      "items": {
+                        "type": "string",
+                        "enum": [
+                          "${evidence}"
+                        ]
+                      },
+                      "maxItems": 1,
+                      "title": "Evidence Refs",
+                      "type": "array",
+                      "uniqueItems": true,
+                      "minItems": 1
+                    },
+                    "unresolved_needs": {
+                      "items": {
+                        "type": "string"
+                      },
+                      "maxItems": 0,
+                      "title": "Unresolved Needs",
+                      "type": "array"
+                    },
+                    "unmet_requirements": {
+                      "items": {
+                        "type": "string"
+                      },
+                      "maxItems": 16,
+                      "title": "Unmet Requirements",
+                      "type": "array"
+                    },
+                    "rationale": {
+                      "default": "",
+                      "maxLength": 600,
+                      "title": "Rationale",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "goal_id",
+                    "next_action",
+                    "satisfaction_status",
+                    "satisfaction_score",
+                    "evidence_refs"
+                  ],
+                  "title": "PlannerEvidenceReentryGoalDecision",
+                  "type": "object"
+                },
+                {
+                  "additionalProperties": false,
+                  "description": "One post-execution decision over an already-owned canonical Goal.\n\nThis is intentionally not a CanonicalPlan/PlannerModelGoalOutcome shape. Re-entry\nanswers one narrow question: given fresh trusted Evidence, what should the same\nPlanner do next for this Goal? Host later lifts the decision into the canonical\nPlanner DTO and re-runs the ordinary trusted validators.",
+                  "properties": {
+                    "goal_id": {
+                      "type": "string",
+                      "const": "${goal}"
+                    },
+                    "next_action": {
+                      "enum": [
+                        "respond"
+                      ],
+                      "title": "Next Action",
+                      "type": "string"
+                    },
+                    "satisfaction_status": {
+                      "enum": [
+                        "substantial"
+                      ],
+                      "title": "Satisfaction Status",
+                      "type": "string"
+                    },
+                    "satisfaction_score": {
+                      "maximum": 1.0,
+                      "minimum": 0.0,
+                      "title": "Satisfaction Score",
+                      "type": "number",
+                      "allOf": [
+                        {
+                          "minimum": 0.75,
+                          "maximum": 0.949999
+                        }
+                      ]
+                    },
+                    "evidence_refs": {
+                      "items": {
+                        "type": "string",
+                        "enum": [
+                          "${evidence}"
+                        ]
+                      },
+                      "maxItems": 1,
+                      "title": "Evidence Refs",
+                      "type": "array",
+                      "uniqueItems": true,
+                      "minItems": 1
+                    },
+                    "unresolved_needs": {
+                      "items": {
+                        "type": "string"
+                      },
+                      "maxItems": 0,
+                      "title": "Unresolved Needs",
+                      "type": "array"
+                    },
+                    "unmet_requirements": {
+                      "items": {
+                        "type": "string"
+                      },
+                      "maxItems": 16,
+                      "title": "Unmet Requirements",
+                      "type": "array"
+                    },
+                    "rationale": {
+                      "default": "",
+                      "maxLength": 600,
+                      "title": "Rationale",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "goal_id",
+                    "next_action",
+                    "satisfaction_status",
+                    "satisfaction_score",
+                    "evidence_refs"
+                  ],
+                  "title": "PlannerEvidenceReentryGoalDecision",
+                  "type": "object"
+                }
+              ]
+            },
+            "ReentryGoal0ExecuteDecision": {
+              "anyOf": [
+                {
+                  "additionalProperties": false,
+                  "description": "One post-execution decision over an already-owned canonical Goal.\n\nThis is intentionally not a CanonicalPlan/PlannerModelGoalOutcome shape. Re-entry\nanswers one narrow question: given fresh trusted Evidence, what should the same\nPlanner do next for this Goal? Host later lifts the decision into the canonical\nPlanner DTO and re-runs the ordinary trusted validators.",
+                  "properties": {
+                    "goal_id": {
+                      "type": "string",
+                      "const": "${goal}"
+                    },
+                    "next_action": {
+                      "enum": [
+                        "execute"
+                      ],
+                      "title": "Next Action",
+                      "type": "string"
+                    },
+                    "satisfaction_status": {
+                      "enum": [
+                        "exact"
+                      ],
+                      "title": "Satisfaction Status",
+                      "type": "string"
+                    },
+                    "satisfaction_score": {
+                      "maximum": 1.0,
+                      "minimum": 0.0,
+                      "title": "Satisfaction Score",
+                      "type": "number",
+                      "allOf": [
+                        {
+                          "minimum": 0.95,
+                          "maximum": 1.0
+                        }
+                      ]
+                    },
+                    "evidence_refs": {
+                      "items": {
+                        "type": "string",
+                        "enum": [
+                          "${evidence}"
+                        ]
+                      },
+                      "maxItems": 1,
+                      "title": "Evidence Refs",
+                      "type": "array",
+                      "uniqueItems": true
+                    },
+                    "unresolved_needs": {
+                      "items": {
+                        "type": "string"
+                      },
+                      "maxItems": 0,
+                      "title": "Unresolved Needs",
+                      "type": "array"
+                    },
+                    "unmet_requirements": {
+                      "items": {
+                        "type": "string"
+                      },
+                      "maxItems": 16,
+                      "title": "Unmet Requirements",
+                      "type": "array"
+                    },
+                    "rationale": {
+                      "default": "",
+                      "maxLength": 600,
+                      "title": "Rationale",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "goal_id",
+                    "next_action",
+                    "satisfaction_status",
+                    "satisfaction_score"
+                  ],
+                  "title": "PlannerEvidenceReentryGoalDecision",
+                  "type": "object"
+                },
+                {
+                  "additionalProperties": false,
+                  "description": "One post-execution decision over an already-owned canonical Goal.\n\nThis is intentionally not a CanonicalPlan/PlannerModelGoalOutcome shape. Re-entry\nanswers one narrow question: given fresh trusted Evidence, what should the same\nPlanner do next for this Goal? Host later lifts the decision into the canonical\nPlanner DTO and re-runs the ordinary trusted validators.",
+                  "properties": {
+                    "goal_id": {
+                      "type": "string",
+                      "const": "${goal}"
+                    },
+                    "next_action": {
+                      "enum": [
+                        "execute"
+                      ],
+                      "title": "Next Action",
+                      "type": "string"
+                    },
+                    "satisfaction_status": {
+                      "enum": [
+                        "substantial"
+                      ],
+                      "title": "Satisfaction Status",
+                      "type": "string"
+                    },
+                    "satisfaction_score": {
+                      "maximum": 1.0,
+                      "minimum": 0.0,
+                      "title": "Satisfaction Score",
+                      "type": "number",
+                      "allOf": [
+                        {
+                          "minimum": 0.75,
+                          "maximum": 0.949999
+                        }
+                      ]
+                    },
+                    "evidence_refs": {
+                      "items": {
+                        "type": "string",
+                        "enum": [
+                          "${evidence}"
+                        ]
+                      },
+                      "maxItems": 1,
+                      "title": "Evidence Refs",
+                      "type": "array",
+                      "uniqueItems": true
+                    },
+                    "unresolved_needs": {
+                      "items": {
+                        "type": "string"
+                      },
+                      "maxItems": 0,
+                      "title": "Unresolved Needs",
+                      "type": "array"
+                    },
+                    "unmet_requirements": {
+                      "items": {
+                        "type": "string"
+                      },
+                      "maxItems": 16,
+                      "title": "Unmet Requirements",
+                      "type": "array"
+                    },
+                    "rationale": {
+                      "default": "",
+                      "maxLength": 600,
+                      "title": "Rationale",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "goal_id",
+                    "next_action",
+                    "satisfaction_status",
+                    "satisfaction_score"
+                  ],
+                  "title": "PlannerEvidenceReentryGoalDecision",
+                  "type": "object"
+                },
+                {
+                  "additionalProperties": false,
+                  "description": "One post-execution decision over an already-owned canonical Goal.\n\nThis is intentionally not a CanonicalPlan/PlannerModelGoalOutcome shape. Re-entry\nanswers one narrow question: given fresh trusted Evidence, what should the same\nPlanner do next for this Goal? Host later lifts the decision into the canonical\nPlanner DTO and re-runs the ordinary trusted validators.",
+                  "properties": {
+                    "goal_id": {
+                      "type": "string",
+                      "const": "${goal}"
+                    },
+                    "next_action": {
+                      "enum": [
+                        "execute"
+                      ],
+                      "title": "Next Action",
+                      "type": "string"
+                    },
+                    "satisfaction_status": {
+                      "enum": [
+                        "partial"
+                      ],
+                      "title": "Satisfaction Status",
+                      "type": "string"
+                    },
+                    "satisfaction_score": {
+                      "maximum": 1.0,
+                      "minimum": 0.0,
+                      "title": "Satisfaction Score",
+                      "type": "number",
+                      "allOf": [
+                        {
+                          "minimum": 0.01,
+                          "maximum": 0.749999
+                        }
+                      ]
+                    },
+                    "evidence_refs": {
+                      "items": {
+                        "type": "string",
+                        "enum": [
+                          "${evidence}"
+                        ]
+                      },
+                      "maxItems": 1,
+                      "title": "Evidence Refs",
+                      "type": "array",
+                      "uniqueItems": true
+                    },
+                    "unresolved_needs": {
+                      "items": {
+                        "type": "string"
+                      },
+                      "maxItems": 0,
+                      "title": "Unresolved Needs",
+                      "type": "array"
+                    },
+                    "unmet_requirements": {
+                      "items": {
+                        "type": "string"
+                      },
+                      "maxItems": 16,
+                      "title": "Unmet Requirements",
+                      "type": "array"
+                    },
+                    "rationale": {
+                      "default": "",
+                      "maxLength": 600,
+                      "title": "Rationale",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "goal_id",
+                    "next_action",
+                    "satisfaction_status",
+                    "satisfaction_score"
+                  ],
+                  "title": "PlannerEvidenceReentryGoalDecision",
+                  "type": "object"
+                },
+                {
+                  "additionalProperties": false,
+                  "description": "One post-execution decision over an already-owned canonical Goal.\n\nThis is intentionally not a CanonicalPlan/PlannerModelGoalOutcome shape. Re-entry\nanswers one narrow question: given fresh trusted Evidence, what should the same\nPlanner do next for this Goal? Host later lifts the decision into the canonical\nPlanner DTO and re-runs the ordinary trusted validators.",
+                  "properties": {
+                    "goal_id": {
+                      "type": "string",
+                      "const": "${goal}"
+                    },
+                    "next_action": {
+                      "enum": [
+                        "execute"
+                      ],
+                      "title": "Next Action",
+                      "type": "string"
+                    },
+                    "satisfaction_status": {
+                      "enum": [
+                        "unsatisfied"
+                      ],
+                      "title": "Satisfaction Status",
+                      "type": "string"
+                    },
+                    "satisfaction_score": {
+                      "maximum": 1.0,
+                      "minimum": 0.0,
+                      "title": "Satisfaction Score",
+                      "type": "number",
+                      "allOf": [
+                        {
+                          "minimum": 0.0,
+                          "maximum": 0.0
+                        }
+                      ]
+                    },
+                    "evidence_refs": {
+                      "items": {
+                        "type": "string",
+                        "enum": [
+                          "${evidence}"
+                        ]
+                      },
+                      "maxItems": 1,
+                      "title": "Evidence Refs",
+                      "type": "array",
+                      "uniqueItems": true
+                    },
+                    "unresolved_needs": {
+                      "items": {
+                        "type": "string"
+                      },
+                      "maxItems": 0,
+                      "title": "Unresolved Needs",
+                      "type": "array"
+                    },
+                    "unmet_requirements": {
+                      "items": {
+                        "type": "string"
+                      },
+                      "maxItems": 16,
+                      "title": "Unmet Requirements",
+                      "type": "array"
+                    },
+                    "rationale": {
+                      "default": "",
+                      "maxLength": 600,
+                      "title": "Rationale",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "goal_id",
+                    "next_action",
+                    "satisfaction_status",
+                    "satisfaction_score"
+                  ],
+                  "title": "PlannerEvidenceReentryGoalDecision",
+                  "type": "object"
+                }
+              ]
+            },
+            "ReentryStepOwnedBy0": {
+              "additionalProperties": false,
+              "description": "Semantic plan leaf returned by a planner model.\n\nStep ownership and arguments are model judgments.  They intentionally have\nno host default at this boundary; otherwise a missing multi-goal ownership\ndecision can silently authorize one step for every active goal.",
+              "properties": {
+                "capability_id": {
+                  "minLength": 1,
+                  "title": "Capability Id",
+                  "type": "string",
+                  "enum": [
+                    "soridormi.blink_eyes"
+                  ]
+                },
+                "step_id": {
+                  "maxLength": 160,
+                  "minLength": 1,
+                  "title": "Step Id",
+                  "type": "string"
+                },
+                "args": {
+                  "additionalProperties": true,
+                  "title": "Args",
+                  "type": "object"
+                },
+                "depends_on": {
+                  "items": {
+                    "type": "string"
+                  },
+                  "maxItems": 8,
+                  "title": "Depends On",
+                  "type": "array"
+                },
+                "source_goal_ids": {
+                  "type": "array",
+                  "uniqueItems": true,
+                  "minItems": 1,
+                  "maxItems": 1,
+                  "items": {
+                    "type": "string",
+                    "enum": [
+                      "${goal}"
+                    ]
+                  }
+                },
+                "reuse_activity_id": {
+                  "default": "",
+                  "title": "Reuse Activity Id",
+                  "type": "string"
+                },
+                "step_purpose": {
+                  "default": "achieve_effect",
+                  "enum": [
+                    "achieve_effect",
+                    "acquire_information"
+                  ],
+                  "title": "Step Purpose",
+                  "type": "string"
+                },
+                "expected_outcome": {
+                  "default": "",
+                  "maxLength": 600,
+                  "title": "Expected Outcome",
+                  "type": "string"
+                },
+                "reason_summary": {
+                  "default": "",
+                  "title": "Reason Summary",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "capability_id",
+                "step_id",
+                "args",
+                "depends_on",
+                "source_goal_ids"
+              ],
+              "title": "PlannerModelStep",
+              "type": "object",
+              "oneOf": [
+                {
+                  "type": "object",
+                  "properties": {
+                    "capability_id": {
+                      "type": "string",
+                      "enum": [
+                        "soridormi.blink_eyes"
+                      ]
+                    },
+                    "step_id": {
+                      "maxLength": 160,
+                      "minLength": 1,
+                      "title": "Step Id",
+                      "type": "string"
+                    },
+                    "args": {
+                      "type": "object",
+                      "properties": {
+                        "count": {
+                          "type": "integer",
+                          "minimum": 1,
+                          "maximum": 10,
+                          "x-chromie-entity-type": "count"
+                        }
+                      },
+                      "required": [
+                        "count"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "depends_on": {
+                      "items": {
+                        "type": "string"
+                      },
+                      "maxItems": 8,
+                      "title": "Depends On",
+                      "type": "array"
+                    },
+                    "source_goal_ids": {
+                      "items": {
+                        "type": "string",
+                        "enum": [
+                          "${goal}"
+                        ]
+                      },
+                      "minItems": 1,
+                      "title": "Source Goal Ids",
+                      "type": "array",
+                      "uniqueItems": true,
+                      "maxItems": 1
+                    },
+                    "reuse_activity_id": {
+                      "default": "",
+                      "title": "Reuse Activity Id",
+                      "type": "string"
+                    },
+                    "step_purpose": {
+                      "type": "string",
+                      "enum": [
+                        "achieve_effect"
+                      ]
+                    },
+                    "expected_outcome": {
+                      "default": "",
+                      "maxLength": 600,
+                      "title": "Expected Outcome",
+                      "type": "string"
+                    },
+                    "reason_summary": {
+                      "default": "",
+                      "title": "Reason Summary",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "capability_id",
+                    "step_id",
+                    "args",
+                    "depends_on",
+                    "source_goal_ids"
+                  ],
+                  "additionalProperties": false
+                }
+              ]
+            },
+            "ReentryGoal0ClarifyDecision": {
+              "anyOf": [
+                {
+                  "additionalProperties": false,
+                  "description": "One post-execution decision over an already-owned canonical Goal.\n\nThis is intentionally not a CanonicalPlan/PlannerModelGoalOutcome shape. Re-entry\nanswers one narrow question: given fresh trusted Evidence, what should the same\nPlanner do next for this Goal? Host later lifts the decision into the canonical\nPlanner DTO and re-runs the ordinary trusted validators.",
+                  "properties": {
+                    "goal_id": {
+                      "type": "string",
+                      "const": "${goal}"
+                    },
+                    "next_action": {
+                      "enum": [
+                        "clarify"
+                      ],
+                      "title": "Next Action",
+                      "type": "string"
+                    },
+                    "satisfaction_status": {
+                      "enum": [
+                        "substantial"
+                      ],
+                      "title": "Satisfaction Status",
+                      "type": "string"
+                    },
+                    "satisfaction_score": {
+                      "maximum": 1.0,
+                      "minimum": 0.0,
+                      "title": "Satisfaction Score",
+                      "type": "number",
+                      "allOf": [
+                        {
+                          "minimum": 0.75,
+                          "maximum": 0.949999
+                        }
+                      ]
+                    },
+                    "evidence_refs": {
+                      "items": {
+                        "type": "string",
+                        "enum": [
+                          "${evidence}"
+                        ]
+                      },
+                      "maxItems": 1,
+                      "title": "Evidence Refs",
+                      "type": "array",
+                      "uniqueItems": true
+                    },
+                    "unresolved_needs": {
+                      "items": {
+                        "type": "string"
+                      },
+                      "maxItems": 16,
+                      "title": "Unresolved Needs",
+                      "type": "array",
+                      "minItems": 1
+                    },
+                    "unmet_requirements": {
+                      "items": {
+                        "type": "string"
+                      },
+                      "maxItems": 16,
+                      "title": "Unmet Requirements",
+                      "type": "array"
+                    },
+                    "rationale": {
+                      "default": "",
+                      "maxLength": 600,
+                      "title": "Rationale",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "goal_id",
+                    "next_action",
+                    "satisfaction_status",
+                    "satisfaction_score"
+                  ],
+                  "title": "PlannerEvidenceReentryGoalDecision",
+                  "type": "object"
+                },
+                {
+                  "additionalProperties": false,
+                  "description": "One post-execution decision over an already-owned canonical Goal.\n\nThis is intentionally not a CanonicalPlan/PlannerModelGoalOutcome shape. Re-entry\nanswers one narrow question: given fresh trusted Evidence, what should the same\nPlanner do next for this Goal? Host later lifts the decision into the canonical\nPlanner DTO and re-runs the ordinary trusted validators.",
+                  "properties": {
+                    "goal_id": {
+                      "type": "string",
+                      "const": "${goal}"
+                    },
+                    "next_action": {
+                      "enum": [
+                        "clarify"
+                      ],
+                      "title": "Next Action",
+                      "type": "string"
+                    },
+                    "satisfaction_status": {
+                      "enum": [
+                        "partial"
+                      ],
+                      "title": "Satisfaction Status",
+                      "type": "string"
+                    },
+                    "satisfaction_score": {
+                      "maximum": 1.0,
+                      "minimum": 0.0,
+                      "title": "Satisfaction Score",
+                      "type": "number",
+                      "allOf": [
+                        {
+                          "minimum": 0.01,
+                          "maximum": 0.749999
+                        }
+                      ]
+                    },
+                    "evidence_refs": {
+                      "items": {
+                        "type": "string",
+                        "enum": [
+                          "${evidence}"
+                        ]
+                      },
+                      "maxItems": 1,
+                      "title": "Evidence Refs",
+                      "type": "array",
+                      "uniqueItems": true
+                    },
+                    "unresolved_needs": {
+                      "items": {
+                        "type": "string"
+                      },
+                      "maxItems": 16,
+                      "title": "Unresolved Needs",
+                      "type": "array",
+                      "minItems": 1
+                    },
+                    "unmet_requirements": {
+                      "items": {
+                        "type": "string"
+                      },
+                      "maxItems": 16,
+                      "title": "Unmet Requirements",
+                      "type": "array"
+                    },
+                    "rationale": {
+                      "default": "",
+                      "maxLength": 600,
+                      "title": "Rationale",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "goal_id",
+                    "next_action",
+                    "satisfaction_status",
+                    "satisfaction_score"
+                  ],
+                  "title": "PlannerEvidenceReentryGoalDecision",
+                  "type": "object"
+                },
+                {
+                  "additionalProperties": false,
+                  "description": "One post-execution decision over an already-owned canonical Goal.\n\nThis is intentionally not a CanonicalPlan/PlannerModelGoalOutcome shape. Re-entry\nanswers one narrow question: given fresh trusted Evidence, what should the same\nPlanner do next for this Goal? Host later lifts the decision into the canonical\nPlanner DTO and re-runs the ordinary trusted validators.",
+                  "properties": {
+                    "goal_id": {
+                      "type": "string",
+                      "const": "${goal}"
+                    },
+                    "next_action": {
+                      "enum": [
+                        "clarify"
+                      ],
+                      "title": "Next Action",
+                      "type": "string"
+                    },
+                    "satisfaction_status": {
+                      "enum": [
+                        "unsatisfied"
+                      ],
+                      "title": "Satisfaction Status",
+                      "type": "string"
+                    },
+                    "satisfaction_score": {
+                      "maximum": 1.0,
+                      "minimum": 0.0,
+                      "title": "Satisfaction Score",
+                      "type": "number",
+                      "allOf": [
+                        {
+                          "minimum": 0.0,
+                          "maximum": 0.0
+                        }
+                      ]
+                    },
+                    "evidence_refs": {
+                      "items": {
+                        "type": "string",
+                        "enum": [
+                          "${evidence}"
+                        ]
+                      },
+                      "maxItems": 1,
+                      "title": "Evidence Refs",
+                      "type": "array",
+                      "uniqueItems": true
+                    },
+                    "unresolved_needs": {
+                      "items": {
+                        "type": "string"
+                      },
+                      "maxItems": 16,
+                      "title": "Unresolved Needs",
+                      "type": "array",
+                      "minItems": 1
+                    },
+                    "unmet_requirements": {
+                      "items": {
+                        "type": "string"
+                      },
+                      "maxItems": 16,
+                      "title": "Unmet Requirements",
+                      "type": "array"
+                    },
+                    "rationale": {
+                      "default": "",
+                      "maxLength": 600,
+                      "title": "Rationale",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "goal_id",
+                    "next_action",
+                    "satisfaction_status",
+                    "satisfaction_score"
+                  ],
+                  "title": "PlannerEvidenceReentryGoalDecision",
+                  "type": "object"
+                }
+              ]
+            },
+            "ReentryGoal0UnavailableDecision": {
+              "anyOf": [
+                {
+                  "additionalProperties": false,
+                  "description": "One post-execution decision over an already-owned canonical Goal.\n\nThis is intentionally not a CanonicalPlan/PlannerModelGoalOutcome shape. Re-entry\nanswers one narrow question: given fresh trusted Evidence, what should the same\nPlanner do next for this Goal? Host later lifts the decision into the canonical\nPlanner DTO and re-runs the ordinary trusted validators.",
+                  "properties": {
+                    "goal_id": {
+                      "type": "string",
+                      "const": "${goal}"
+                    },
+                    "next_action": {
+                      "enum": [
+                        "unavailable"
+                      ],
+                      "title": "Next Action",
+                      "type": "string"
+                    },
+                    "satisfaction_status": {
+                      "enum": [
+                        "substantial"
+                      ],
+                      "title": "Satisfaction Status",
+                      "type": "string"
+                    },
+                    "satisfaction_score": {
+                      "maximum": 1.0,
+                      "minimum": 0.0,
+                      "title": "Satisfaction Score",
+                      "type": "number",
+                      "allOf": [
+                        {
+                          "minimum": 0.75,
+                          "maximum": 0.949999
+                        }
+                      ]
+                    },
+                    "evidence_refs": {
+                      "items": {
+                        "type": "string",
+                        "enum": [
+                          "${evidence}"
+                        ]
+                      },
+                      "maxItems": 1,
+                      "title": "Evidence Refs",
+                      "type": "array",
+                      "uniqueItems": true
+                    },
+                    "unresolved_needs": {
+                      "items": {
+                        "type": "string"
+                      },
+                      "maxItems": 16,
+                      "title": "Unresolved Needs",
+                      "type": "array"
+                    },
+                    "unmet_requirements": {
+                      "items": {
+                        "type": "string"
+                      },
+                      "maxItems": 16,
+                      "title": "Unmet Requirements",
+                      "type": "array"
+                    },
+                    "rationale": {
+                      "default": "",
+                      "maxLength": 600,
+                      "title": "Rationale",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "goal_id",
+                    "next_action",
+                    "satisfaction_status",
+                    "satisfaction_score"
+                  ],
+                  "title": "PlannerEvidenceReentryGoalDecision",
+                  "type": "object"
+                },
+                {
+                  "additionalProperties": false,
+                  "description": "One post-execution decision over an already-owned canonical Goal.\n\nThis is intentionally not a CanonicalPlan/PlannerModelGoalOutcome shape. Re-entry\nanswers one narrow question: given fresh trusted Evidence, what should the same\nPlanner do next for this Goal? Host later lifts the decision into the canonical\nPlanner DTO and re-runs the ordinary trusted validators.",
+                  "properties": {
+                    "goal_id": {
+                      "type": "string",
+                      "const": "${goal}"
+                    },
+                    "next_action": {
+                      "enum": [
+                        "unavailable"
+                      ],
+                      "title": "Next Action",
+                      "type": "string"
+                    },
+                    "satisfaction_status": {
+                      "enum": [
+                        "partial"
+                      ],
+                      "title": "Satisfaction Status",
+                      "type": "string"
+                    },
+                    "satisfaction_score": {
+                      "maximum": 1.0,
+                      "minimum": 0.0,
+                      "title": "Satisfaction Score",
+                      "type": "number",
+                      "allOf": [
+                        {
+                          "minimum": 0.01,
+                          "maximum": 0.749999
+                        }
+                      ]
+                    },
+                    "evidence_refs": {
+                      "items": {
+                        "type": "string",
+                        "enum": [
+                          "${evidence}"
+                        ]
+                      },
+                      "maxItems": 1,
+                      "title": "Evidence Refs",
+                      "type": "array",
+                      "uniqueItems": true
+                    },
+                    "unresolved_needs": {
+                      "items": {
+                        "type": "string"
+                      },
+                      "maxItems": 16,
+                      "title": "Unresolved Needs",
+                      "type": "array"
+                    },
+                    "unmet_requirements": {
+                      "items": {
+                        "type": "string"
+                      },
+                      "maxItems": 16,
+                      "title": "Unmet Requirements",
+                      "type": "array"
+                    },
+                    "rationale": {
+                      "default": "",
+                      "maxLength": 600,
+                      "title": "Rationale",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "goal_id",
+                    "next_action",
+                    "satisfaction_status",
+                    "satisfaction_score"
+                  ],
+                  "title": "PlannerEvidenceReentryGoalDecision",
+                  "type": "object"
+                },
+                {
+                  "additionalProperties": false,
+                  "description": "One post-execution decision over an already-owned canonical Goal.\n\nThis is intentionally not a CanonicalPlan/PlannerModelGoalOutcome shape. Re-entry\nanswers one narrow question: given fresh trusted Evidence, what should the same\nPlanner do next for this Goal? Host later lifts the decision into the canonical\nPlanner DTO and re-runs the ordinary trusted validators.",
+                  "properties": {
+                    "goal_id": {
+                      "type": "string",
+                      "const": "${goal}"
+                    },
+                    "next_action": {
+                      "enum": [
+                        "unavailable"
+                      ],
+                      "title": "Next Action",
+                      "type": "string"
+                    },
+                    "satisfaction_status": {
+                      "enum": [
+                        "unsatisfied"
+                      ],
+                      "title": "Satisfaction Status",
+                      "type": "string"
+                    },
+                    "satisfaction_score": {
+                      "maximum": 1.0,
+                      "minimum": 0.0,
+                      "title": "Satisfaction Score",
+                      "type": "number",
+                      "allOf": [
+                        {
+                          "minimum": 0.0,
+                          "maximum": 0.0
+                        }
+                      ]
+                    },
+                    "evidence_refs": {
+                      "items": {
+                        "type": "string",
+                        "enum": [
+                          "${evidence}"
+                        ]
+                      },
+                      "maxItems": 1,
+                      "title": "Evidence Refs",
+                      "type": "array",
+                      "uniqueItems": true
+                    },
+                    "unresolved_needs": {
+                      "items": {
+                        "type": "string"
+                      },
+                      "maxItems": 16,
+                      "title": "Unresolved Needs",
+                      "type": "array"
+                    },
+                    "unmet_requirements": {
+                      "items": {
+                        "type": "string"
+                      },
+                      "maxItems": 16,
+                      "title": "Unmet Requirements",
+                      "type": "array"
+                    },
+                    "rationale": {
+                      "default": "",
+                      "maxLength": 600,
+                      "title": "Rationale",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "goal_id",
+                    "next_action",
+                    "satisfaction_status",
+                    "satisfaction_score"
+                  ],
+                  "title": "PlannerEvidenceReentryGoalDecision",
+                  "type": "object"
+                }
+              ]
             }
           },
           "additionalProperties": false,
@@ -14196,13 +15319,14 @@
               "additionalProperties": false,
               "properties": {
                 "goal_decisions": {
-                  "items": {
-                    "$ref": "#/$defs/PlannerEvidenceReentryGoalDecisionWithoutWork"
-                  },
-                  "maxItems": 1,
+                  "type": "array",
+                  "prefixItems": [
+                    {
+                      "$ref": "#/$defs/ReentryGoal0RespondDecision"
+                    }
+                  ],
                   "minItems": 1,
-                  "title": "Goal Decisions",
-                  "type": "array"
+                  "maxItems": 1
                 },
                 "new_work": {
                   "items": {
@@ -14244,17 +15368,18 @@
               "additionalProperties": false,
               "properties": {
                 "goal_decisions": {
-                  "items": {
-                    "$ref": "#/$defs/PlannerEvidenceReentryGoalDecision"
-                  },
-                  "maxItems": 1,
+                  "type": "array",
+                  "prefixItems": [
+                    {
+                      "$ref": "#/$defs/ReentryGoal0ExecuteDecision"
+                    }
+                  ],
                   "minItems": 1,
-                  "title": "Goal Decisions",
-                  "type": "array"
+                  "maxItems": 1
                 },
                 "new_work": {
                   "items": {
-                    "$ref": "#/$defs/PlannerModelStep"
+                    "$ref": "#/$defs/ReentryStepOwnedBy0"
                   },
                   "maxItems": 4,
                   "title": "New Work",
@@ -14294,17 +15419,18 @@
               "additionalProperties": false,
               "properties": {
                 "goal_decisions": {
-                  "items": {
-                    "$ref": "#/$defs/PlannerEvidenceReentryGoalDecision"
-                  },
-                  "maxItems": 1,
+                  "type": "array",
+                  "prefixItems": [
+                    {
+                      "$ref": "#/$defs/ReentryGoal0ExecuteDecision"
+                    }
+                  ],
                   "minItems": 1,
-                  "title": "Goal Decisions",
-                  "type": "array"
+                  "maxItems": 1
                 },
                 "new_work": {
                   "items": {
-                    "$ref": "#/$defs/PlannerModelStep"
+                    "$ref": "#/$defs/ReentryStepOwnedBy0"
                   },
                   "maxItems": 4,
                   "title": "New Work",
@@ -14328,6 +15454,104 @@
                   "type": "boolean",
                   "enum": [
                     true
+                  ]
+                }
+              },
+              "required": [
+                "goal_decisions",
+                "confidence",
+                "plan_relation",
+                "user_confirmation_required",
+                "new_work"
+              ],
+              "type": "object"
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "goal_decisions": {
+                  "type": "array",
+                  "prefixItems": [
+                    {
+                      "$ref": "#/$defs/ReentryGoal0ClarifyDecision"
+                    }
+                  ],
+                  "minItems": 1,
+                  "maxItems": 1
+                },
+                "new_work": {
+                  "items": {
+                    "$ref": "#/$defs/PlannerModelStep"
+                  },
+                  "maxItems": 0,
+                  "title": "New Work",
+                  "type": "array"
+                },
+                "confidence": {
+                  "maximum": 1.0,
+                  "minimum": 0.0,
+                  "title": "Confidence",
+                  "type": "number"
+                },
+                "plan_relation": {
+                  "type": "string",
+                  "enum": [
+                    "exact"
+                  ]
+                },
+                "user_confirmation_required": {
+                  "type": "boolean",
+                  "enum": [
+                    false
+                  ]
+                }
+              },
+              "required": [
+                "goal_decisions",
+                "confidence",
+                "plan_relation",
+                "user_confirmation_required",
+                "new_work"
+              ],
+              "type": "object"
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "goal_decisions": {
+                  "type": "array",
+                  "prefixItems": [
+                    {
+                      "$ref": "#/$defs/ReentryGoal0UnavailableDecision"
+                    }
+                  ],
+                  "minItems": 1,
+                  "maxItems": 1
+                },
+                "new_work": {
+                  "items": {
+                    "$ref": "#/$defs/PlannerModelStep"
+                  },
+                  "maxItems": 0,
+                  "title": "New Work",
+                  "type": "array"
+                },
+                "confidence": {
+                  "maximum": 1.0,
+                  "minimum": 0.0,
+                  "title": "Confidence",
+                  "type": "number"
+                },
+                "plan_relation": {
+                  "type": "string",
+                  "enum": [
+                    "exact"
+                  ]
+                },
+                "user_confirmation_required": {
+                  "type": "boolean",
+                  "enum": [
+                    false
                   ]
                 }
               },

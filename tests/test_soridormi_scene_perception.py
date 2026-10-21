@@ -171,6 +171,28 @@ def test_ambient_scene_refresh_updates_only_on_semantic_revision() -> None:
     assert host._ambient_situation_projection is None
 
 
+def test_each_scene_revision_replaces_the_one_before() -> None:
+    """Live 2026-10-21: every ambient refresh inherited the earlier scene revisions, so
+    the interpretation bound kept only stale objects and, once 16 sources had piled up,
+    the new revision was dropped ("source refs must be present in projection") and
+    Chromie's perception stopped updating."""
+    invoker = SceneInvoker(scene())
+    host = AmbientHost(invoker)
+    directions = ["in front of Chromie", "to Chromie's left", "behind Chromie", "to Chromie's right"]
+    for revision in range(1, 21):
+        objects = [{"object_ref": f"soridormi_mock_{name}", "description": name.replace("_", " "),
+                    "relative_direction": directions[(revision + index) % 4], "distance_m": 1.0 + index}
+                   for index, name in enumerate(("milk_bottle", "water_bottle", "user_torso"))]
+        invoker.output = {**scene(objects=objects), "observation_id": f"soridormi-scene-{revision}",
+                          "observation_sequence": revision, "scene_revision": revision,
+                          "scene_signature": f"{revision:064x}"}
+        assert asyncio.run(refresh_soridormi_ambient_scene_once(host)) == "updated"
+        projection = host._ambient_situation_projection
+        assert [source.reference_id for source in projection.source_refs] == [f"soridormi-scene-{revision}"]
+        assert [item.value.split(", ")[1] for item in projection.interpretations] == [
+            f"{1.0 + index:g} meters {directions[(revision + index) % 4]} (simulated)" for index in range(3)]
+
+
 def test_planning_situation_carries_goal_free_perception_forward() -> None:
     observation = asyncio.run(observe_soridormi_sim_scene(SceneInvoker(scene()), context={}))
     assert observation is not None

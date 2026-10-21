@@ -298,14 +298,25 @@ def build_situation_projection(
             ]
 
     explicit_sources = list(source_refs or [])
+    # A newer observation from the same perception owner replaces the one it supersedes,
+    # and what the caller supplies now outranks what was carried forward (live
+    # 2026-10-21: each ambient scene revision inherited every earlier one, the
+    # interpretation bound kept only stale objects, and once the source bound filled the
+    # new revision was dropped and perception stopped updating).
+    replacing_owners = {item.owner for item in explicit_sources if item.kind == "perception"}
+    superseded = {item.reference_id for item in inherited_sources if item.owner in replacing_owners}
+    inherited_sources = [item for item in inherited_sources if item.reference_id not in superseded]
+    inherited_interpretations = [
+        item for item in inherited_interpretations if not set(item.source_refs) & superseded
+    ]
     bounded_sources = _source_refs(
-        [*inherited_sources, *explicit_sources, *evidence_sources],
+        [*explicit_sources, *evidence_sources, *inherited_sources],
         limit=16,
     )
     allowed_source_refs = {item.reference_id for item in bounded_sources}
     candidate_interpretations = [
-        *inherited_interpretations,
         *list(interpretations or []),
+        *inherited_interpretations,
     ]
     bounded_interpretations: list[SituationInterpretation] = []
     seen_interpretations: set[str] = set()

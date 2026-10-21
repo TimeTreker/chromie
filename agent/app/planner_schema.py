@@ -19,6 +19,7 @@ from shared.chromie_contracts.plan import (
     PERCEIVED_ANSWER_SOURCE,
 )
 
+from .planner_native_schema import REENTRY_DECISION_STATE_MAX_GOALS, reentry_assignment_states
 from .planner_validation import _capability_acquires_information
 from .planner_fast_validation import fast_capability_acquires_information
 from .planner_grounding import (
@@ -576,6 +577,9 @@ def fast_evidence_reentry_response_schema(
     # as a safe_adjustment with no Work and rejected).
     definitions["PlannerEvidenceReentryGoalDecisionWithoutWork"] = decision_branches(
         [action for action in allowed_actions if action != "execute"])
+    if allow_new_work and len(goals) <= REENTRY_DECISION_STATE_MAX_GOALS:
+        schema["oneOf"] = reentry_assignment_states(schema, goals, allowed_actions, held, subset_branches)
+        return schema
     states = []
     for relation, confirmation, with_work in (
         (["exact"], [False], False),

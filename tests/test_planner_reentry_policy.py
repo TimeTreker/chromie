@@ -1068,6 +1068,54 @@ def test_reentry_decoder_offers_only_actions_the_host_accepts() -> None:
     assert not completed.is_valid(output("execute", work=[nod], relation="alternative"))
 
 
+def test_new_reentry_work_belongs_only_to_goals_decided_execute() -> None:
+    """Live 2026-10-21 (mix_water_time_zh): both Goals were decided respond with their
+    Evidence, then the executed fetch and clock read were re-listed as new Work; Host
+    rejected the turn. The decisions now fix whether new Work follows and who owns it."""
+    from jsonschema import Draft202012Validator
+
+    from agent.app.clients.sglang_protocol import _openai_response_format
+
+    nod_args = {"type": "object", "properties": {}, "additionalProperties": False}
+    schema = fast_evidence_reentry_response_schema(
+        expected_goal_ids=["goal-water", "goal-time"], evidence_refs=["evidence-fetch", "evidence-clock"],
+        allowed_capability_ids=["test.nod"], capability_input_schemas={"test.nod": nod_args},
+        completed_evidence_refs=["evidence-fetch", "evidence-clock"])
+    wire = _openai_response_format(schema)["json_schema"]["schema"]
+
+    def decision(goal, action, evidence):
+        status, score = ("exact", 1.0) if action in {"respond", "execute"} else ("unsatisfied", 0.0)
+        return {"goal_id": goal, "next_action": action, "satisfaction_status": status,
+                "satisfaction_score": score, "evidence_refs": [evidence], "rationale": "From the result."}
+
+    def output(water, time, work=()):
+        return {"goal_decisions": [decision("goal-water", water, "evidence-fetch"),
+                                   decision("goal-time", time, "evidence-clock")],
+                "new_work": list(work), "confidence": 1.0, "plan_relation": "exact",
+                "user_confirmation_required": False}
+
+    def nod(*owners):
+        return {"step_id": "nod", "capability_id": "test.nod", "args": {},
+                "depends_on": ["evidence-fetch"], "source_goal_ids": list(owners)}
+
+    cases = [
+        (output("respond", "respond"), True),
+        (output("respond", "respond", [nod("goal-water")]), False),  # the live failure
+        (output("execute", "respond", [nod("goal-water")]), True),
+        (output("execute", "respond", [nod("goal-time")]), False),
+        (output("execute", "respond"), False),
+    ]
+    for validator in (Draft202012Validator(schema), Draft202012Validator(wire)):
+        for raw, valid in cases:
+            assert validator.is_valid(raw) is valid, raw
+    for raw, valid in cases:
+        if valid:
+            PlannerEvidenceReentryModelOutput.model_validate(raw)
+        else:
+            with pytest.raises(ValueError):
+                PlannerEvidenceReentryModelOutput.model_validate(raw)
+
+
 def test_a_reentry_clarify_names_the_need_its_goal_outcome_requires() -> None:
     """Live 2026-10-13 (errand_milk_en, errand_remote_en): after a failed fetch the
     Planner chose clarify with only a rationale. The decoder and the compact DTO
