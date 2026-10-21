@@ -17,17 +17,18 @@ Run the everyday live-text cohort (`scenarios/everyday/`, 70 cases) against
 Soridormi MuJoCo, judge every case, and repair each failure at its earliest
 responsible owner. One invocation and one debug bundle per run; a hard failure in
 the 15-case `must_pass` smoke stage stops `core` and `challenge` (owner rule).
-Evidence and per-run judgments: `.chromie/acceptance/thirsty-offer-20261021/` (latest),
+Evidence and per-run judgments: `.chromie/acceptance/vj-facts-20261021/` (latest),
+`thirsty-offer-20261021/`,
 `main-6f8525947-quiet-20261021/`, `umi-time-margin-20261021/`, `main-3178a822c-20261021/`,
 `playback-race-20261020/`, `answer-source-20261020/`, `gaze-turn-20261020/`, `said-now-20261020/`, `decided-activity-20261020/`,
 `main-03974435e-20261020/` and `everyday-20261016/` (README.md in each).
 
 ## Resume point — 2026-10-21
 
-- Agent `thirsty-offer-20261021` (= `chromie-agent:latest`) is built from the source this
+- Agent `vj-facts-20261021` (= `chromie-agent:latest`) is built from the source this
   delivery records and deployed with the quiet-mode timeout override; the Situation split runs
   in the host Orchestrator. Soridormi `main` (`e6257f4`, containing the pinned `51a2afa`) runs
-  in the MCP container. Rollback: `reentry-ownership-20261021`.
+  in the MCP container. Rollback: `thirsty-offer-20261021`.
 - The workstation runs in quiet mode (owner request): CPU turbo off, GPU clocks locked to
   1800 MHz, and raised Agent and Host timeouts (Handoff).
 - "告诉我现在几点" was typed speech on one `chromie-llm` lifetime and information on the next two,
@@ -39,14 +40,21 @@ Evidence and per-run judgments: `.chromie/acceptance/thirsty-offer-20261021/` (l
   milk and copied the fused scene string, and Soridormi could not match it. With this delivery
   Chromie offers water, the person's "Yes, please." fetches it, and the run reached smoke 15/15
   and core 18/24 before stopping at `errand_remote_en` (STATUS open work 1).
-- Next: repair `errand_remote_en` at its earliest boundary, rerun the complete cohort, then
-  STATUS open work 2 by earliest boundary.
+- `errand_remote_en` was right up to Value Judgment: it wrote "nobody_else" with
+  "others_property" and asked whose the household remote was. With its facts made consistent
+  the focused rerun looks, says it could not find the remote and asks where. The runner still
+  stopped there because it counted Soridormi's declared non-completion as a hard failure; it
+  now judges that case and keeps collecting (owner decision). The remote branch
+  `claude/continue-from-checkpoint-om8ui5` is an earlier freeze-40 version of `c96253110`
+  and is left unmerged.
+- Next: rerun the complete cohort on this revision, then STATUS open work 2 by earliest
+  boundary.
 
-Verification: the new projection regression is red without its fix. Gate on the GPU host:
-pytest 3,993 passed + 5 skipped (`xgrammar` not installed), benchmarks 172, legacy Agent tests
-20; policies, docs, test ownership, ruff, mypy and runtime-structure ratchets pass. Workflow
-corpus freeze 47 (`bdb8db08…`) recaptures the 6,500 UMI requests; `scripts/run_workflow_replay.py`
-6,000 cases passed with unchanged verdicts.
+Verification: the new Value Judgment and runner regressions are red without their fixes.
+Gate on the GPU host: pytest 3,999 passed + 5 skipped (`xgrammar` not installed), benchmarks
+172, legacy Agent tests 20; policies, docs, test ownership, ruff, mypy and runtime-structure
+ratchets pass. Workflow corpus freeze 47 (`bdb8db08…`, unchanged; the corpus has no Value
+Judgment coverage); `scripts/run_workflow_replay.py` 6,000 cases passed with unchanged verdicts.
 
 ## Repairs in force from this Issue
 
@@ -99,6 +107,11 @@ corpus freeze 47 (`bdb8db08…`) recaptures the 6,500 UMI requests; `scripts/run
   help Chromie could give now; its speech Responsibility addresses the need and asks whether the
   person wants that help. A turn that also asks for something keeps that request as its only
   Responsibility.
+- Value Judgment writes who is affected, then the concern, then the decision, and each fact
+  narrows what follows in the decoder and the DTO: a concern about someone else's things,
+  privacy, consent, deception or family needs someone besides the person asking, and no concern
+  decides proceed (live: "nobody_else" with "others_property" asked whose a household TV remote
+  was; with no concern it asked where to wait).
 
 ## Owner decisions in force
 
@@ -127,6 +140,13 @@ corpus freeze 47 (`bdb8db08…`) recaptures the 6,500 UMI requests; `scripts/run
   SC checks nothing. With no offer made, "Yes, please" taking the first-listed perceived object
   is a known gemma4 12B limit: a UMI rule against it changed nothing (milk over water by 9 nats,
   and listing water first flips it).
+- Value Judgment asks before Chromie takes or uses another family member's personal things
+  (a parent's wallet or phone) unless the words show that person agreed; the person's own
+  things and things the household shares proceed (owner decision 2026-10-21).
+- A provider that declared it did not complete and did not move, with a safe-idle final
+  state, reported honest Evidence: the acceptance runner judges that case by its expectations
+  and keeps collecting (owner decision 2026-10-21). Safety, service, provenance, contract and
+  LLM-integrity failures still stop the cohort.
 - A person beyond the head's turning range is looked at by turning the body first, inside
   Soridormi (owner decision 2026-10-20). A standalone `look_at_person` turns on a walking
   arc at the slowest gait pace, because pure in-place yaw barely turns this gait. It keeps

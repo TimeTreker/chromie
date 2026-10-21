@@ -15,7 +15,11 @@ from typing import Any
 from .clients.ollama_client import OllamaClient, OllamaGenerationError, llm_failure_metadata
 
 from shared.chromie_contracts.core_interpretation import CognitiveWorkRequest
-from shared.chromie_contracts.value_judgment import ValueJudgmentModelOutput, ValueJudgmentResult
+from shared.chromie_contracts.value_judgment import (
+    ValueJudgmentModelOutput,
+    ValueJudgmentResult,
+    value_judgment_response_schema,
+)
 
 logger = logging.getLogger("chromie.agent.value_judgment")
 
@@ -32,8 +36,11 @@ VALUE_JUDGMENT_SYSTEM_PROMPT = (
     "approaching someone who has not agreed), deception (lying, pretending, hiding something from "
     "someone), harm_risk (risk to a person's body or health, especially a child's), "
     "irreversible, rules_or_law, family_conflict. decision: proceed when there is no concern or "
-    "the words and context already settle it, such as the person's own or family belongings or a "
-    "family member who wants it - most requests are ordinary and proceed. ask when acting could "
+    "the words and context already settle it, such as the person's own things, things the household "
+    "shares (the fruit bowl, the living-room lamp) or a family member who wants it - most requests are "
+    "ordinary and proceed. Another family member's personal things (Dad's keys, Mom's handbag, a "
+    "sibling's schoolbag) belong to that person: affected is family_member with the matching concern, "
+    "and taking or using them waits for a question unless the words show that person agreed. ask when acting could "
     "be fine but one missing fact decides it, such as whose it is or whether someone agreed; "
     "Chromie asks before acting. decline when the request itself asks for something wrong that no "
     "answer could make right: deceiving or manipulating someone, taking or using someone else's "
@@ -83,7 +90,7 @@ class ValueJudgmentResolver:
                 self.prompt(request),
                 system=VALUE_JUDGMENT_SYSTEM_PROMPT,
                 options={"temperature": 0, "top_p": 0.9, "num_ctx": self.num_ctx, "num_predict": self.num_predict},
-                response_format=ValueJudgmentModelOutput.model_json_schema(),
+                response_format=value_judgment_response_schema(),
                 prompt_family="value_judgment.primary",
                 turn_id=request.sid,
                 attempt=1,

@@ -5,6 +5,20 @@ remains available in Git history.
 
 ## Unreleased
 
+### Consistent Value Judgment facts, family members' personal things, honest non-completion (2026-10-21)
+
+- Value Judgment's facts now narrow what follows, in the decoder and the DTO: a concern about
+  someone else's things, privacy, consent, deception or family needs someone besides the person
+  asking, and no concern decides proceed. It had written "nobody_else" with "others_property"
+  and asked whose a household TV remote was; with no concern it asked where to wait.
+- Value Judgment asks before taking or using another family member's personal things (a
+  parent's wallet or phone) unless that person agreed; the person's own things and things the
+  household shares proceed (owner decision).
+- The acceptance runner no longer stops a cohort when a provider declared it did not complete,
+  did not move and left Chromie safe idle; the case is judged by its own expectations (owner
+  decision). `errand_remote_en` now allows looking for the remote and forbids only a completed
+  fetch.
+
 ### Offering help for a stated need, and scene objects named apart from their position (freeze 47, 2026-10-21)
 
 - UMI now understands a bodily need told without a request ("I'm really thirsty") as asking

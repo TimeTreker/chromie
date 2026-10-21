@@ -234,6 +234,27 @@ def is_optional_social_decoration_result(result: Any) -> bool:
     )
 
 
+def is_declared_non_completion_result(result: Any) -> bool:
+    """Recognize a provider that ran, declared it did not complete and did not move.
+
+    That is honest Evidence the person is told about, not an integrity failure (owner
+    decision 2026-10-21); the scenario's own expectations judge the case. Callers still
+    require a safe-idle final state.
+    """
+
+    if isinstance(result, dict):
+        status, metadata = result.get("status"), result.get("metadata")
+    else:
+        status, metadata = getattr(result, "status", None), getattr(result, "metadata", None)
+    output = metadata.get("provider_output") if isinstance(metadata, dict) else None
+    return bool(
+        status == "failed"
+        and isinstance(output, dict)
+        and output.get("completed") is False
+        and output.get("no_motion") is True
+    )
+
+
 def _workflow_field(message: str, key: str) -> str:
     match = re.search(rf"(?:^|\s){re.escape(key)}=([^\s]+)", message)
     if not match:
@@ -1548,12 +1569,24 @@ async def run_check(
                         "no Soridormi result retained trusted cancellation evidence"
                     )
             else:
-                if execution.status != "completed":
+                unfinished = [
+                    result
+                    for result in execution.results
+                    if result.status != "completed"
+                    and not is_optional_social_decoration_result(result)
+                ]
+                declared = bool(unfinished) and all(
+                    is_declared_non_completion_result(result) for result in unfinished
+                )
+                if execution.status != "completed" and not (
+                    execution.status == "failed" and declared
+                ):
                     errors.append(f"Trusted Capability Runtime status was {execution.status!r}")
                 for result in body_results:
                     if (
                         result.status != "completed"
                         and not is_optional_social_decoration_result(result)
+                        and not is_declared_non_completion_result(result)
                     ):
                         errors.append(
                             f"{result.capability_id} ended with status {result.status!r}: "

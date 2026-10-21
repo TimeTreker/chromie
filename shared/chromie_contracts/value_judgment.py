@@ -10,9 +10,9 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from typing import Any, Literal
+from typing import Any, Literal, get_args
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 ValueAffected = Literal["nobody_else", "family_member", "another_adult", "child", "stranger", "owner_unknown"]
 ValueConcern = Literal[
@@ -21,11 +21,20 @@ ValueConcern = Literal[
 ]
 ValueDecision = Literal["proceed", "ask", "decline"]
 
+# Concerns that by definition touch someone besides the person asking.
+VALUE_CONCERNS_ABOUT_OTHERS = frozenset({"others_property", "privacy", "consent", "deception", "family_conflict"})
+
 VALUE_REVIEW_RELATIVE_PATH = Path("capabilities/value_review.json")
 
 
 class ValueJudgmentModelOutput(BaseModel):
-    """The model writes who is affected and the concern before its decision."""
+    """The model writes who is affected and the concern before its decision.
+
+    Each fact narrows what follows it: a concern about someone else's things, privacy,
+    consent, deception or family needs someone besides the person asking, and with no
+    concern the decision is proceed (live 2026-10-21: "nobody_else" with "others_property"
+    asked whose a household TV remote was).
+    """
 
     model_config = ConfigDict(extra="forbid")
 
@@ -38,6 +47,38 @@ class ValueJudgmentModelOutput(BaseModel):
     @classmethod
     def normalize_reason(cls, value: Any) -> str:
         return " ".join(str(value or "").strip().split())
+
+    @model_validator(mode="after")
+    def facts_settle_the_decision(self) -> "ValueJudgmentModelOutput":
+        if self.affected == "nobody_else" and self.concern in VALUE_CONCERNS_ABOUT_OTHERS:
+            raise ValueError(f"concern {self.concern} needs someone besides the person asking")
+        if self.concern == "none" and self.decision != "proceed":
+            raise ValueError("with no value concern the decision is proceed")
+        return self
+
+
+def value_judgment_response_schema() -> dict[str, Any]:
+    """Native decoder states for the facts the DTO validates, in their written order."""
+
+    base = ValueJudgmentModelOutput.model_json_schema()
+    concerns = [value for value in get_args(ValueConcern) if value != "none"]
+    others = [value for value in get_args(ValueAffected) if value != "nobody_else"]
+    self_only = [value for value in concerns if value not in VALUE_CONCERNS_ABOUT_OTHERS]
+
+    def state(affected: list[str], concern: list[str], decision: list[str]) -> dict[str, Any]:
+        properties = dict(base["properties"])
+        for name, values in (("affected", affected), ("concern", concern), ("decision", decision)):
+            properties[name] = {"type": "string", "enum": values}
+        return {"type": "object", "additionalProperties": False, "properties": properties,
+                "required": base["required"]}
+
+    decisions = list(get_args(ValueDecision))
+    return {"title": base["title"], "oneOf": [
+        state(["nobody_else"], ["none"], ["proceed"]),
+        state(["nobody_else"], self_only, decisions),
+        state(others, ["none"], ["proceed"]),
+        state(others, concerns, decisions),
+    ]}
 
 
 class ValueJudgmentResult(BaseModel):

@@ -1993,6 +1993,41 @@ def test_evidence_bound_scenario_accepts_receipts_grounded_answers_and_failure_u
     assert _live_integrity_stop(summary, execute=False) is None
 
 
+SAFE_IDLE_STATUS = {"active_lanes": {}, "active_task": None, "activity_idle": True, "backend": "runtime",
+                    "emergency_stop": False, "fallen": False, "mode": "sim", "safe_idle": True, "standing": True}
+
+
+@pytest.mark.parametrize("provider_output,status_after,stops", [
+    ({"completed": False, "no_motion": True}, SAFE_IDLE_STATUS, False),
+    ({"completed": False, "no_motion": True}, {**SAFE_IDLE_STATUS, "safe_idle": False}, True),
+    ({"completed": False, "no_motion": False}, SAFE_IDLE_STATUS, True),
+    (None, SAFE_IDLE_STATUS, True),
+])
+def test_declared_provider_non_completion_is_evidence_not_an_integrity_stop(provider_output, status_after, stops):
+    """Live 2026-10-21 (errand_remote_en, multi_thirsty_yes_en): Soridormi saw no such object, did
+    not move and said so, and the cohort stopped as if Runtime had failed. Owner decision: such a
+    case is judged by its expectations and the cohort continues; anything else still stops it."""
+    from scripts.general_ability_acceptance import _live_integrity_stop
+
+    metadata = {"provider_output": provider_output} if provider_output is not None else {}
+    summary = {
+        "cognitive_runtime": {"status": "applied"},
+        "session_state": {"cognitive_workflow_stages": [{
+            "stage": "trusted_capability_runtime_completion", "status": "failed",
+            "errors": [{"request_id": "fetch-1", "status": "failed", "reason_code": "execution_incomplete"}],
+        }]},
+        "execution": {"status": "failed", "results": [
+            {"request_id": "fetch-1", "status": "failed", "reason_code": "execution_incomplete", "metadata": metadata},
+        ]},
+        "status_before": SAFE_IDLE_STATUS,
+        "status_after": status_after,
+    }
+
+    stop = _live_integrity_stop(summary, execute=True)
+
+    assert (stop is not None) is stops, stop
+
+
 def test_context_grounded_answer_stays_legal_without_an_evidence_bound_declaration():
     case = TextScenarioCase(case_id="identity", text="你是谁？")
     summary = _sc_answer_summary(function="respond", truth_stage="context_grounded",

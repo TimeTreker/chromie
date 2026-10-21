@@ -3,7 +3,9 @@ from __future__ import annotations
 
 import asyncio
 import json
+from itertools import product
 from pathlib import Path
+from typing import get_args
 
 import pytest
 
@@ -16,9 +18,13 @@ from shared.chromie_contracts.mind import default_mind_profile
 from shared.chromie_contracts.plan import CanonicalPlan
 from shared.chromie_contracts.value_judgment import (
     VALUE_REVIEW_RELATIVE_PATH,
+    ValueAffected,
+    ValueConcern,
+    ValueDecision,
     ValueJudgmentModelOutput,
     ValueJudgmentResult,
     load_value_review_capability_ids,
+    value_judgment_response_schema,
 )
 from tests.capability_runtime_test_support import submit_and_wait_terminal
 from tests.test_capability_runtime import MockCapabilityProvider, _body_definition
@@ -69,12 +75,41 @@ def test_resolver_judges_from_the_full_stable_mind_and_turn_facts():
     facts = json.loads(prompt.split("Current request facts JSON:\n", 1)[1].split("\n\n", 1)[0])
     assert facts["person_said"].startswith("Take the neighbor's package")
     assert facts["chromie_perceives"] == ["bottle of water, 2 meters in front of Chromie"]
-    assert list(kwargs["response_format"]["properties"]) == ["affected", "concern", "decision", "reason"]
+    assert kwargs["response_format"] == value_judgment_response_schema()
+    for state in kwargs["response_format"]["oneOf"]:
+        assert list(state["properties"]) == ["affected", "concern", "decision", "reason"]
+
+
+def test_each_fact_narrows_what_follows():
+    """Live 2026-10-21 (errand_remote_en): "nobody_else" then "others_property" asked whose a
+    household TV remote was, and a judgment with no concern asked where to wait."""
+    with pytest.raises(ValueError, match="needs someone besides"):
+        ValueJudgmentModelOutput(**judgment("ask", "others_property", "nobody_else"))
+    with pytest.raises(ValueError, match="no value concern"):
+        ValueJudgmentModelOutput(**judgment("ask", "none", "nobody_else"))
+    assert ValueJudgmentModelOutput(**judgment("ask", "harm_risk", "nobody_else")).decision == "ask"
+    allowed = {
+        (affected, concern, decision)
+        for state in value_judgment_response_schema()["oneOf"]
+        for affected in state["properties"]["affected"]["enum"]
+        for concern in state["properties"]["concern"]["enum"]
+        for decision in state["properties"]["decision"]["enum"]
+    }
+    for affected, concern, decision in product(
+        get_args(ValueAffected), get_args(ValueConcern), get_args(ValueDecision)
+    ):
+        try:
+            ValueJudgmentModelOutput(**judgment(decision, concern, affected))
+            valid = True
+        except ValueError:
+            valid = False
+        assert ((affected, concern, decision) in allowed) is valid
 
 
 @pytest.mark.parametrize("reply,mind", [
     ({"decision": "proceed"}, True),                       # incomplete verdict
     ({**judgment("maybe")}, True),                         # unknown decision
+    (judgment("ask", "others_property", "nobody_else"), True),  # facts contradict each other
     (RuntimeError("model down"), True),                    # service failure
     (judgment("proceed", "none", "nobody_else"), False),   # no owner-approved Stable Mind
 ])

@@ -30,6 +30,7 @@ from scripts.evidence_io import (  # noqa: E402
     write_json as _write_json,
 )
 from scripts.interaction_text_mujoco_check import (  # noqa: E402
+    is_declared_non_completion_result,
     parse_expected_arg,
     run_check,
     run_check_sequence,
@@ -392,7 +393,31 @@ def _provenance_attachment_rejected(cognitive: dict[str, Any]) -> bool:
 def _failed_workflow_stage(summary: dict[str, Any]) -> dict[str, Any] | None:
     session = summary.get("session_state") or {}
     return next((item for item in session.get("cognitive_workflow_stages") or []
-                 if isinstance(item, dict) and item.get("status") in {"error", "failed"}), None)
+                 if isinstance(item, dict) and item.get("status") in {"error", "failed"}
+                 and not _declared_safe_non_completion(summary, item)), None)
+
+
+def _declared_safe_non_completion(summary: dict[str, Any], stage: dict[str, Any]) -> bool:
+    """A completion stage failed only by providers that declared they did not complete,
+    with no motion and a safe-idle final state, holds honest Evidence rather than an
+    integrity failure (owner decision 2026-10-21); the case's expectations judge it."""
+
+    if stage.get("stage") != "trusted_capability_runtime_completion":
+        return False
+    status = summary.get("status_after")
+    if not isinstance(status, dict) or safe_idle_errors(status):
+        return False
+    results = {
+        item.get("request_id"): item
+        for item in (summary.get("execution") or {}).get("results") or []
+        if isinstance(item, dict)
+    }
+    errors = stage.get("errors") or []
+    return bool(errors) and all(
+        isinstance(error, dict)
+        and is_declared_non_completion_result(results.get(error.get("request_id")) or {})
+        for error in errors
+    )
 
 
 def _structured_case_metrics(
