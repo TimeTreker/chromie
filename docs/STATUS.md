@@ -12,12 +12,12 @@ single-authority architecture.
 
 | Axis | Current evidence |
 | --- | --- |
-| Implementation | One Planner ([PLANNER-AUTHORITY-001](PROJECT_CHARTER.md)): need-first Work begins with `ability_needs`; a non-fitting need triggers one Agent library search and one more plan; with no usable Capability the Planner reports an honest `unavailable` limitation. The Deep Planner, `/deep-plan` and escalation are retired. Value Judgment (VALUE-JUDGMENT-001, `POST /value-judgment`) reviews the turn's first Plan, and any later re-entry Plan in the turn that adds a not-yet-judged Capability listed in `capabilities/value_review.json` (an already judged one reuses its verdict); `ask` adds a confirmation, `decline` or any failure withholds the reviewed effects before provider start. Social Cognition owns every user-facing Communicative Activity. While a Responsibility UMI marked `value_review` waits for Value Judgment, ingress admits only an acknowledgement for its whole turn and sibling speech is answered after the verdict; a value-reviewed Capability alone does not hold back sibling speech. An information Responsibility with citable current perception may be answered from that cited observation. Native decoders serialize mandatory members first: each Responsibility decided work or clarify opens the Planner's counted Activities with its own Activity, and Social Cognition's first act names every result need that must be said now. An information Responsibility that current perception could answer first states its answer source, then its observations. Evidence re-entry with up to two Goals lets new Work belong only to Goals decided execute. A newer perception observation replaces the one it supersedes in Situation. |
-| Automatic verification | Canonical gate (`./scripts/run_tests.sh`, clean worktree) on the RTX 5090 host (2026-10-21) with this delivery: pytest 3,992 passed + 5 skipped (`xgrammar` not installed), benchmarks 172, legacy Agent tests 20; policies, docs, test ownership, ruff, mypy and runtime-structure ratchets pass. Workflow corpus freeze 46 (`36b7702b…`): every Evidence re-entry request recaptured for the ownership states (200 requests in 6,000 cases), no reply re-authored, every recorded reply's schema validity unchanged; strict replay with zero model calls: `scripts/run_workflow_replay.py` 6,000 cases passed, verdict counts equal to freeze 45. The replay corpus runs with an empty value-review list, so it has no Value Judgment coverage. |
-| Target validation | Everyday live-text cohort `scenarios/everyday/` (70 cases: 15-case `must_pass` smoke stage, then `core` and `challenge`) on Soridormi MuJoCo. Latest live runs (2026-10-21): on `main` `3178a822c` smoke 15/15 and core 13/14, stopped by an Evidence re-entry that re-listed executed Work (repaired in this delivery); with the repair smoke 15/15 and core 12/14, stopped at `mix_water_time_zh` when UMI typed the time question as speech (open work 1); challenge not run. Slow (simple turns 33-40 s, water errand 163 s). Not qualified. No current-revision supervised physical audio or robot evidence (one historical physical voice turn is recorded in [Acceptance](ACCEPTANCE.md)). |
-| Deployment state | Live Agent: `chromie-agent:latest` = `reentry-ownership-20261021`, built from the source this delivery records; source identity verified. Soridormi MCP runs Soridormi `main`, which contains the pinned `51a2afa`. GPU smoke 17/17. LLM serving uses SGLang per the maintained [hardware profiles](../HARDWARE_PROFILES.md). No release. Exact identities and commands: [Handoff](../HANDOFF.md). |
+| Implementation | One Planner ([PLANNER-AUTHORITY-001](PROJECT_CHARTER.md)): need-first Work begins with `ability_needs`; a non-fitting need triggers one Agent library search and one more plan; with no usable Capability the Planner reports an honest `unavailable` limitation. The Deep Planner, `/deep-plan` and escalation are retired. Value Judgment (VALUE-JUDGMENT-001, `POST /value-judgment`) reviews the turn's first Plan, and any later re-entry Plan in the turn that adds a not-yet-judged Capability listed in `capabilities/value_review.json` (an already judged one reuses its verdict); `ask` adds a confirmation, `decline` or any failure withholds the reviewed effects before provider start. Social Cognition owns every user-facing Communicative Activity. While a Responsibility UMI marked `value_review` waits for Value Judgment, ingress admits only an acknowledgement for its whole turn and sibling speech is answered after the verdict; a value-reviewed Capability alone does not hold back sibling speech. An information Responsibility with citable current perception may be answered from that cited observation. Native decoders serialize mandatory members first: each Responsibility decided work or clarify opens the Planner's counted Activities with its own Activity, and Social Cognition's first act names every result need that must be said now. An information Responsibility that current perception could answer first states its answer source, then its observations. Evidence re-entry with up to two Goals lets new Work belong only to Goals decided execute. A newer perception observation replaces the one it supersedes in Situation. UMI understands a bodily need told without a request ("I'm really thirsty") as asking for help Chromie could give, so SC offers it; Situation carries each perceived object's identity and position as separate interpretations of one subject. |
+| Automatic verification | Canonical gate (`./scripts/run_tests.sh`, clean worktree) on the RTX 5090 host (2026-10-21) with this delivery: pytest 3,993 passed + 5 skipped (`xgrammar` not installed), benchmarks 172, legacy Agent tests 20; policies, docs, test ownership, ruff, mypy and runtime-structure ratchets pass. Workflow corpus freeze 47 (`bdb8db08…`): every UMI request recaptured for the need-report wording (6,500 requests in 6,000 cases), no reply re-authored, every recorded reply's schema validity unchanged; strict replay with zero model calls: `scripts/run_workflow_replay.py` 6,000 cases passed with unchanged verdicts. The corpus has no scene perception, so the Situation split changes no frozen request. The replay corpus runs with an empty value-review list, so it has no Value Judgment coverage. |
+| Target validation | Everyday live-text cohort `scenarios/everyday/` (70 cases: 15-case `must_pass` smoke stage, then `core` and `challenge`) on Soridormi MuJoCo, local gemma4 12B in quiet mode (CPU turbo off, GPU clocks locked, raised timeouts). Latest runs (2026-10-21): on `main` `6f8525947` smoke 15/15 and core 13/17, stopped at `multi_thirsty_yes_en` (no offer, then "Yes, please." fetched a scene string Soridormi could not match; repaired in this delivery); with this delivery smoke 15/15 and core 18/24, `multi_thirsty_yes_en` and `mix_water_time_zh` pass, stopped at `errand_remote_en` (open work 1); challenge not run. Slow in quiet mode (simple turns 45-60 s, water errand 194 s). Not qualified. No current-revision supervised physical audio or robot evidence (one historical physical voice turn is recorded in [Acceptance](ACCEPTANCE.md)). |
+| Deployment state | Live Agent: `chromie-agent:latest` = `thirsty-offer-20261021`, built from the source this delivery records, with the quiet-mode timeout override; source identity verified. Soridormi MCP runs Soridormi `main`, which contains the pinned `51a2afa`. GPU smoke 17/17. LLM serving uses SGLang per the maintained [hardware profiles](../HARDWARE_PROFILES.md). No release. Exact identities and commands: [Handoff](../HANDOFF.md). |
 
-Evidence: `.chromie/acceptance/main-3178a822c-20261021/` (latest; freeze 46 scripts in `freeze46/`), `playback-race-20261020/`, `answer-source-20261020/`, `gaze-turn-20261020/`, `said-now-20261020/`, `decided-activity-20261020/` and `main-03974435e-20261020/` (README.md in each); earlier runs `.chromie/acceptance/everyday-20261016/`.
+Evidence: `.chromie/acceptance/thirsty-offer-20261021/` (latest; freeze 47 scripts in `freeze47/`), `main-6f8525947-quiet-20261021/`, `umi-time-margin-20261021/`, `main-3178a822c-20261021/` (freeze 46 scripts), `playback-race-20261020/`, `answer-source-20261020/`, `gaze-turn-20261020/`, `said-now-20261020/`, `decided-activity-20261020/` and `main-03974435e-20261020/` (README.md in each); earlier runs `.chromie/acceptance/everyday-20261016/`.
 
 ## Social Cognition migration
 
@@ -57,26 +57,27 @@ This is the single ordered open-work list, blockers included. The
 order; the [checkpoint](../DEVELOPMENT_CHECKPOINT.md) owns the active Issue,
 repairs and owner decisions in force.
 
-1. Complete the everyday cohort: the latest run stopped at `mix_water_time_zh`. UMI typed
-   "告诉我现在几点" as speech (5/5 on replay); a speech Responsibility is offered only
-   `answer`, so the clock read landed on the fetch's Goal and Host rejected the Plan. Owner
-   decision (2026-10-21): when the person wants to know the time, SC says it will check, the
-   Planner reads the clock, and SC tells the result after Evidence (not yet implemented;
-   writing outcome first regressed "一会儿提醒我"). Then challenge.
-2. Known live defects: celebrate (UMI may fold the celebration into speech, the
-   Planner may wave instead, SC echoes "一起庆祝"); "去那边等我" walks while asking where;
-   "blink twice" is declined as unsupported; "Yes, please" after a water-or-milk offer
-   promises water then asks which; a conversation-settled "那个" is still asked about;
-   hug gestures before asking who; wording: time with date and seconds, "在你的身后" for
-   Chromie's own back, device-like "我没有播放音乐的功能", a homework decline offering
-   help Chromie cannot give, and one that took the child's homework as Chromie's own
-   ("我可以承认我还没写完作业"). The corpus has no SC step or perceived-answer turn.
-3. Constrained Planner decoding runs about 12-15 tokens/s in grammar-heavy regions,
+1. Complete the everyday cohort: the latest run stopped at `errand_remote_en` (failed 10/11 on
+   2026-10-13 too). No remote is in view, yet the Planner dispatched a fetch with an unknown source;
+   Soridormi reported it not observed before moving, and the harness counts that typed provider
+   non-completion as a hard stop. Then challenge.
+2. Known live defects: celebrate (the Planner waves instead, SC echoes "一起庆祝"); "Say hi to my
+   friend with a wave!" waves without the greeting since this delivery's UMI wording; "去那边等我"
+   may walk while asking where; "blink twice" is declined as unsupported; "点两下头" nods without
+   the count; a conversation-settled "那个" is still asked about; with no offer made, "Yes, please"
+   takes the first-listed perceived object (known gemma4 12B limit, owner 2026-10-21); hug
+   gestures before asking who; Value Judgment asks whose a household remote is; wording: time
+   with date and seconds, weather read out in fragments with the date, "好的。" before a refusal,
+   "我没看清楚" when both bottles are in view, device-like "设置提醒或闹钟的功能". The corpus has
+   no SC step or perceived-answer turn.
+3. The same request can change a near-tie decision between `chromie-llm` restarts (about 3 nats
+   observed); measure logprob margins across restarts before a prompt repair claims stability.
+4. Constrained Planner decoding runs about 12-15 tokens/s in grammar-heavy regions,
    so a second Planner pass can miss the turn deadline.
-4. Review the SC fresh-turn silence finding; qualify
+5. Review the SC fresh-turn silence finding; qualify
    Schema/DTO/native grammar, SC context budget and latency, provider scene and
    geographic Evidence, and Goal/action/provenance coverage.
-5. After the cohort: narrow current-revision voice proof, then the default
+6. After the cohort: narrow current-revision voice proof, then the default
    [target-evidence profile](TARGET_EVIDENCE_CLOSURE.md). Physical microphone,
    speaker and robot evidence stays supervised; text, discarded TTS and simulated
    acquisition do not replace it.

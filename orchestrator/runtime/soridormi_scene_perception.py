@@ -97,11 +97,23 @@ def _validated_sim_scene_observation(
         ):
             raise ValueError("mock scene object does not satisfy the scene marker contract")
         seen_refs.add(object_ref)
+        # What the object is and where it is are separate aspects of one subject, so a
+        # value copied as the object's name never carries its position (live 2026-10-21:
+        # "bottle of milk, 9.899 meters to Chromie's left (simulated)" became a resource
+        # description Soridormi could not match).
         interpretations.append(SituationInterpretation(
             interpretation_id=f"{observation_id}:object-{index}",
             subject_ref=f"sim-object:{object_ref}",
             relation="scene.simulated_object",
-            value=f"{description}, {distance:g} meters {direction} (simulated)",
+            value=description,
+            epistemic_status="established",
+            source_refs=[observation_id],
+        ))
+        interpretations.append(SituationInterpretation(
+            interpretation_id=f"{observation_id}:object-{index}:position",
+            subject_ref=f"sim-object:{object_ref}",
+            relation="scene.simulated_position",
+            value=f"{distance:g} meters {direction} (simulated)",
             epistemic_status="established",
             source_refs=[observation_id],
         ))

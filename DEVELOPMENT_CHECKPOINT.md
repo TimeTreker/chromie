@@ -17,34 +17,36 @@ Run the everyday live-text cohort (`scenarios/everyday/`, 70 cases) against
 Soridormi MuJoCo, judge every case, and repair each failure at its earliest
 responsible owner. One invocation and one debug bundle per run; a hard failure in
 the 15-case `must_pass` smoke stage stops `core` and `challenge` (owner rule).
-Evidence and per-run judgments: `.chromie/acceptance/playback-race-20261020/` (latest),
-`answer-source-20261020/`, `gaze-turn-20261020/`, `said-now-20261020/`, `decided-activity-20261020/`,
+Evidence and per-run judgments: `.chromie/acceptance/thirsty-offer-20261021/` (latest),
+`main-6f8525947-quiet-20261021/`, `umi-time-margin-20261021/`, `main-3178a822c-20261021/`,
+`playback-race-20261020/`, `answer-source-20261020/`, `gaze-turn-20261020/`, `said-now-20261020/`, `decided-activity-20261020/`,
 `main-03974435e-20261020/` and `everyday-20261016/` (README.md in each).
 
 ## Resume point — 2026-10-21
 
-- Agent `reentry-ownership-20261021` (= `chromie-agent:latest`) is built from the source this
-  delivery records and deployed; the Situation repair runs in the host Orchestrator.
-  Soridormi `main` (`e6257f4`, containing the pinned `51a2afa`) runs in the MCP container.
-  Rollback: `answer-source-20261020`.
-- The 2026-10-20 branches are merged to `main` (owner request, no post-merge gate). On
-  `main` `3178a822c` (2026-10-21) the everyday run reached smoke 15/15 and core 13/14. It then
-  stopped at `mix_water_time_zh`: both Goals were decided respond with their Evidence, and the
-  re-entry re-listed the executed fetch and clock read as new Work. Replaying the recorded
-  request gave the valid output 3/3, so the decoder now makes that shape impossible. The same
-  run logged twice that ambient perception stopped updating (stale scene revisions crowded out
-  the new one).
-- The rerun with these repairs reached smoke 15/15 and core 12/14, with no ambient perception
-  error. It stopped at `mix_water_time_zh`: UMI typed the time question as speech (STATUS open
-  work 1).
-- Next: implement the owner's decision for a question that needs a current fact, then rerun
-  the complete cohort and repair STATUS open work 2 by earliest boundary.
+- Agent `thirsty-offer-20261021` (= `chromie-agent:latest`) is built from the source this
+  delivery records and deployed with the quiet-mode timeout override; the Situation split runs
+  in the host Orchestrator. Soridormi `main` (`e6257f4`, containing the pinned `51a2afa`) runs
+  in the MCP container. Rollback: `reentry-ownership-20261021`.
+- The workstation runs in quiet mode (owner request): CPU turbo off, GPU clocks locked to
+  1800 MHz, and raised Agent and Host timeouts (Handoff).
+- "告诉我现在几点" was typed speech on one `chromie-llm` lifetime and information on the next two,
+  with the same request bytes (logprob margin -, +4.2, +1.5 nats). A candidate UMI sentence did
+  not raise that margin consistently, so it was not adopted; `mix_water_time_zh` passed in both
+  later runs.
+- On `main` `6f8525947` the cohort stopped at `multi_thirsty_yes_en`: Chromie only
+  sympathized, "Yes, please." then accepted an offer never made, UMI took the first-listed
+  milk and copied the fused scene string, and Soridormi could not match it. With this delivery
+  Chromie offers water, the person's "Yes, please." fetches it, and the run reached smoke 15/15
+  and core 18/24 before stopping at `errand_remote_en` (STATUS open work 1).
+- Next: repair `errand_remote_en` at its earliest boundary, rerun the complete cohort, then
+  STATUS open work 2 by earliest boundary.
 
-Verification: the new regressions are red without their fixes. XGrammar compiles the
-two-Goal re-entry schema in 0.38 s, against 0.28 s before on identical inputs. Gate on the GPU
-host: pytest 3,992 passed + 5 skipped (`xgrammar` not installed), benchmarks 172, legacy Agent tests 20; policies, docs, test ownership, ruff, mypy and runtime-structure ratchets
-pass. Workflow corpus freeze 46 (`36b7702b…`) recaptures the 200 re-entry requests;
-`scripts/run_workflow_replay.py` 6,000 cases passed, verdict counts equal to freeze 45.
+Verification: the new projection regression is red without its fix. Gate on the GPU host:
+pytest 3,993 passed + 5 skipped (`xgrammar` not installed), benchmarks 172, legacy Agent tests
+20; policies, docs, test ownership, ruff, mypy and runtime-structure ratchets pass. Workflow
+corpus freeze 47 (`bdb8db08…`) recaptures the 6,500 UMI requests; `scripts/run_workflow_replay.py`
+6,000 cases passed with unchanged verdicts.
 
 ## Repairs in force from this Issue
 
@@ -89,6 +91,14 @@ pass. Workflow corpus freeze 46 (`36b7702b…`) recaptures the 200 re-entry requ
 - Situation: a newer perception observation from the same owner replaces the one it
   supersedes, and the caller's sources and interpretations outrank inherited ones in the
   bounds (live: ambient perception kept stale objects, then stopped updating).
+- A Soridormi scene object is two interpretations of one subject: what it is
+  (`scene.simulated_object`, "bottle of milk") and where it is (`scene.simulated_position`).
+  The fused "bottle of milk, 9.899 meters to Chromie's left (simulated)" was copied whole into
+  a resource description that Soridormi could not match.
+- UMI understands a bodily need told without a request ("I'm really thirsty") as asking for
+  help Chromie could give now; its speech Responsibility addresses the need and asks whether the
+  person wants that help. A turn that also asks for something keeps that request as its only
+  Responsibility.
 
 ## Owner decisions in force
 
@@ -108,9 +118,15 @@ pass. Workflow corpus freeze 46 (`36b7702b…`) recaptures the 200 re-entry requ
   decoration may use expressive gestures Soridormi declares low-risk; locomotion stays
   excluded (owner decision 2026-10-17).
 - UMI never authors `bindings`; Planner alone extracts Capability parameters.
-- A question about a current fact ("告诉我现在几点") is answered from a fresh read even when UMI
-  types it as speech. SC says it will check, the Planner reads, and SC tells the result after
-  Evidence (owner decision 2026-10-21, implementation pending).
+- Wanting to know a changing fact ("告诉我现在几点", also beside another request) is understood
+  by UMI as information. The Planner reads it; SC only communicates: it may say it will check
+  and tells the result after Evidence. Speech never reads and SC never checks (owner decision
+  2026-10-21).
+- Chromie offers help a family member would offer when the person tells a need she can meet
+  (owner decision 2026-10-21). The offer comes from UMI's understanding and SC's communication;
+  SC checks nothing. With no offer made, "Yes, please" taking the first-listed perceived object
+  is a known gemma4 12B limit: a UMI rule against it changed nothing (milk over water by 9 nats,
+  and listing water first flips it).
 - A person beyond the head's turning range is looked at by turning the body first, inside
   Soridormi (owner decision 2026-10-20). A standalone `look_at_person` turns on a walking
   arc at the slowest gait pace, because pure in-place yaw barely turns this gait. It keeps

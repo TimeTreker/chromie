@@ -5,6 +5,18 @@ remains available in Git history.
 
 ## Unreleased
 
+### Offering help for a stated need, and scene objects named apart from their position (freeze 47, 2026-10-21)
+
+- UMI now understands a bodily need told without a request ("I'm really thirsty") as asking
+  for help Chromie could give, so Social Cognition offers it ("Would you like me to help you get
+  some water?"). Chromie used to only sympathize; "Yes, please." then accepted an offer never
+  made and fetched the first-listed milk.
+- Each Soridormi scene object is now two Situation interpretations of one subject: what it is
+  ("bottle of milk") and where it is. The fused "bottle of milk, 9.899 meters to Chromie's left
+  (simulated)" was copied whole into a resource description that Soridormi could not match.
+- Workflow corpus freeze 47 recaptures the 6,500 UMI requests. No reply is re-authored, and
+  every reply's schema validity and every verdict are unchanged.
+
 ### Evidence re-entry ownership and fresh ambient perception (freeze 46, 2026-10-21)
 
 - With up to two Goals, the Evidence re-entry decoder makes each decision assignment

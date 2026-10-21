@@ -6,13 +6,13 @@
   "independent_review": false,
   "model_ability_evaluated": false,
   "case_sha256": {
-    "workflow-cancellation.json": "33923052b958edb96b0dee07f6f699bb34e3bd3b1d0bb9de81f2cddd9a12ae2f",
-    "workflow-conditional-dry.json": "4954c81123f94ddd3e8f3c9e74dfe89c08e3eb22d2ed66e1c445c239f11b35a4",
-    "workflow-conditional-rain.json": "e0d3112dbecab73dba1f95b5bf1b3ce278394771b2cd9a690f5867478b14d4d2",
-    "workflow-delayed.json": "94dc82d792940fd21e810f37ac2ee84272db710eb7d28d280a06fb5eca2183fb",
-    "workflow-normal.json": "3648489d13cc17ae734312723a67b33f531f65ceae7ceae887e9bd6c9de007a1"
+    "workflow-cancellation.json": "1df86223a41c02a7a992ef9aaa9b34ad3b4ea5ca77a9d7211a622785d2abe2c3",
+    "workflow-conditional-dry.json": "a4a7097c94493be043b908da552def3ff7e1ab680375ebeed6e12f08c4ab498b",
+    "workflow-conditional-rain.json": "0374d9bb6fbb73d6c06aca6b55188e53cce3b0daa9a820b6a2b98cc560a2ae2d",
+    "workflow-delayed.json": "d1b40b859c8a48cd8148ce901e976b74ffcbc7a123d7a324bc7da95e00d870f0",
+    "workflow-normal.json": "2d1384b954e1e2fb7dfa67baa4144bab4402d82ad1da5874033d71dc9831ed39"
   },
-  "freeze_revision": 46,
-  "freeze_note": "Re-entry ownership repair (2026-10-21). Every Evidence re-entry request recaptured: with up to two Goals each decision assignment is a native decoder state in Goal order, an execute opens new_work owned only by executing Goals and no execute closes it (live: 帮我拿瓶水，顺便告诉我现在几点。 re-listed executed Work under respond decisions). No reply re-authored; every recorded reply keeps its schema validity; inputs, provider outcomes, expectations and splits unchanged; every case reaches its expected verdict; no candidate calls.",
+  "freeze_revision": 47,
+  "freeze_note": "Need-report understanding repair (2026-10-21). Every UMI request recaptured: a bodily need Chromie could help meet now (\"I'm really thirsty\") asks for that help, so its speech Responsibility addresses the need and asks whether the person wants it (live: multi_thirsty_yes_en acknowledged only, then 'Yes, please.' accepted an offer never made and fetched the first-listed milk). No reply re-authored; every recorded reply keeps its schema validity; inputs, provider outcomes, expectations and splits unchanged; every case reaches its expected verdict; no candidate calls.",
   "migration": "Work-only contracts and separate SC fixtures; unchanged expectations, complete request recapture."
 }

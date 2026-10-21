@@ -61,13 +61,25 @@ def test_simulator_observation_reaches_chromie_with_source_ref() -> None:
     assert observation is not None
     assert observation.goal_ids == []
     assert observation.source_refs == ["soridormi-scene-7"]
-    assert observation.projection.interpretations[0].value == (
-        "bottle of milk, 50 meters in front of Chromie (simulated)"
-    )
-    assert observation.projection.interpretations[1].value == (
-        "user, 1.5 meters to Chromie's right (simulated)"
-    )
-    assert observation.projection.interpretations[1].source_refs == ["soridormi-scene-7"]
+    assert [item.value for item in observation.projection.interpretations] == [
+        "bottle of milk", "50 meters in front of Chromie (simulated)",
+        "user", "1.5 meters to Chromie's right (simulated)",
+    ]
+    assert observation.projection.interpretations[3].source_refs == ["soridormi-scene-7"]
+
+
+def test_object_value_names_only_what_it_is() -> None:
+    """Live 2026-10-21 (multi_thirsty_yes_en): the fused value "bottle of milk, 9.899 meters
+    to Chromie's left (simulated)" was copied whole into resource.description, and Soridormi
+    reported the resource not observed. Its position is a separate aspect of the same subject."""
+    observation = asyncio.run(observe_soridormi_sim_scene(SceneInvoker(scene()), context={}))
+    assert observation is not None
+    what, where = observation.projection.interpretations
+    assert (what.relation, what.value) == ("scene.simulated_object", "bottle of milk")
+    assert (where.relation, where.value) == (
+        "scene.simulated_position", "50 meters in front of Chromie (simulated)")
+    assert where.subject_ref == what.subject_ref == "sim-object:soridormi_mock_milk_bottle"
+    assert where.interpretation_id == what.interpretation_id + ":position"
 
 
 def test_scene_observation_uses_checked_in_registry_and_transport(monkeypatch) -> None:
@@ -123,9 +135,9 @@ def test_scene_object_can_describe_another_simulated_resource() -> None:
         context={"recent_dialogue": ["I am thirsty"]},
     ))
     assert observation is not None
-    assert observation.projection.interpretations[0].value == (
-        "bottle of water, 3 meters to Chromie's left (simulated)"
-    )
+    assert [item.value for item in observation.projection.interpretations] == [
+        "bottle of water", "3 meters to Chromie's left (simulated)",
+    ]
     assert observation.projection.interpretations[0].source_refs == ["soridormi-scene-7"]
 
 
@@ -189,7 +201,8 @@ def test_each_scene_revision_replaces_the_one_before() -> None:
         assert asyncio.run(refresh_soridormi_ambient_scene_once(host)) == "updated"
         projection = host._ambient_situation_projection
         assert [source.reference_id for source in projection.source_refs] == [f"soridormi-scene-{revision}"]
-        assert [item.value.split(", ")[1] for item in projection.interpretations] == [
+        assert [item.value for item in projection.interpretations
+                if item.relation == "scene.simulated_position"] == [
             f"{1.0 + index:g} meters {directions[(revision + index) % 4]} (simulated)" for index in range(3)]
 
 
@@ -252,10 +265,8 @@ def test_text_check_primes_and_keeps_live_ambient_perception() -> None:
 
     host, record = asyncio.run(exercise())
     assert record == {"enabled": True, "primed": "updated", "scene_revision": 3,
-                      "interpretation_count": 1}
-    assert host._ambient_situation_projection.interpretations[0].value == (
-        "bottle of milk, 50 meters in front of Chromie (simulated)"
-    )
+                      "interpretation_count": 2}
+    assert host._ambient_situation_projection.interpretations[0].value == "bottle of milk"
     assert host.started == 2
 
 

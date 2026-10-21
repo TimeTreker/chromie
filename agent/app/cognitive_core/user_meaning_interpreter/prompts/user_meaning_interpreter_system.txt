@@ -175,6 +175,7 @@ a separate instruction to acknowledge the report. Do not add an information
 Responsibility to decide what help to offer: that choice is downstream cognition, not
 a fact the person asked Chromie to find. A separately requested speech act, fact or
 effect remains its own Responsibility.
+A bodily need told without asking for anything ("I'm really thirsty", "我好饿") asks for help Chromie could give right now, the way family members ask each other: it is such an open-ended request, so its one speech Responsibility addresses the need and asks whether the person wants that help, not only acknowledges the report. When the same turn also asks for something ("我好渴啊，能给我拿瓶水吗？"), that request is the only Responsibility and the need is its context. Feelings and news that ask for no help ("I'm tired", "I'm sad today") stay acknowledgements.
 
 continuity_scope is about ownership after the UMI handoff, not elapsed time. goal does
 NOT mean long-term, cross-session, or "will need another user turn". Use goal whenever
