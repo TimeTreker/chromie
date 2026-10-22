@@ -2643,6 +2643,184 @@ def test_interpretation_schema_rejects_non_speech_context_grounded_inform():
     assert list(Draft202012Validator(schema).iter_errors(wrong))
 
 
+def _uncertain_fetch_request(*, uncertain=True, value_review=False):
+    from shared.chromie_contracts.core_interpretation import (
+        CognitiveResponsibilityProposal, UserMeaningUncertainty,
+    )
+
+    return request(
+        trigger="interpretation", source_refs=["turn:that"], goal_ids=[],
+        source_turn={"turn_id": "turn:that", "original_text": "把那个拿给我。"},
+        responsibilities=[CognitiveResponsibilityProposal(
+            local_ref="r1", outcome="把那个拿给我。", output_mode="body_action",
+            body_effect_family="task_physical_effect", continuity_scope="goal", confidence=1.0,
+            value_review=value_review,
+        )],
+        meaning_uncertainties=[UserMeaningUncertainty(
+            local_ref="u1", kind="referent", description="Which object '那个' names.",
+            responsibility_refs=["r1"],
+        )] if uncertain else [],
+        context={"work_decision_pending": True, "interaction_context": {
+            "events": [], "already_spoken": [], "pending_speech": [], "prior_delivered_speech": [],
+        }},
+    )
+
+
+def _ingress_question(truth_stage="context_grounded"):
+    from shared.chromie_contracts.social_cognition import SocialCognitionOutput
+
+    act = {"activity_id": "ask-which", "text": "你是要牛奶还是水呀？", "function": "ask",
+           "truth_stage": truth_stage, "source_responsibility_refs": ["r1"]}
+    if truth_stage == "pre_evidence":
+        act["progress_kind"] = "think"
+    return SocialCognitionOutput.model_validate({
+        "disposition": "communicate", "activities": [act],
+        "reason_summary": "Ask which object.", "need_outcomes": {},
+    })
+
+
+def test_ingress_may_ask_about_a_task_meaning_umi_left_uncertain():
+    """Live 2026-10-22 (clarify_bring_that_zh, must_pass): with two bottles in view, ingress SC
+    asked "which one?" inside an acknowledgement and the Planner's later question was never
+    said. Owner decision: ask right away, as a person would, when UMI lists the uncertainty."""
+    from agent.app.social_cognition import (
+        _social_current_turn_output_guard, social_cognition_response_schema,
+        validate_social_cognition_output,
+    )
+
+    current = _uncertain_fetch_request()
+    validate_social_cognition_output(_ingress_question(), current, [])
+    with pytest.raises(ValueError, match="context-grounded"):
+        validate_social_cognition_output(_ingress_question("pre_evidence"), current, [])
+    assert "ask the one question that settles it" in _social_current_turn_output_guard(current)
+
+    acts = social_cognition_response_schema(current, [])["$defs"]["SocialCommunicativeAct"]["oneOf"]
+    questions = [act for act in acts if act["properties"]["function"].get("const") == "ask"]
+    assert len(questions) == 1
+    assert questions[0]["properties"]["truth_stage"] == {"const": "context_grounded", "type": "string"}
+    assert questions[0]["properties"]["source_responsibility_refs"]["items"]["enum"] == ["r1"]
+    assert questions[0]["properties"]["source_responsibility_refs"]["minItems"] == 1
+
+
+@pytest.mark.parametrize("changes", [{"uncertain": False}, {"value_review": True}])
+def test_ingress_task_question_needs_an_uncertainty_and_no_pending_value_judgment(changes):
+    from agent.app.social_cognition import social_cognition_response_schema, validate_social_cognition_output
+
+    current = _uncertain_fetch_request(**changes)
+    with pytest.raises(ValueError):
+        validate_social_cognition_output(_ingress_question(), current, [])
+    acts = social_cognition_response_schema(current, [])["$defs"]["SocialCommunicativeAct"]["oneOf"]
+    assert not [act for act in acts if act["properties"]["function"].get("const") == "ask"]
+
+
+def _weekday_work_state(**changes):
+    from shared.chromie_contracts.core_interpretation import CognitiveResponsibilityProposal
+
+    return request(
+        trigger="work_state", source_refs=["work:clock"], goal_ids=["goal:day"],
+        responsibilities=[CognitiveResponsibilityProposal(
+            local_ref="r1", outcome="answer what day it is today", output_mode="information",
+            continuity_scope="goal", confidence=1.0,
+        )],
+        context={"work": [{"id": "work:clock", "status": "scheduled"}],
+                 "active_goal_snapshots": [{"goal_id": "goal:day", "status": "active"}],
+                 "interaction_context": {"events": [], "already_spoken": [], "pending_speech": [],
+                                         "prior_delivered_speech": []}},
+    ).model_copy(update=changes)
+
+
+def _weekday_act(**changes):
+    from shared.chromie_contracts.social_cognition import SocialCognitionOutput
+
+    act = {"activity_id": "day", "text": "It's Wednesday, October 22nd.", "function": "inform",
+           "truth_stage": "context_grounded", "source_responsibility_refs": ["r1"], "source_goal_ids": ["goal:day"]}
+    act.update(changes)
+    return SocialCognitionOutput.model_validate({
+        "disposition": "communicate", "activities": [act], "reason_summary": "Day.", "need_outcomes": {},
+    })
+
+
+def test_task_result_waits_for_evidence_after_ingress_too():
+    """Live 2026-10-22 (info_weekday_en): at the work-state turn, before the clock read, SC said
+    "It's Wednesday", then repeated it after Evidence said Thursday. Owner decision: before its
+    Evidence, task Work is spoken of only as received, being checked or in progress."""
+    from agent.app.social_cognition import social_cognition_response_schema, validate_social_cognition_output
+    from shared.chromie_contracts.social_cognition import SocialCognitionResolution
+
+    current = _weekday_work_state()
+    early = _weekday_act()
+    with pytest.raises(ValueError, match="before its Evidence"):
+        validate_social_cognition_output(early, current, [])
+    with pytest.raises(ValueError, match="before its Evidence"):
+        SocialCognitionResolution(**early.model_dump(), request_id=current.request_id,
+                                  snapshot_digest=current.snapshot_digest(), model_call_count=1,
+                                  ).validate_request(current)
+    for allowed in (
+        _weekday_act(text="我查一下。", truth_stage="pre_evidence", progress_kind="check_information"),
+        _weekday_act(text="我听到了。", function="acknowledge", source_responsibility_refs=[]),
+    ):
+        validate_social_cognition_output(allowed, current, [])
+
+    blink = {"capability_id": "soridormi.blink_eyes", "input_schema": {
+        "type": "object", "properties": {"count": {"type": "integer"}}, "additionalProperties": False}}
+    for candidates in ([], [blink]):  # live 2026-10-22: with an expression candidate this raised
+        acts = social_cognition_response_schema(current, candidates)["$defs"]["SocialCommunicativeAct"]["oneOf"]
+        grounded = [act for act in acts if act["properties"]["truth_stage"].get("const") == "context_grounded"]
+        for act in grounded:
+            function = act["properties"]["function"]
+            assert set(function.get("enum", [function.get("const")])) <= {"acknowledge", "nonverbal"}
+        assert any(act["properties"]["truth_stage"].get("const") == "pre_evidence" for act in acts)
+
+
+def test_pre_evidence_branches_stay_compilable_with_ordered_and_question_needs():
+    """Live 2026-10-22 (mix_wave_joke_en): an act required to address a need was split into a
+    delivery phase with no compatible need, giving minItems 1 > maxItems 0; XGrammar refused
+    the grammar (HTTP 400)."""
+    from agent.app.social_cognition import social_cognition_response_schema
+    from shared.chromie_contracts.core_interpretation import CognitiveResponsibilityProposal
+    from shared.chromie_contracts.plan import SocialCommunicationNeed
+
+    current = _weekday_work_state(
+        responsibilities=[
+            CognitiveResponsibilityProposal(local_ref="r1", outcome="tell a joke", output_mode="speech",
+                                            continuity_scope="turn", confidence=1.0),
+            CognitiveResponsibilityProposal(local_ref="r2", outcome="wave", output_mode="body_action",
+                                            body_effect_family="social_expression", continuity_scope="goal",
+                                            confidence=1.0),
+        ],
+        communication_needs=[
+            SocialCommunicationNeed(need_id="need:joke", owner="planner", kind="answer", reference_id="plan:1",
+                                    source_goal_ids=["goal:day"], source_responsibility_refs=["r1"],
+                                    delivery_phase="immediate"),
+            SocialCommunicationNeed(need_id="need:which", owner="planner", kind="input", reference_id="plan:1",
+                                    source_goal_ids=["goal:day"], source_responsibility_refs=["r2"]),
+        ],
+    )
+
+    def arrays(node):
+        if isinstance(node, dict):
+            if "minItems" in node and "maxItems" in node:
+                yield node
+            for value in node.values():
+                yield from arrays(value)
+        elif isinstance(node, list):
+            for value in node:
+                yield from arrays(value)
+
+    schema = social_cognition_response_schema(current, [])
+    assert all(item["minItems"] <= item["maxItems"] for item in arrays(schema))
+    # oneOf admits exactly one state: a joke answering its need while citing its speech
+    # Responsibility matched two states and the raw Schema check rejected it (live 2026-10-22).
+    answer = {"disposition": "communicate", "reason_summary": "Joke.", "need_outcomes": {
+        "need:joke": "covered", "need:which": "pending"}, "memory_candidates": [], "self_memory_candidates": [],
+        "activities": [{"activity_id": "joke", "text": "Why did the bicycle fall over? It was two-tired!",
+                        "function": "respond", "truth_stage": "context_grounded", "delivery_phase": "immediate",
+                        "addressed_need_ids": ["need:joke"], "source_responsibility_refs": ["r1"],
+                        "source_goal_ids": ["goal:day"], "evidence_refs": [], "repair_of_activity_ids": [],
+                        "auxiliary_activities": []}]}
+    assert not list(Draft202012Validator(schema).iter_errors(answer))
+
+
 def test_social_authority_defaults_to_natural_conversational_economy() -> None:
     from agent.app.social_cognition import SOCIAL_COGNITION_AUTHORITY_PROMPT
 
@@ -2777,8 +2955,11 @@ def test_current_turn_output_guard_keeps_task_acknowledgement_precommitment() ->
     guard = _social_current_turn_output_guard(current)
     assert "acknowledge receipt or understanding only" in guard
     assert "Do not promise, accept, announce an intention to execute" in guard
-    assert "Use neutral acknowledgement wording in the person's language" in guard
+    # The receipt does not agree yet, matching the authority prompt; a suggested '好的'
+    # here preceded later refusals (live 2026-10-21/22).
+    assert "does not agree yet" in guard and "好的" not in guard
     assert "'I'll do/get/bring it' is a future-Work commitment" in guard
+    assert "ask the one question that settles it" not in guard
 
 
 def test_current_turn_output_guard_keeps_direct_chat_compact() -> None:

@@ -5,6 +5,21 @@ remains available in Git history.
 
 ## Unreleased
 
+### Asking right away, no results before Evidence, decoder control characters (2026-10-22)
+
+- When UMI lists a meaning uncertainty for a task ("把那个拿给我" with two bottles in view),
+  Social Cognition may ask at ingress, as a person would (owner decision). The question is
+  context-grounded and claims nothing about the Work; Host and the decoder allow it only for
+  that Responsibility and not while Value Judgment is pending. Live, the question was said as
+  an acknowledgement and rejected, and the Planner's later question was never said.
+- The ingress task receipt no longer suggests "好的", which preceded later refusals; it
+  matches the authority prompt's "嗯，我看看。".
+- Before a task's Evidence or a supplied need, Social Cognition speaks of that Work only as
+  received, being checked or in progress, at every moment (owner decision). Live, Chromie said
+  "It's Wednesday" before the clock read and repeated it after Evidence said Thursday.
+- Model JSON parsing accepts raw control characters inside strings, which the native decoder
+  admits; a tab ending a Planner reason_summary had stopped a live cohort.
+
 ### Consistent Value Judgment facts, family members' personal things, honest non-completion (2026-10-21)
 
 - Value Judgment's facts now narrow what follows, in the decoder and the DTO: a concern about

@@ -25,7 +25,8 @@ from shared.chromie_contracts.plan import FastProgressKind, validate_communicati
 from shared.chromie_contracts.social_cognition import (
     SocialCognitionOutput, SocialCognitionRequest, SocialCognitionResolution,
     SocialStartupGreetingOutput, SocialStartupGreetingRequest, SocialStartupGreetingResolution,
-    must_say_now_need_ids, value_review_responsibility_refs, value_withheld_need_ids,
+    must_say_now_need_ids, pre_evidence_act_violation, uncertain_task_responsibility_refs,
+    value_review_responsibility_refs, value_withheld_need_ids,
 )
 from shared.chromie_contracts.text import normalize_whitespace
 from shared.chromie_contracts.user_turn import user_turn_prohibits_speech
@@ -151,7 +152,11 @@ SOCIAL_COGNITION_AUTHORITY_PROMPT = (
     "erase, or decide a Goal relationship. Non-speech task Responsibilities still have an "
     "independent Work decision pending: before Planner/Evidence establishes task facts, any act "
     "about that Responsibility is acknowledgement-only, truth_stage=pre_evidence, and may claim "
-    "only receipt/understanding or that checking/Work is pending. Never state or repeat a task "
+    "only receipt/understanding or that checking/Work is pending. When UMI lists a meaning "
+    "uncertainty for that Responsibility, you may instead ask the one question that settles it, "
+    "context_grounded, as a person would right away; that question claims nothing about the Work. "
+    "Until Evidence for that Work arrives or a supplied need says otherwise, at any later moment "
+    "too, speak of it only as received, being checked or in progress (pre_evidence). Never state or repeat a task "
     "result at interpretation ingress. Silence remains valid when no useful interaction or supplied-need accounting "
     "is due. An already pending/delivered reply suppresses extra playback, not the exact-act "
     "accounting required for a supplied need. Never invent a task just to create "
@@ -592,9 +597,7 @@ def social_cognition_response_schema(
     stages = ["context_grounded"]
     if request.evidence_refs:
         stages.append("post_evidence")
-    if request.trigger == "interpretation" and any(
-        item.output_mode != "speech" for item in request.responsibilities
-    ):
+    if any(item.output_mode != "speech" for item in request.responsibilities):
         stages.append("pre_evidence")
     else:
         act["progress_kind"] = {"type": "null"}
@@ -615,6 +618,8 @@ def social_cognition_response_schema(
                 branch["properties"]["progress_kind"] = {"type": "null"}
             branches.append(branch)
         schema["$defs"]["SocialCommunicativeAct"] = {"oneOf": branches}
+        if request.trigger != "interpretation":
+            _restrict_pre_evidence_task_words(schema, request, withheld)
     if ordered_needs:
         # Native decoding ignores conditional delivery-phase dependencies.
         # Compile the existing Host rule into complete alternatives: an act may
@@ -632,6 +637,8 @@ def social_cognition_response_schema(
                                   and need.need_id not in withheld]
                 if compatible_ids:
                     properties["addressed_need_ids"]["items"] = {"type": "string", "enum": compatible_ids}
+                elif properties["addressed_need_ids"].get("minItems", 0):
+                    continue  # an act that must address a need has none in this phase
                 else:
                     properties["addressed_need_ids"]["maxItems"] = 0
                 # Emit upstream need bindings before timing and wording so the
@@ -649,10 +656,16 @@ def social_cognition_response_schema(
         existing = schema["$defs"]["SocialCommunicativeAct"]
         expression_branches = []
         for branch in existing.get("oneOf", [existing]):
-            verbal = copy.deepcopy(branch)
-            verbal["properties"]["function"]["enum"].remove("nonverbal")
-            verbal["properties"]["text"]["minLength"] = 1
-            expression_branches.append(verbal)
+            function = branch["properties"]["function"]
+            functions = [value for value in function.get("enum", [function.get("const")]) if value is not None]
+            worded = [value for value in functions if value != "nonverbal"]
+            if worded:
+                verbal = copy.deepcopy(branch)
+                verbal["properties"]["function"] = {"type": "string", "enum": worded}
+                verbal["properties"]["text"]["minLength"] = 1
+                expression_branches.append(verbal)
+            if "nonverbal" not in functions:
+                continue
             nonverbal = copy.deepcopy(branch)
             nonverbal["properties"]["function"] = {"type": "string", "const": "nonverbal"}
             nonverbal["properties"]["text"] = {"type": "string", "const": ""}
@@ -682,6 +695,8 @@ def social_cognition_response_schema(
                     compatible = [key for key in addressed["items"].get("enum", []) if key not in question_ids]
                     if compatible:
                         addressed["items"] = {"type": "string", "enum": compatible}
+                    elif addressed.get("minItems", 0):
+                        continue  # an act that must address a need has no non-question need
                     else:
                         addressed["maxItems"] = 0
                 question_branches.append(variant)
@@ -708,6 +723,9 @@ def social_cognition_response_schema(
             for item in request.responsibilities
             if item.output_mode != "speech"
         )
+        # A task Responsibility whose meaning UMI left uncertain may be asked about now
+        # (owner decision 2026-10-22).
+        uncertain_refs = sorted(uncertain_task_responsibility_refs(request))
         existing = schema["$defs"]["SocialCommunicativeAct"]
         continuity_branches = []
         for branch in existing.get("oneOf", [existing]):
@@ -718,9 +736,18 @@ def social_cognition_response_schema(
             ]
             direct = [value for value in functions if value not in {"acknowledge", "nonverbal"}]
             acknowledgement = [value for value in functions if value in {"acknowledge", "nonverbal"}]
+            stage_contract = branch["properties"].get("truth_stage", {})
+            stage_values = stage_contract.get("enum", [stage_contract.get("const")])
+            if "ask" in functions and uncertain_refs and stage_values == ["context_grounded"]:
+                variant = copy.deepcopy(branch)
+                properties = variant["properties"]
+                properties["function"] = {"type": "string", "const": "ask"}
+                source_refs = copy.deepcopy(properties["source_responsibility_refs"])
+                source_refs["minItems"] = 1
+                source_refs["items"] = {"type": "string", "enum": uncertain_refs}
+                properties["source_responsibility_refs"] = source_refs
+                continuity_branches.append(variant)
             if acknowledgement:
-                stage_contract = branch["properties"].get("truth_stage", {})
-                stage_values = stage_contract.get("enum", [stage_contract.get("const")])
                 if not task_refs or "pre_evidence" in stage_values:
                     variant = copy.deepcopy(branch)
                     properties = variant["properties"]
@@ -782,6 +809,58 @@ def social_cognition_response_schema(
         decisions.append(branch)
     schema["oneOf"] = decisions
     return schema
+
+
+def _restrict_pre_evidence_task_words(
+    schema: dict[str, Any], request: SocialCognitionRequest, withheld: set[str],
+) -> None:
+    """Decode the Host's pre-evidence rule: without Evidence or a supplied need, task Work
+    is spoken of only as received, being checked or in progress (owner decision 2026-10-22).
+
+    A context-grounded act must acknowledge, be wordless, address a supplied need or cite only
+    speech Responsibilities; a pre-evidence act never covers a supplied need.
+    """
+
+    speech_refs = sorted(item.local_ref for item in request.responsibilities if item.output_mode == "speech")
+    need_ids = [item.need_id for item in request.communication_needs if item.need_id not in withheld]
+    branches = []
+    for branch in schema["$defs"]["SocialCommunicativeAct"]["oneOf"]:
+        stage = branch["properties"]["truth_stage"].get("const")
+        if stage == "pre_evidence":
+            variant = copy.deepcopy(branch)
+            variant["properties"]["addressed_need_ids"] = {"type": "array", "maxItems": 0, "items": {"type": "string"}}
+            branches.append(variant)
+            continue
+        if stage != "context_grounded":
+            branches.append(branch)
+            continue
+        function = branch["properties"]["function"]
+        functions = [value for value in function.get("enum", [function.get("const")]) if value is not None]
+        worded = [value for value in functions if value not in {"nonverbal", "acknowledge"}]
+        free = [value for value in functions if value in {"nonverbal", "acknowledge"}]
+        if free:
+            variant = copy.deepcopy(branch)
+            variant["properties"]["function"] = {"type": "string", "enum": free}
+            branches.append(variant)
+        if worded and need_ids:
+            variant = copy.deepcopy(branch)
+            variant["properties"]["function"] = {"type": "string", "enum": worded}
+            addressed = copy.deepcopy(variant["properties"]["addressed_need_ids"])
+            addressed["minItems"] = 1
+            addressed["items"] = {"type": "string", "enum": need_ids}
+            variant["properties"]["addressed_need_ids"] = addressed
+            branches.append(variant)
+        if worded and speech_refs:
+            variant = copy.deepcopy(branch)
+            variant["properties"]["function"] = {"type": "string", "enum": worded}
+            cited = copy.deepcopy(variant["properties"]["source_responsibility_refs"])
+            cited["minItems"] = 1
+            cited["items"] = {"type": "string", "enum": speech_refs}
+            variant["properties"]["source_responsibility_refs"] = cited
+            # Disjoint from the need branch: oneOf admits exactly one state per act.
+            variant["properties"]["addressed_need_ids"] = {"type": "array", "maxItems": 0, "items": {"type": "string"}}
+            branches.append(variant)
+    schema["$defs"]["SocialCommunicativeAct"] = {"oneOf": branches}
 
 
 def _said_now_act_prefix(schema: dict[str, Any], request: SocialCognitionRequest) -> list[dict[str, Any]]:
@@ -916,6 +995,9 @@ def validate_social_cognition_output(
         "addressed_need_ids": {item.need_id for item in request.communication_needs},
     }
     for act in output.activities:
+        early = pre_evidence_act_violation(act, request)
+        if early:
+            raise ValueError(early)
         if request.trigger == "interpretation" and not request.communication_needs:
             direct_speech_refs = {
                 item.local_ref
@@ -928,14 +1010,20 @@ def validate_social_cognition_output(
                 if item.output_mode != "speech"
             }
             cited_refs = set(act.source_responsibility_refs)
-            if act.function not in {"acknowledge", "nonverbal"}:
+            asks_uncertain_meaning = act.function == "ask" and bool(cited_refs) and cited_refs.issubset(
+                uncertain_task_responsibility_refs(request)
+            )
+            if asks_uncertain_meaning:
+                if act.truth_stage != "context_grounded":
+                    raise ValueError("a question about uncertain meaning is context-grounded")
+            elif act.function not in {"acknowledge", "nonverbal"}:
                 if not cited_refs or not cited_refs.issubset(direct_speech_refs):
                     raise ValueError(
                         "interpretation-triggered task result cannot be communicated before "
                         "Planner/Evidence establishes it; only ordinary speech Responsibilities "
                         "may receive a direct response"
                     )
-            if cited_refs.intersection(task_refs):
+            if cited_refs.intersection(task_refs) and not asks_uncertain_meaning:
                 if act.function not in {"acknowledge", "nonverbal"}:
                     raise ValueError(
                         "non-speech task Responsibility is acknowledgement-only at interpretation ingress"
@@ -1185,10 +1273,13 @@ def _social_current_turn_output_guard(request: SocialCognitionRequest) -> str:
             "that Planner/Runtime has not established yet. If you speak now, acknowledge "
             "receipt or understanding only. Do not promise, accept, announce an intention "
             "to execute, or say the Work will happen; later supplied Work facts own that "
-            "commitment. Use neutral acknowledgement wording in the person's language, such as "
-            "'Okay' or '好的'. "
+            "commitment. Use a receipt in the person's language that does not agree yet, such as "
+            "'Mm, let me see.' or '嗯，我看看。'. "
             "Wording like 'I'll do/get/bring it' is a future-Work commitment, not an "
-            "acknowledgement.\n"
+            "acknowledgement."
+            + (" A meaning uncertainty is listed for this Work: you may instead ask the one "
+               "question that settles it." if uncertain_task_responsibility_refs(request) else "")
+            + "\n"
         )
     return (
         "\nCurrent-turn output guard: this is direct conversational speech. Answer only "

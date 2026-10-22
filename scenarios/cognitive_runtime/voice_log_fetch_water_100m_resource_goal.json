@@ -189,13 +189,14 @@
             "text": "好呀，我去拿给你。",
             "function": "inform",
             "delivery_phase": "immediate",
-            "truth_stage": "context_grounded",
+            "truth_stage": "pre_evidence",
             "source_goal_ids": [
               "goal-water"
             ],
             "evidence_refs": [],
             "source_responsibility_refs": [],
-            "addressed_need_ids": []
+            "addressed_need_ids": [],
+            "progress_kind": "perform_action"
           }
         ],
         "reason_summary": "Explicit Level A SC fixture; authored interaction is not proof of delivery."

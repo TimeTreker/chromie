@@ -17,44 +17,33 @@ Run the everyday live-text cohort (`scenarios/everyday/`, 70 cases) against
 Soridormi MuJoCo, judge every case, and repair each failure at its earliest
 responsible owner. One invocation and one debug bundle per run; a hard failure in
 the 15-case `must_pass` smoke stage stops `core` and `challenge` (owner rule).
-Evidence and per-run judgments: `.chromie/acceptance/vj-facts-20261021/` (latest),
+Evidence and per-run judgments: `.chromie/acceptance/sc-evidence-20261022/` (latest),
+`sc-ask-uncertain-20261022/`, `main-ad898cf7f-20261022/`, `vj-facts-20261021/`,
 `thirsty-offer-20261021/`,
 `main-6f8525947-quiet-20261021/`, `umi-time-margin-20261021/`, `main-3178a822c-20261021/`,
 `playback-race-20261020/`, `answer-source-20261020/`, `gaze-turn-20261020/`, `said-now-20261020/`, `decided-activity-20261020/`,
 `main-03974435e-20261020/` and `everyday-20261016/` (README.md in each).
 
-## Resume point — 2026-10-21
+## Resume point — 2026-10-22
 
-- Agent `vj-facts-20261021` (= `chromie-agent:latest`) is built from the source this
-  delivery records and deployed with the quiet-mode timeout override; the Situation split runs
-  in the host Orchestrator. Soridormi `main` (`e6257f4`, containing the pinned `51a2afa`) runs
-  in the MCP container. Rollback: `thirsty-offer-20261021`.
-- The workstation runs in quiet mode (owner request): CPU turbo off, GPU clocks locked to
-  1800 MHz, and raised Agent and Host timeouts (Handoff).
-- "告诉我现在几点" was typed speech on one `chromie-llm` lifetime and information on the next two,
-  with the same request bytes (logprob margin -, +4.2, +1.5 nats). A candidate UMI sentence did
-  not raise that margin consistently, so it was not adopted; `mix_water_time_zh` passed in both
-  later runs.
-- On `main` `6f8525947` the cohort stopped at `multi_thirsty_yes_en`: Chromie only
-  sympathized, "Yes, please." then accepted an offer never made, UMI took the first-listed
-  milk and copied the fused scene string, and Soridormi could not match it. With this delivery
-  Chromie offers water, the person's "Yes, please." fetches it, and the run reached smoke 15/15
-  and core 18/24 before stopping at `errand_remote_en` (STATUS open work 1).
-- `errand_remote_en` was right up to Value Judgment: it wrote "nobody_else" with
-  "others_property" and asked whose the household remote was. With its facts made consistent
-  the focused rerun looks, says it could not find the remote and asks where. The runner still
-  stopped there because it counted Soridormi's declared non-completion as a hard failure; it
-  now judges that case and keeps collecting (owner decision). The remote branch
-  `claude/continue-from-checkpoint-om8ui5` is an earlier freeze-40 version of `c96253110`
-  and is left unmerged.
-- Next: rerun the complete cohort on this revision, then STATUS open work 2 by earliest
-  boundary.
+- Agent `sc-evidence-20261022` (= `chromie-agent:latest`, `2eadc0bbc248`) is built from the source this
+  delivery records and deployed with the quiet-mode timeout override. Rollback: `vj-facts-20261021`.
+- Quiet mode: the owner runs `sudo .chromie/quiet-mode/quiet-mode.sh on` (CPU turbo off, GPU clocks
+  210-1800 MHz, GPU power at its 400 W minimum); a reboot resets it unless `enable-at-boot` is used.
+  The quiet-mode Host override raises the TTS playback-start barrier to 60 s, which lifts the speech
+  request timeout to 65 s (six slow TTS chunks had passed the fixed 30 s and were cancelled).
+- On `ad898cf7f` the cohort stopped in must_pass: ingress Social Cognition asked "which one?" inside
+  an acknowledgement. The owner decided that SC may ask right away about a meaning uncertainty UMI
+  listed. With that and the later repairs the cohort reached smoke 15/15 and core 22/29.
+- The last run stopped at `info_umbrella_zh`: the Planner cited another Responsibility's words.
+  It also showed a truthfulness defect caused by the ingress question (STATUS open work 1).
+- Next: make an ingress question count as asked and awaiting the person, so later turns of that
+  request neither invent the answer nor repeat it; then STATUS open work 1 and the complete cohort.
 
-Verification: the new Value Judgment and runner regressions are red without their fixes.
-Gate on the GPU host: pytest 3,999 passed + 5 skipped (`xgrammar` not installed), benchmarks
-172, legacy Agent tests 20; policies, docs, test ownership, ruff, mypy and runtime-structure
-ratchets pass. Workflow corpus freeze 47 (`bdb8db08…`, unchanged; the corpus has no Value
-Judgment coverage); `scripts/run_workflow_replay.py` 6,000 cases passed with unchanged verdicts.
+Verification: the new regressions are red without their fixes. Gate on the GPU host: pytest 4,005
+passed + 5 skipped (`xgrammar` not installed), benchmarks 172, legacy Agent tests 20; policies,
+docs, test ownership, ruff, mypy and runtime-structure ratchets pass. All 300 Social Cognition
+schema shapes compile on live SGLang. Freeze 47 is unchanged.
 
 ## Repairs in force from this Issue
 
@@ -107,6 +96,17 @@ Judgment coverage); `scripts/run_workflow_replay.py` 6,000 cases passed with unc
   help Chromie could give now; its speech Responsibility addresses the need and asks whether the
   person wants that help. A turn that also asks for something keeps that request as its only
   Responsibility.
+- Ingress Social Cognition may ask about a task Responsibility only when UMI listed a meaning
+  uncertainty for it: the decoder offers that question branch and Host and the DTO admit it
+  only then. Its task receipt no longer suggests "好的", matching the authority prompt's
+  "嗯，我看看。" (live 2026-10-22: "好的，请问是哪一个？" was rejected as an acknowledgement).
+- After ingress, an informing, answering, asking or repairing act about task Work needs that
+  Work's Evidence (post_evidence), a supplied need, or only speech Responsibilities; otherwise it
+  is pre_evidence. The decoder offers pre_evidence at every trigger with task Work, and Host and
+  the DTO enforce the same rule.
+- Model JSON parsing accepts raw control characters inside strings, which the native decoder's
+  string rule admits (live: a tab ending a Planner reason_summary failed the contract after
+  decoding).
 - Value Judgment writes who is affected, then the concern, then the decision, and each fact
   narrows what follows in the decoder and the DTO: a concern about someone else's things,
   privacy, consent, deception or family needs someone besides the person asking, and no concern
@@ -140,6 +140,15 @@ Judgment coverage); `scripts/run_workflow_replay.py` 6,000 cases passed with unc
   SC checks nothing. With no offer made, "Yes, please" taking the first-listed perceived object
   is a known gemma4 12B limit: a UMI rule against it changed nothing (milk over water by 9 nats,
   and listing water first flips it).
+- When UMI cannot tell what the person wants and lists a meaning uncertainty for a task
+  (which of two bottles "那个" is), Social Cognition asks the person right away at ingress,
+  as a person would; UMI's goal is to know what the person wants and SC communicates to
+  clarify it (owner decision 2026-10-22). The question is context-grounded and claims
+  nothing about the Work; a turn waiting for Value Judgment still only acknowledges.
+- Before a task's Evidence or a supplied need exists, Social Cognition speaks of that Work only
+  as received, being checked or in progress, at every moment and not only at ingress (owner
+  decision 2026-10-22; live: "It's Wednesday" was said before the clock read and repeated after
+  Evidence said Thursday).
 - Value Judgment asks before Chromie takes or uses another family member's personal things
   (a parent's wallet or phone) unless the words show that person agreed; the person's own
   things and things the household shares proceed (owner decision 2026-10-21).

@@ -137,8 +137,9 @@ SC does not infer missing identity or audience. Ordinary turns and trusted Situa
 | Agent module endpoints | The named cognitive owner only | bounded module authority | `/cognitive-core/interpret`, Planner, Social Cognition (including optional expression), Goal Association, Reflection, Agent Skill, tool, and WorkDAG contracts | Endpoint failure remains local to that bounded contract; it cannot reopen a second semantic planner. |
 
 The first user-facing speech path belongs to SC. One accepted UMI result can start
-SC, GA and Work planning independently. At that point SC may acknowledge understanding
-or remain silent; it cannot predict unfinished Work decisions. Canonical Goal binding
+SC, GA and Work planning independently. At that point SC may acknowledge understanding,
+ask about a meaning uncertainty UMI listed, or remain silent; it cannot predict unfinished
+Work decisions. Canonical Goal binding
 does not itself require another utterance. Required answer/input/confirmation Needs
 are joined to the exact validated Plan; factual results require admitted Evidence.
 

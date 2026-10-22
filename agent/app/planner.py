@@ -141,7 +141,7 @@ def complete_ability_needs(buffer: str) -> list[Any] | None:
     if start < 0:
         return None
     try:
-        value, _ = json.JSONDecoder().raw_decode(buffer, start)
+        value, _ = json.JSONDecoder(strict=False).raw_decode(buffer, start)
     except json.JSONDecodeError:
         return None
     return value if isinstance(value, list) else None
@@ -159,7 +159,10 @@ def parse_fast_work_document(buffer: str) -> dict[str, Any]:
     """Require one finite, unambiguous complete Work object."""
     def reject_constant(value: str) -> Any:
         raise PlannerDTOContractError(f"Planner JSON contains nonfinite value: {value}")
-    value = json.loads(buffer, object_pairs_hook=_unique_json_object, parse_constant=reject_constant)
+    # The native decoder's JSON string rule admits raw tab and other control characters,
+    # which strict JSON rejects (live 2026-10-22: a tab ending reason_summary failed this
+    # contract after decoding). Accept exactly what the decoder may emit; nothing else relaxes.
+    value = json.loads(buffer, strict=False, object_pairs_hook=_unique_json_object, parse_constant=reject_constant)
     if not isinstance(value, dict):
         raise PlannerDTOContractError("Planner Work result must be an object")
     return value

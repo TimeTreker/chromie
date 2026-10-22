@@ -152,14 +152,15 @@
             "text": "好，我会先看着你两秒，再点两下头。",
             "function": "inform",
             "delivery_phase": "immediate",
-            "truth_stage": "context_grounded",
+            "truth_stage": "pre_evidence",
             "source_goal_ids": [
               "goal-look",
               "goal-nod"
             ],
             "evidence_refs": [],
             "source_responsibility_refs": [],
-            "addressed_need_ids": []
+            "addressed_need_ids": [],
+            "progress_kind": "perform_action"
           }
         ],
         "reason_summary": "Explicit Level A SC fixture; authored interaction is not proof of delivery."

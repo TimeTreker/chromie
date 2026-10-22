@@ -1283,13 +1283,14 @@ class OllamaClient:
         cleaned = self._strip_code_fence(text)
 
         try:
-            parsed = json.loads(cleaned)
+            # Decoder strings may hold raw control characters that strict JSON rejects.
+            parsed = json.loads(cleaned, strict=False)
         except json.JSONDecodeError as original_error:
             object_start = cleaned.find("{")
             if object_start < 0:
                 raise
             try:
-                parsed, consumed = json.JSONDecoder().raw_decode(
+                parsed, consumed = json.JSONDecoder(strict=False).raw_decode(
                     cleaned[object_start:]
                 )
             except json.JSONDecodeError:

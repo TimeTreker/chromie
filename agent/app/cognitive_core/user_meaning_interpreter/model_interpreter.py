@@ -158,7 +158,7 @@ def _extract_json_object(text: str) -> dict[str, Any]:
     def reject_constant(value: str) -> Any:
         raise ValueError(f"non-finite model JSON value: {value}")
 
-    value = json.loads(text, object_pairs_hook=unique_object, parse_constant=reject_constant)
+    value = json.loads(text, strict=False, object_pairs_hook=unique_object, parse_constant=reject_constant)
     if not isinstance(value, dict):
         raise ValueError("model response JSON is not an object")
     return value

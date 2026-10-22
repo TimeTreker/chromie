@@ -91,6 +91,20 @@ class OllamaClientTests(unittest.IsolatedAsyncioTestCase):
         with self.assertRaises(json.JSONDecodeError):
             client._parse_json('{"decision":"one"} {"decision":"two"}')
 
+    def test_parse_json_accepts_decoder_control_characters_inside_strings(self) -> None:
+        """Live 2026-10-22: the native decoder ended a string with a raw tab, which strict
+        JSON rejects; every other strictness stays."""
+        from agent.app.planner import parse_fast_work_document
+        from agent.app.planner_model_contract import PlannerDTOContractError
+
+        client = OllamaClient(base_url="http://chromie-llm:11434", model="test-model")
+        self.assertEqual(client._parse_json('{"reason": "establish the \t"}'), {"reason": "establish the \t"})
+        self.assertEqual(parse_fast_work_document('{"reason_summary": "a\tb"}'), {"reason_summary": "a\tb"})
+        with self.assertRaises(PlannerDTOContractError):
+            parse_fast_work_document('{"a": 1, "a": 2}')
+        with self.assertRaises(PlannerDTOContractError):
+            parse_fast_work_document('{"a": NaN}')
+
     async def test_generate_stream_yields_ndjson_deltas_from_one_request(self) -> None:
         for response_format in (
             {"type": "object"}, "text",

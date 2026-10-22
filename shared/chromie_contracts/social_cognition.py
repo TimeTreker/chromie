@@ -268,6 +268,42 @@ def value_review_responsibility_refs(request: "SocialCognitionRequest") -> set[s
     return {item.local_ref for item in request.responsibilities if item.value_review}
 
 
+def uncertain_task_responsibility_refs(request: "SocialCognitionRequest") -> set[str]:
+    """Task Responsibilities whose meaning UMI left uncertain: SC may ask about them at ingress.
+
+    Owner decision 2026-10-22: a person who says "把那个拿给我" with two bottles in view is
+    asked "which one?" right away, as a person would. The question claims no Work result and is
+    context-grounded. A turn waiting for Value Judgment still receives only an acknowledgement.
+    """
+
+    if value_review_responsibility_refs(request):
+        return set()
+    task_refs = {item.local_ref for item in request.responsibilities if item.output_mode != "speech"}
+    named = {ref for item in request.meaning_uncertainties for ref in item.responsibility_refs}
+    return task_refs & named
+
+
+def pre_evidence_act_violation(act: "SocialCommunicativeAct", request: "SocialCognitionRequest") -> str | None:
+    """After ingress, words about task Work without its Evidence or a supplied need are pre-evidence.
+
+    Owner decision 2026-10-22: before Evidence Chromie says only that a request is received,
+    being checked or in progress. Live, a work-state turn said "It's Wednesday" before the clock
+    read, then repeated it after Evidence said Thursday. Interpretation ingress keeps its own rule.
+    """
+
+    if request.trigger == "interpretation" or act.function in {"nonverbal", "acknowledge"} or act.addressed_need_ids:
+        return None
+    if not any(item.output_mode != "speech" for item in request.responsibilities):
+        return None
+    if act.truth_stage in {"pre_evidence", "post_evidence"}:
+        return None
+    speech_refs = {item.local_ref for item in request.responsibilities if item.output_mode == "speech"}
+    cited = set(act.source_responsibility_refs)
+    if cited and cited.issubset(speech_refs):
+        return None
+    return "before its Evidence, task Work is spoken of only as received, being checked or in progress"
+
+
 class SocialCognitionResolution(SocialCognitionOutput):
     request_id: str
     snapshot_digest: str = Field(min_length=64, max_length=64)
@@ -338,6 +374,9 @@ class SocialCognitionResolution(SocialCognitionOutput):
             if not set(self_candidate.subject_refs).issubset(subjects | {"self:chromie"}):
                 raise ValueError("social self-context widens Situation subjects")
         for act in self.activities:
+            early = pre_evidence_act_violation(act, request)
+            if early:
+                raise ValueError(early)
             if request.trigger == "interpretation" and not request.communication_needs and act.function in {"respond", "ask"}:
                 turn_local_refs = {
                     item.local_ref
@@ -345,7 +384,12 @@ class SocialCognitionResolution(SocialCognitionOutput):
                     if item.continuity_scope == "turn"
                 }
                 cited_refs = set(act.source_responsibility_refs)
-                if not cited_refs or not cited_refs.issubset(turn_local_refs - value_review_responsibility_refs(request)):
+                asks_uncertain_meaning = act.function == "ask" and bool(cited_refs) and cited_refs.issubset(
+                    uncertain_task_responsibility_refs(request)
+                )
+                if not asks_uncertain_meaning and (
+                    not cited_refs or not cited_refs.issubset(turn_local_refs - value_review_responsibility_refs(request))
+                ):
                     raise ValueError(
                         "interpretation-triggered respond/ask cannot fulfill an unestablished "
                         "Work communication need unless it cites only turn-local "

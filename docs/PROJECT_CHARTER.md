@@ -118,8 +118,11 @@ foreground. Before GA has bound that Responsibility, broad active/working/long-t
 not model-facing social authority and is omitted from that invocation; prior delivered speech remains
 available for conversational repair. For non-speech task Responsibilities, interpretation-ingress SC
 may acknowledge only pre-evidence receipt/progress and cannot state a task result before Planner or
-trusted Evidence establishes one. Later Goal/Work/Evidence-triggered SC receives the exact bound
-state it needs.
+trusted Evidence establishes one. When UMI lists a meaning uncertainty for such a Responsibility, that
+SC may instead ask the one question that settles it, claiming nothing about the Work (owner decision
+2026-10-22). Later Goal/Work/Evidence-triggered SC receives the exact bound
+state it needs; until a task's Evidence or a supplied need exists, it too speaks of that Work only as
+received, being checked or in progress (owner decision 2026-10-22).
 
 One accepted UMI result carries explicit `cognitive_requests[]` only for non-standing
 cognition whose usefulness depends on the accepted meaning: Goal Association and Planner,
