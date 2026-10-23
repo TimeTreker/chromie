@@ -706,6 +706,17 @@ def _source_policy_finding(
     )
 
 
+def _source_present(path: Path) -> bool:
+    """A retired file, or a retired directory holding any file other than bytecode cache.
+
+    An ignored leftover ``__pycache__`` is not a restored module (review 2026-10-23).
+    """
+
+    if path.is_dir():
+        return any(item.is_file() and "__pycache__" not in item.parts for item in path.rglob("*"))
+    return path.exists()
+
+
 def audit_semantic_authority_boundaries(root: Path) -> list[PolicyFinding]:
     """Reject Host semantic delegation, phrase agents, and memory inference."""
 
@@ -722,7 +733,7 @@ def audit_semantic_authority_boundaries(root: Path) -> list[PolicyFinding]:
         "agent/app/agents/memory.py": RULE_MEMORY_MODEL_AUTHORED,
     }
     for relative, rule_id in forbidden_files.items():
-        if (root / relative).exists():
+        if _source_present(root / relative):
             findings.append(
                 _source_policy_finding(
                     root=root,

@@ -5,6 +5,35 @@ remains available in Git history.
 
 ## Unreleased
 
+### Argument spans stay inside the Responsibility's own words; one identical read serves both questions; stated preferences are kept (2026-10-23)
+
+- A merged read must wait for the same state changes as its twin: a read after an action
+  is a different read (second review: "read → walk → read" lost its second read, also in the
+  committed same-Responsibility collapse), and a read with an unknown dependency is never
+  merged, so validation still rejects it.
+- When an information read's cited turn words lack its value, the value appears verbatim
+  exactly once in the outcome of a Responsibility it serves, and earlier conversation already
+  said it, the Host cites that outcome instead (owner decision); a value only the outcome holds
+  still fails closed, so UMI cannot override the person's own words. Live, "Will it rain there this afternoon?" wrote "Beijing" (UMI's
+  outcome) but cited "there", and the long conversation stopped.
+- The repository policy check no longer treats an ignored `__pycache__`-only directory as a
+  restored retired module.
+- Social Cognition keeps a lasting preference the person states ("以后先用中文回答我") as a
+  memory candidate at ingress; the Host stores it as session Memory and Social Cognition
+  answers in the stated language on later turns (owner decision). Live, the preference was
+  agreed aloud and the next English question was answered in English.
+
+- When the Planner writes a second, byte-identical idempotent and side-effect-free read for
+  another Responsibility, the Host merges it into the first before validation, and that read
+  serves both (owner decision). Live, "明天北京会下雨吗？我要不要带伞？" planned a second
+  weather read for the umbrella question that cited the first question's "北京", and the turn
+  failed; no prompt or decoder change moved the 0.27-nat count near-tie.
+
+- The Planner decoder now offers a turn-span citation only inside the source words of a
+  Responsibility the Capability can serve. Live, "帮我拿瓶水，顺便告诉我现在几点。" cited
+  "瓶水，" with the comma past the fetch's words; Host rejected the citation and the cohort
+  stopped in core.
+
 ### Unavailable only when an ability is missing; the ingress question covers the Planner's (2026-10-23)
 
 - Before deciding a Responsibility that could be a limitation, the Planner states whether the

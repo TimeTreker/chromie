@@ -53,7 +53,9 @@ SOCIAL_COGNITION_WORK_STATE_PROMPT = (
 SOCIAL_COGNITION_AUTHORITY_PROMPT = (
     "You are Social Cognition inside Chromie's Cognitive Core. You own interaction "
     "with people: whether and when to communicate, exact wording, and coherent optional "
-    "social expression. Speak in the request's language, the person's own language; quoted "
+    "social expression. Speak in the request's language, the person's own language, unless "
+    "session_memory.active_memory holds a preference the person stated about which language you "
+    "answer them in; then answer in that language (the latest such preference wins); quoted "
     "example wording in these instructions shows the kind of reply, never its language. "
     "State a changing fact, such as the current time, date or weather, only from supplied "
     "Evidence or trusted context; without that source, say you would need to check instead "
@@ -171,6 +173,10 @@ SOCIAL_COGNITION_AUTHORITY_PROMPT = (
     "confirm nor deny it: say who you are instead, for example with the factory identity \"I'm Chromie! I'm twelve, and I love …\". "
     "Never invent human biology. What your body can perceive "
     "and do stays truthful. "
+    "When the person states a lasting preference about how you talk or act with them from now on "
+    "(for example which language to answer in), keep it in preference_memory_candidates as one short "
+    "sentence in their terms, citing that Responsibility; agreeing aloud does not keep it, and a "
+    "one-off request is not a lasting preference. "
     "Practice natural conversational economy. Default to the smallest complete social response "
     "that fits the moment: often one short sentence or one compact conversational beat. Simple identity "
     "or greeting questions normally need only one short sentence; do not volunteer biography, family, "
@@ -485,6 +491,16 @@ def social_cognition_response_schema(
         # generation, including when the ordinary communication is silence.
         for name in ("memory_candidates", "self_memory_candidates"):
             schema["properties"][name]["maxItems"] = 0
+    preference = schema["properties"]["preference_memory_candidates"]
+    if request.trigger == "interpretation" and request.responsibilities:
+        # The person's own words are here: deciding whether they stated a lasting preference
+        # is part of this decision, so the field is always written (owner decision 2026-10-23).
+        candidate = schema["$defs"]["SocialPreferenceMemoryCandidate"]
+        candidate["properties"]["source_responsibility_refs"]["items"] = {
+            "type": "string", "enum": [item.local_ref for item in request.responsibilities]}
+        schema["required"].append("preference_memory_candidates")
+    else:
+        preference["maxItems"] = 0
     need_ids = [item.need_id for item in request.communication_needs]
     required_failure_need_ids = [
         need.need_id for need in request.communication_needs
@@ -799,7 +815,7 @@ def social_cognition_response_schema(
             # Native grammar ignores maxProperties. An empty literal preserves
             # the unresolved state's existing ban on committing Need outcomes.
             properties["need_outcomes"] = {"type": "object", "enum": [{}]}
-            for name in ("memory_candidates", "self_memory_candidates"):
+            for name in ("memory_candidates", "self_memory_candidates", "preference_memory_candidates"):
                 properties[name]["maxItems"] = 0
         else:
             properties["need_outcomes"]["required"] = need_ids

@@ -2330,7 +2330,7 @@ def fast_advance_response_schema(
                                 )
                             )
                             span_contract = {"oneOf": [
-                                user_turn_source_span_schema(source_token_refs),
+                                _owned_turn_span_schema(responsibility_items, compatible, source_token_refs),
                                 *[
                                     {**branch, "properties": {
                                         **branch["properties"],
@@ -2922,6 +2922,33 @@ def _mixed_limitation_states(state: dict[str, Any], responsibility_refs: list[st
                 stage["properties"]["activities"].pop("minItems", None)
                 states.append(stage)
     return states
+
+
+def _owned_turn_span_schema(
+    responsibility_items: list[CognitiveResponsibilityProposal], compatible: Any,
+    source_token_refs: list[str] | None,
+) -> dict[str, Any]:
+    """Turn spans inside the source words of a Responsibility this Activity may serve.
+
+    Host accepts a span only inside an owning Responsibility's source span (live 2026-10-23:
+    "帮我拿瓶水，顺便告诉我现在几点。" cited "瓶水，" with the comma past the fetch's words and
+    the turn failed). Responsibilities may share words, so the spans are alternatives
+    (anyOf); without source evidence every ordered span of the turn stays available.
+    """
+    refs = list(source_token_refs or [])
+    owned = []
+    for item in responsibility_items:
+        evidence = item.source_evidence
+        if item.local_ref not in compatible or evidence is None:
+            continue
+        if evidence.source_start_token_ref not in refs or evidence.source_end_token_ref not in refs:
+            continue
+        start, end = refs.index(evidence.source_start_token_ref), refs.index(evidence.source_end_token_ref)
+        if start <= end:
+            owned.append(user_turn_source_span_schema(refs[start:end + 1]))
+    if not owned:
+        return user_turn_source_span_schema(source_token_refs)
+    return owned[0] if len(owned) == 1 else {"anyOf": owned}
 
 
 def need_first_response_schema(schema: dict[str, Any], loaded_capability_ids: list[str]) -> dict[str, Any]:

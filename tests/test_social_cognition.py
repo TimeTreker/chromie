@@ -118,7 +118,9 @@ def response(**changes):
     act = {"activity_id": "sc-act", "text": "还在进行中。", "function": "inform",
            "truth_stage": "context_grounded", "source_goal_ids": ["goal:1"]}
     act.update(changes)
-    return {"disposition": "communicate", "activities": [act], "reason_summary": "Meaningful progress."}
+    # An ingress decision states whether a lasting preference was kept (2026-10-23).
+    return {"disposition": "communicate", "activities": [act], "reason_summary": "Meaningful progress.",
+            "preference_memory_candidates": []}
 
 
 @pytest.mark.parametrize("state", ["queued", "playing", "completed", "interrupted", "failed"])
@@ -258,7 +260,8 @@ def test_fresh_addressed_task_cannot_silently_disappear_while_work_runs_in_paral
         },
     )
     schema = social_cognition_response_schema(current, [])
-    silence = {"disposition": "silence", "activities": [], "reason_summary": "Wait for Planner."}
+    silence = {"disposition": "silence", "activities": [], "reason_summary": "Wait for Planner.",
+               "preference_memory_candidates": []}
     assert list(Draft202012Validator(schema).iter_errors(silence))
     with pytest.raises(ValueError, match="requires acknowledgement"):
         validate_social_cognition_output(SocialCognitionOutput.model_validate(silence), current, [])
@@ -433,7 +436,7 @@ def test_goal_scoped_speech_is_only_acknowledged_before_its_answer_need():
                            source_evidence={"source_start_token_ref": "t0", "source_end_token_ref": "t1"})])
 
     def act(function):
-        return {"disposition": "communicate", "reason_summary": "Reply.", "activities": [{
+        return {"disposition": "communicate", "reason_summary": "Reply.", "preference_memory_candidates": [], "activities": [{
             "activity_id": "a1", "text": "Once upon a time...", "function": function,
             "truth_stage": "context_grounded", "progress_kind": None,
             "source_responsibility_refs": ["r1"], "source_goal_ids": [], "evidence_refs": [],
@@ -2755,6 +2758,63 @@ def test_the_ingress_question_already_asks_the_planners_later_meaning_need(varia
     else:
         with pytest.raises(ValueError, match="prior communicative act cannot answer"):
             validate_social_cognition_output(reuse, current, [])
+
+
+def _preference_turn(**changes):
+    from shared.chromie_contracts.core_interpretation import CognitiveResponsibilityProposal
+
+    return request(
+        trigger="interpretation", source_refs=["turn:pref"], goal_ids=[],
+        source_turn={"turn_id": "turn:pref", "original_text": "以后先用中文回答我，可以吗？"},
+        responsibilities=[CognitiveResponsibilityProposal(
+            local_ref="r1", outcome="以后先用中文回答我", output_mode="speech", continuity_scope="turn",
+            confidence=1.0)],
+        context={"interaction_context": {"events": [], "already_spoken": [], "pending_speech": [],
+                                         "prior_delivered_speech": []}},
+    ).model_copy(update=changes)
+
+
+def test_a_stated_preference_is_kept_as_session_memory_and_read_back():
+    """Live 2026-10-23 (memory_language_pref_zh): "以后先用中文回答我" was agreed aloud, then an
+    English question was answered in English; nothing kept the preference. Owner decision: SC
+    keeps it at ingress, Host stores it, and SC reads it from Active Memory later."""
+    from agent.app.social_cognition import (
+        SOCIAL_COGNITION_AUTHORITY_PROMPT, social_cognition_response_schema, validate_social_cognition_output,
+    )
+    from orchestrator.runtime.conversation_state import ConversationStateManager
+    from orchestrator.runtime.response_plan import build_social_interaction_response
+    from shared.chromie_contracts.social_cognition import SocialCognitionOutput, SocialCognitionResolution
+
+    current = _preference_turn()
+    schema = social_cognition_response_schema(current, [])
+    assert "preference_memory_candidates" in schema["required"]
+    refs = schema["$defs"]["SocialPreferenceMemoryCandidate"]["properties"]["source_responsibility_refs"]
+    assert refs["items"]["enum"] == ["r1"]
+    later = social_cognition_response_schema(request(), [])
+    assert later["properties"]["preference_memory_candidates"]["maxItems"] == 0
+    assert "answer in that language" in SOCIAL_COGNITION_AUTHORITY_PROMPT
+
+    output = SocialCognitionOutput.model_validate({
+        "disposition": "communicate", "reason_summary": "Agree and keep it.", "need_outcomes": {},
+        "activities": [{"activity_id": "agree", "text": "好的，以后我用中文回答你。", "function": "respond",
+                        "truth_stage": "context_grounded", "source_responsibility_refs": ["r1"]}],
+        "preference_memory_candidates": [{"text": "Answer me in Chinese.", "source_responsibility_refs": ["r1"]}],
+    })
+    validate_social_cognition_output(output, current, [])
+    result = SocialCognitionResolution(**output.model_dump(), request_id=current.request_id,
+                                       snapshot_digest=current.snapshot_digest(), model_call_count=1)
+    later_turn = current.model_copy(update={"trigger": "work_state"})
+    with pytest.raises(ValueError, match="kept only at ingress"):
+        SocialCognitionResolution(**output.model_dump(), request_id=later_turn.request_id,
+                                  snapshot_digest=later_turn.snapshot_digest(), model_call_count=1,
+                                  ).validate_request(later_turn)
+
+    response = build_social_interaction_response(current, result, session_id="pref", interaction_context=None)
+    state = ConversationStateManager(enabled=True)
+    state.record_user_turn("pref", "以后先用中文回答我，可以吗？")
+    state.record_interaction_response("pref", response)
+    entries = state.session_memory()["active_memory"]["entries"]
+    assert any(item.get("kind") == "preference" and item.get("text") == "Answer me in Chinese." for item in entries)
 
 
 def _weekday_work_state(**changes):

@@ -29,6 +29,13 @@ complete communication/silence decision, exact acts and bounded eligible social
 expression proposals. One source-only deeper call is allowed for unresolved
 cognition; trusted slow readiness enters that same deeper scope directly. Missing
 required cognition is reported as a failure, never a fabricated silence decision. Goals, task Work and effect authorization are not writable fields.
+At an interpretation trigger the resolution also states `preference_memory_candidates`
+(possibly empty, at most two): a lasting preference the person stated about how Chromie
+talks or acts with them, as one short sentence citing that turn's Responsibility. Host
+rejects them at any other trigger, carries them on the response as session `preference`
+Memory updates, and Social Cognition reads them back from `session_memory.active_memory`
+(for example the language to answer in). A preference stated in a turn whose final response
+comes from Work is not yet kept.
 The Host client rechecks identity/provenance; the runtime entrypoint requires the
 state owner's freshness predicate before and after inference. Expression execution
 uses the existing catalog/target/resource/duplicate-dispatch validators. Empty
@@ -314,7 +321,13 @@ state may therefore hold only a response or an input Need beside a limitation.
 Ordinary speech is always answered, never decided unavailable. A Responsibility that
 could be a limitation first states `needed_abilities_fit`: `true` offers `work`, `answer`
 or `clarify`, `false` only `unavailable`, and the DTO rejects any other pairing (an uncertain
-referent whose abilities fit is a clarification, not a limitation). An information
+referent whose abilities fit is a clarification, not a limitation). A turn-span argument
+citation is offered only inside the source words of a Responsibility the Capability can
+serve, which Host validation also requires. When an information read's cited turn words lack
+its free-text value but the value occurs verbatim exactly once in the outcome of a
+Responsibility it serves and in earlier conversation, Host re-anchors the citation to that
+outcome span before validation (`metadata.citation_reanchoring`). Identical idempotent reads merge only when
+they wait for the same state-changing Activities. An information
 Responsibility that current established perception already answers first names those
 `situation.interpretations` IDs in its decision's `observed_refs`, then decides
 `answer_from_perception`; only a non-empty `observed_refs` opens that decision, which

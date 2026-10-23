@@ -183,6 +183,24 @@ class SocialCommunicativeAct(BaseModel):
         return self
 
 
+class SocialPreferenceMemoryCandidate(BaseModel):
+    """A lasting preference the person stated about how Chromie talks or acts with them.
+
+    Owner decision 2026-10-23: Social Cognition, which owns how Chromie communicates, keeps it;
+    Host stores it as session Memory and later turns read it from Active Memory (live: "以后先用
+    中文回答我" was agreed aloud, then an English question was answered in English).
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+    text: str = Field(min_length=3, max_length=160)
+    source_responsibility_refs: list[str] = Field(min_length=1, max_length=4)
+
+    @field_validator("text", mode="before")
+    @classmethod
+    def normalize_preference_text(cls, value: Any) -> str:
+        return " ".join(str(value or "").split())
+
+
 class SocialCognitionOutput(BaseModel):
     """One primary semantic result; a depth request cannot contain a decision."""
 
@@ -193,12 +211,15 @@ class SocialCognitionOutput(BaseModel):
     need_outcomes: dict[str, Literal["covered", "pending"]] = Field(default_factory=dict)
     memory_candidates: list[SituationalRelationshipMemoryCandidate] = Field(default_factory=list, max_length=4)
     self_memory_candidates: list[SituationalSelfMemoryCandidate] = Field(default_factory=list, max_length=4)
+    preference_memory_candidates: list[SocialPreferenceMemoryCandidate] = Field(default_factory=list, max_length=2)
 
     @model_validator(mode="after")
     def validate_decision(self) -> "SocialCognitionOutput":
         if (self.disposition == "communicate") != bool(self.activities):
             raise ValueError("only communicate may carry a nonempty complete act decision")
-        if self.disposition == "deliberate" and (self.memory_candidates or self.self_memory_candidates):
+        if self.disposition == "deliberate" and (
+            self.memory_candidates or self.self_memory_candidates or self.preference_memory_candidates
+        ):
             raise ValueError("unresolved cognition cannot author a Memory decision")
         if self.disposition == "deliberate" and self.need_outcomes:
             raise ValueError("unresolved cognition cannot commit communication coverage")
@@ -388,6 +409,11 @@ class SocialCognitionResolution(SocialCognitionOutput):
                 need_id in act.addressed_need_ids and act.text.strip() for act in self.activities
             ):
                 raise ValueError("covered communication needs require an explicit verbal act")
+        if self.preference_memory_candidates and (request.trigger != "interpretation" or any(
+            not set(item.source_responsibility_refs) <= {resp.local_ref for resp in request.responsibilities}
+            for item in self.preference_memory_candidates
+        )):
+            raise ValueError("a stated preference is kept only at ingress from the person's own Responsibility")
         situation = request.situation
         if (self.memory_candidates or self.self_memory_candidates) and (
             request.trigger != "situation" or situation is None

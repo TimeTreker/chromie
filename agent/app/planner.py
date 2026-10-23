@@ -84,7 +84,9 @@ from .planner_fast_validation import (
     canonicalize_fast_argument_source_spans,
     collapse_redundant_idempotent_read_activities,
     drop_repeated_identical_activities,
+    merge_identical_reads_across_responsibilities,
     normalize_fast_capability_activity_purpose,
+    reanchor_turn_citations_to_outcomes,
     project_responsibility_decisions,
     validate_fast_advance_output,
     validate_work_reuse_selection,
@@ -285,6 +287,17 @@ class PlannerResolver:
                 take_activity_count(raw)
                 output = FastPlannerAdvanceModelOutput.model_validate(raw)
                 output, repeated_activity_repairs = drop_repeated_identical_activities(output)
+                output, merged_read_repairs = merge_identical_reads_across_responsibilities(
+                    output, capabilities=capabilities)
+                repeated_activity_repairs += merged_read_repairs
+                output, citation_repairs = reanchor_turn_citations_to_outcomes(
+                    output, source=current.original_user_text, responsibilities=responsibilities,
+                    capabilities=capabilities, earlier_talk=[
+                        str(item.get("text") or "") for item in current.history or current.context.get("history") or []
+                        if isinstance(item, dict)])
+                if citation_repairs:
+                    logger.info("fast_planner_citation_reanchored sid=%s repairs=%s",
+                                request.sid, bounded_json(citation_repairs, 1000))
                 if repeated_activity_repairs:
                     logger.info("fast_planner_repeated_activity_removed sid=%s repairs=%s",
                                 request.sid, bounded_json(repeated_activity_repairs, 1000))
@@ -323,6 +336,7 @@ class PlannerResolver:
                 "semantic_authority": "planner_model", "phase": "responsibility_work_plan",
                 "responsibility_decisions": authored_decisions,
                 **({"repeated_activity_normalization": repeated_activity_repairs} if repeated_activity_repairs else {}),
+                **({"citation_reanchoring": citation_repairs} if citation_repairs else {}),
                 "execution_authority": "trusted_capability_runtime", "semantic_result_call_count": 1,
                 **ability_need_metadata(first_needs or final_needs, unmet if loaded_ids else [], loaded_ids),
                 "final_ability_needs": [item.model_dump() for item in final_needs],

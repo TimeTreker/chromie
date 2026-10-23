@@ -17,8 +17,9 @@ Run the everyday live-text cohort (`scenarios/everyday/`, 70 cases) against
 Soridormi MuJoCo, judge every case, and repair each failure at its earliest
 responsible owner. One invocation and one debug bundle per run; a hard failure in
 the 15-case `must_pass` smoke stage stops `core` and `challenge` (owner rule).
-Evidence and per-run judgments: `.chromie/acceptance/planner-fit-20261023/` and
-`ingress-awaiting-20261023/` (focused),
+Evidence and per-run judgments: `.chromie/acceptance/review-fixes-20261023/` (running at commit),
+`merge-reads-20261023/`, `span-owned-20261023/`, `main-20cce0dfa-20261023/` (complete cohorts),
+`planner-fit-20261023/` and `ingress-awaiting-20261023/` (focused),
 `sc-evidence-20261022/` (latest full run),
 `sc-ask-uncertain-20261022/`, `main-ad898cf7f-20261022/`, `vj-facts-20261021/`,
 `thirsty-offer-20261021/`,
@@ -26,27 +27,27 @@ Evidence and per-run judgments: `.chromie/acceptance/planner-fit-20261023/` and
 `playback-race-20261020/`, `answer-source-20261020/`, `gaze-turn-20261020/`, `said-now-20261020/`, `decided-activity-20261020/`,
 `main-03974435e-20261020/` and `everyday-20261016/` (README.md in each).
 
-## Resume point — 2026-10-23
+## Resume point — 2026-10-23 (evening)
 
-- Agent `planner-fit-20261023` (= `chromie-agent:latest`, `ac2391a00505`) is built from the source this
-  delivery records and deployed with the quiet-mode timeout override. Rollback: `ingress-awaiting-20261023`.
-- Quiet mode: the owner runs `sudo .chromie/quiet-mode/quiet-mode.sh on` (CPU turbo off, GPU clocks
-  210-1800 MHz, GPU power at its 400 W minimum); a reboot resets it unless `enable-at-boot` is used.
-  The quiet-mode Host override raises the TTS playback-start barrier to 60 s, which lifts the speech
-  request timeout to 65 s.
-- The last full run (`8520d0468`, smoke 15/15, core 22/29) stopped at `info_umbrella_zh`: the Planner
-  cited another Responsibility's words.
-- Since then (focused reruns, `.chromie/acceptance/ingress-awaiting-20261023/` and `planner-fit-20261023/`):
-  an ingress question is no longer followed by an invented answer; the Planner states whether the
-  needed abilities fit before deciding, so an uncertain referent is clarified rather than declared
-  unavailable, and the ingress question covers that clarification. A Chinese-answer preference was
-  not kept (STATUS open work 2).
-- Next: the Planner's cross-Responsibility citation, then the complete cohort on a fresh LLM lifetime.
+- Agent `review-fixes-20261023` (= `chromie-agent:latest`, `24d01f31c3ed`) is deployed from the source one change
+  before the commit (re-anchoring without the earlier-talk condition); its source check matched that source, not
+  the commit. Rebuild before attributing live results to the commit. Rollback: `planner-fit-20261023`.
+- Quiet mode: the owner runs `sudo .chromie/quiet-mode/quiet-mode.sh on`; the quiet-mode Host override raises the
+  TTS playback-start barrier to 60 s (speech request timeout 65 s).
+- Complete cohorts today: on `20cce0dfa` core stopped at `mix_water_time_zh` (a citation past the fetch's words);
+  with owned spans core stopped at `info_umbrella_zh` (a duplicate read); with the read merge smoke 15/15, core
+  46/50 completed, challenge stopped at `long_park_day_en` (a value resolved from earlier talk cited from the
+  turn). A second review then found the read merge lost a read after a state change; this delivery fixes that,
+  re-anchors resolved values to the outcome (owner decision) and keeps stated preferences (owner decision).
+- At commit time a complete cohort of that deployed build was running (`.chromie/acceptance/review-fixes-20261023/`);
+  its gate found one failure, fixed in the commit (earlier-talk condition). Rerun the full gate on the commit,
+  rebuild the Agent, and judge a cohort of the commit before any revision-level claim.
+- Next: STATUS open work 1-2.
 
-Verification: the new regressions are red without their fixes. Gate on the GPU host: pytest 4,011
-passed + 5 skipped (`xgrammar` not installed), benchmarks 172, legacy Agent tests 20; policies,
-docs, test ownership, ruff, mypy and runtime-structure ratchets pass (the `cognitive_runtime.py`
-line baseline rises 3690 → 3694 for the goal_state hold; owner review). Freeze 47 is unchanged.
+Verification: each new regression is red without its fix. Last complete gate (before the last three
+repairs): pytest 4,015 passed + 5 skipped (`xgrammar` not installed), benchmarks 172, legacy Agent tests 20,
+all checks; the committed source's gate was running at commit time. Strict replay 6,000/6,000 on freeze 47
+(unchanged). 300 SC schema shapes compile on live SGLang.
 
 ## Repairs in force from this Issue
 
@@ -78,6 +79,15 @@ line baseline rises 3690 → 3694 for the goal_state hold; owner review). Freeze
   its own Activity (live: "我考了满分！快跟我一起庆祝一下！" spent its one Activity on the
   sibling answer). Social Cognition's first act names every result need that must be
   said now (live: "我不会后空翻" said the limitation but named only the answer need).
+- Before validation, a byte-identical idempotent, side-effect-free read the Planner wrote again
+  for another Responsibility is merged into the first, which then serves both and is validated
+  (owner decision 2026-10-23; live: "我要不要带伞？" got a second weather read citing the
+  first question's "北京"). Both read merges require the same state snapshot: identical reads
+  merge only when they wait for the same state-changing Activities, and a read with an unknown
+  dependency is never merged (second review 2026-10-23).
+- A Planner argument's turn-span citation is offered only inside the source words of a
+  Responsibility its Capability can serve, which the Host requires (live 2026-10-23:
+  "瓶水，" ran past the fetch's words into the comma and stopped the cohort).
 - A Responsibility that could be a limitation states `needed_abilities_fit` right before its
   decision; only `false` opens `unavailable` (live 2026-10-22: every ability need fit, yet
   "把那个拿给我" named the uncertain referent as missing and was decided unavailable, so SC
@@ -165,6 +175,23 @@ line baseline rises 3690 → 3694 for the goal_state hold; owner review). Freeze
   as received, being checked or in progress, at every moment and not only at ingress (owner
   decision 2026-10-22; live: "It's Wednesday" was said before the clock read and repeated after
   Evidence said Thursday).
+- Two identical idempotent reads written for two Responsibilities become one read serving
+  both, merged by the Host before validation (owner decision 2026-10-23). This is an exception
+  to the freeze-36 direction to fix repeated Activities at the model input: the count was a
+  0.27-nat near-tie, and a prompt sentence, a new answer source and an Evidence-bound answer
+  form each failed to move it.
+- When an information read's cited turn words lack its free-text value and the value occurs
+  verbatim exactly once in the outcome of a Responsibility the Activity serves and earlier talk
+  already said it, the Host re-anchors that citation to the outcome span before validation
+  (a value only the outcome holds still fails closed); the value is unchanged
+  (owner decision 2026-10-23; live: "there" was cited for "Beijing" that UMI had resolved; the
+  turn-versus-outcome choice was a 0.1-nat near-tie and a decoder reorder flipped either way).
+- Social Cognition may propose memory candidates in ordinary turns (for example the answer
+  language a person asked for); the Host validates them and Memory stores them, and Social
+  Cognition reads the preference back from Active Memory (owner decision 2026-10-23; live: a
+  Chinese-answer preference was agreed and then not kept). The decoder requires the field at
+  ingress, the Host carries it as a session `preference` Memory update on the turn's response;
+  a preference stated in a turn whose final response comes from Work is not yet kept.
 - Value Judgment asks before Chromie takes or uses another family member's personal things
   (a parent's wallet or phone) unless the words show that person agreed; the person's own
   things and things the household shares proceed (owner decision 2026-10-21).

@@ -316,7 +316,8 @@ async def test_streamed_string_argument_mapping_preserves_source_ownership(varia
     schema = model.last_kwargs["response_format"]
     sent = declared_ability_needs(raw, schema)
     for contract in (schema, {"$defs": schema.get("$defs", {}), "oneOf": schema["oneOf"]}):
-        assert Draft202012Validator(contract).is_valid(_counted(sent)) is (variant != "missing")
+        # A span outside the Responsibility's own words is no longer even offered (2026-10-23).
+        assert Draft202012Validator(contract).is_valid(_counted(sent)) is (variant not in {"missing", "foreign_span"})
     if variant in {"missing", "foreign_span"}:
         assert isinstance(events[0], FastPlannerStreamFailure)
         assert events[0].failure_class == "fast_stream_contract_invalid"
@@ -1421,8 +1422,8 @@ async def test_required_enum_source_matches_selected_value_and_original_turn(var
     frames = [f async for f in PlannerResolver(model, _Catalog([capability])).stream_advance(request)]
     assert model.calls == 1
     schema = model.last_kwargs['response_format']
-    assert Draft202012Validator(schema).is_valid(declared_ability_needs(raw, schema)) == (
-        expected or variant == 'foreign_source')
+    # The decoder offers spans only inside the owning Responsibility's words (2026-10-23).
+    assert Draft202012Validator(schema).is_valid(declared_ability_needs(raw, schema)) == expected
     assert isinstance(frames[-1], FastPlannerStreamTerminal) == expected
     if not expected:
         assert frames[-1].failure_stage == 'before_commit'
@@ -1821,6 +1822,199 @@ def test_an_activity_names_its_responsibilities_before_its_capability():
 
     walk(schema)
     assert seen and all(names == ["role", "source_responsibility_refs"] for names in seen)
+
+
+def test_argument_spans_stay_inside_a_responsibilitys_own_words():
+    """Live 2026-10-23 (mix_water_time_zh): "帮我拿瓶水，顺便告诉我现在几点。" cited "瓶水，", the
+    comma past the fetch's own words, and Host stopped the turn. The decoder offers only spans
+    inside the source words of a Responsibility the Capability can serve."""
+    from shared.chromie_contracts.user_turn import user_turn_source_tokens
+
+    text = "北京天气怎么样，顺便给我讲个笑话。"
+    tokens = user_turn_source_tokens(text)
+
+    def span(surface):
+        start = text.index(surface)
+        found = [t for t in tokens if start <= t["start"] and t["end"] <= start + len(surface)]
+        return {"source_start_token_ref": found[0]["ref"], "source_end_token_ref": found[-1]["ref"]}
+
+    weather = CognitiveResponsibilityProposal(local_ref="r1", outcome="北京天气怎么样", output_mode="information",
+                                              confidence=1.0, source_evidence=span("北京天气怎么样"))
+    joke = CognitiveResponsibilityProposal(local_ref="r2", outcome="给我讲个笑话", output_mode="speech",
+                                           continuity_scope="turn", confidence=1.0, source_evidence=span("给我讲个笑话"))
+    read = {"capability_id": "test.weather", "effects": ["information"], "input_schema": {
+        "type": "object", "properties": {"location": {"type": "string"}}, "required": ["location"],
+        "additionalProperties": False}}
+    schema = fast_streaming_advance_response_schema(["r1", "r2"], responsibilities=[weather, joke], capabilities=[read],
+                                                    source_token_refs=[t["ref"] for t in tokens])
+
+    def output(location_span):
+        return {"responsibility_decisions": {"r1": {"needed_abilities_fit": True, "decision": "work", "missing": []},
+                                             "r2": {"decision": "answer", "missing": []}},
+                "activity_count": 2,
+                "activities": [{"role": "capability", "source_responsibility_refs": ["r1"], "capability_id": "test.weather",
+                                "activity_id": "act_0", "args": {"location": "北京"},
+                                "argument_sources": {"location": location_span}, "depends_on": []},
+                               {"role": "complete_response", "activity_id": "act_1", "source_responsibility_refs": ["r2"],
+                                "timing": "parallel", "rationale": "x"}],
+                "disposition": "mixed", "coverage": "complete", "covered_responsibility_refs": ["r1", "r2"],
+                "confidence": 1.0, "unresolved": [], "reason_summary": "x"}
+
+    validator = Draft202012Validator(schema)
+    assert validator.is_valid(output(span("北京")))
+    assert not validator.is_valid(output(span("怎么样，")))  # past its own words
+    assert not validator.is_valid(output(span("笑话")))  # words of a Responsibility it cannot serve
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("same_args", [True, False])
+async def test_an_identical_read_written_for_a_second_question_serves_both(same_args):
+    """Live 2026-10-22/23 (info_umbrella_zh): "明天北京会下雨吗？我要不要带伞？" planned a second,
+    identical weather read for the umbrella question, citing the first question's "北京"; Host
+    rejected the turn. Owner decision 2026-10-23: one identical idempotent read serves both
+    Responsibilities and is then validated; different arguments stay two reads."""
+    from shared.chromie_contracts.user_turn import user_turn_source_tokens
+
+    text = "明天北京会下雨吗？我要不要带伞？"
+    tokens = user_turn_source_tokens(text)
+
+    def span(surface):
+        start = text.index(surface)
+        found = [t for t in tokens if start <= t["start"] and t["end"] <= start + len(surface)]
+        return {"source_start_token_ref": found[0]["ref"], "source_end_token_ref": found[-1]["ref"]}
+
+    request = CognitiveWorkRequest(sid="umbrella", text=text, language="zh-CN", interpretation_confidence=1.0,
+        responsibilities=[CognitiveResponsibilityProposal(local_ref=ref, outcome=words, output_mode="information",
+                                                          confidence=1.0, source_evidence=span(words))
+                          for ref, words in (("r1", "明天北京会下雨吗"), ("r2", "我要不要带伞"))])
+    weather = CatalogCapability(
+        capability_id="chromie.weather.lookup", agent_id="chromie.weather", description="Retrieve a forecast.",
+        input_schema={"type": "object", "properties": {"location": {"type": "string"}}, "required": ["location"],
+                      "additionalProperties": False},
+        available=True, interaction_executable=True, prompt_tier="common", idempotent=True, side_effect_free=True,
+        safety_class="safe_read", hints={"side_effect_free": True, "semantic_scope": {
+            "responsibility_type": "acquire_and_deliver_resource", "resource_kinds": ["information"]}})
+
+    def read(activity_id, ref, location, depends_on):
+        return {"role": "capability", "source_responsibility_refs": [ref], "capability_id": "chromie.weather.lookup",
+                "activity_id": activity_id, "args": {"location": location},
+                "argument_sources": {"location": span("北京")}, "depends_on": depends_on}
+
+    raw = {"ability_needs": [{"need": "read the weather forecast", "closest_loaded": "chromie.weather.lookup",
+                              "closest_loaded_does": "Retrieve a forecast.", "fits": True}],
+           "responsibility_decisions": {ref: {"needed_abilities_fit": True, "decision": "work", "missing": []}
+                                        for ref in ("r1", "r2")},
+           "activity_count": 2,
+           "activities": [read("act_1", "r1", "北京", []),
+                          read("act_2", "r2", "北京" if same_args else "北京市", ["act_1"])],
+           "disposition": "execute", "coverage": "complete", "covered_responsibility_refs": ["r1", "r2"],
+           "confidence": 1.0, "unresolved": [], "reason_summary": "Read the forecast, then advise."}
+    model = _StreamingModel([json.dumps(raw, ensure_ascii=False)])
+    frames = [f async for f in PlannerResolver(model, _Catalog([weather])).stream_advance(request)]
+    if not same_args:
+        assert isinstance(frames[-1], FastPlannerStreamFailure)
+        return
+    assert isinstance(frames[-1], FastPlannerStreamTerminal), frames[-1]
+    activity, = frames[-1].advance.activities
+    assert activity.activity_id == "act_1" and activity.source_responsibility_refs == ["r1", "r2"]
+    repairs = frames[-1].advance.metadata["repeated_activity_normalization"]
+    assert repairs[-1]["normalization"] == "identical_read_merged_across_responsibilities"
+
+
+@pytest.mark.parametrize("shape", ["read_walk_read_same", "read_walk_read_other", "unknown_dependency",
+                                   "before_and_after_walk", "second_waits_on_first"])
+def test_identical_reads_merge_only_when_they_observe_the_same_state(shape):
+    """Review 2026-10-23: idempotent means a repeat changes nothing, not that a read after an
+    action sees what a read before it saw. "read → walk → read" lost its second read in both
+    merges, and a merged read's unknown dependency vanished before validation."""
+    from agent.app.planner_fast_validation import (
+        collapse_redundant_idempotent_read_activities, merge_identical_reads_across_responsibilities,
+    )
+
+    capabilities = [
+        {"capability_id": "test.look", "idempotent": True, "side_effect_free": True,
+         "input_schema": {"type": "object", "properties": {"target": {"type": "string"}}}},
+        {"capability_id": "test.walk", "idempotent": False, "side_effect_free": False,
+         "input_schema": {"type": "object", "properties": {}}},
+    ]
+
+    def act(activity_id, capability_id, refs, depends_on):
+        return {"role": "capability", "activity_id": activity_id, "capability_id": capability_id,
+                "args": {"target": "door"} if capability_id == "test.look" else {}, "argument_sources": {},
+                "depends_on": depends_on, "source_responsibility_refs": refs}
+
+    activities, merged = {
+        "read_walk_read_same": ([act("look1", "test.look", ["r1"], []), act("walk", "test.walk", ["r1"], ["look1"]),
+                                 act("look2", "test.look", ["r1"], ["walk"])], False),
+        "read_walk_read_other": ([act("look1", "test.look", ["r1"], []), act("walk", "test.walk", ["r1"], ["look1"]),
+                                  act("look2", "test.look", ["r2"], ["walk"])], False),
+        "unknown_dependency": ([act("look1", "test.look", ["r1"], []), act("look2", "test.look", ["r2"], ["ghost"])], False),
+        "before_and_after_walk": ([act("walk", "test.walk", ["r1"], []), act("look1", "test.look", ["r1"], ["walk"]),
+                                   act("look2", "test.look", ["r2"], [])], False),
+        "second_waits_on_first": ([act("look1", "test.look", ["r1"], []), act("look2", "test.look", ["r2"], ["look1"])], True),
+    }[shape]
+    output = FastPlannerAdvanceModelOutput.model_validate({
+        "responsibility_decisions": {}, "disposition": "execute", "coverage": "complete",
+        "covered_responsibility_refs": ["r1", "r2"], "activities": activities, "confidence": 1,
+        "unresolved": [], "reason_summary": "x"})
+    kept, _ = merge_identical_reads_across_responsibilities(output, capabilities=capabilities)
+    assert ("look2" not in [item.activity_id for item in kept.activities]) is merged
+    if shape == "unknown_dependency":
+        assert kept.activities[-1].depends_on == ["ghost"]  # left for validation to reject
+    collapsed, _ = collapse_redundant_idempotent_read_activities(output, capabilities=capabilities)
+    if shape == "read_walk_read_same":
+        assert [item.activity_id for item in collapsed.activities] == ["look1", "walk", "look2"]
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("location,earlier", [("Beijing", True), ("Shanghai", True), ("Beijing", False)])
+async def test_a_value_resolved_from_earlier_talk_is_cited_from_the_outcome(location, earlier):
+    """Live 2026-10-23 (long_park_day_en): "Will it rain there this afternoon?" — UMI's outcome says
+    Beijing; the Planner wrote location "Beijing" but cited the turn's "there", and Host rejected
+    the turn. Owner decision 2026-10-23: a value found verbatim exactly once in the served
+    outcome is cited there; any other unsupported citation still fails closed."""
+    from shared.chromie_contracts.user_turn import user_turn_source_tokens
+
+    text = "Will it rain there this afternoon?"
+    tokens = user_turn_source_tokens(text)
+
+    def span(surface):
+        start = text.index(surface)
+        found = [t for t in tokens if start <= t["start"] and t["end"] <= start + len(surface)]
+        return {"source_start_token_ref": found[0]["ref"], "source_end_token_ref": found[-1]["ref"]}
+
+    request = CognitiveWorkRequest(sid="park", text=text, language="en-US", interpretation_confidence=1.0,
+        history=[{"role": "user", "text": "I'm going to the park in Beijing this afternoon."}] if earlier else [],
+        responsibilities=[CognitiveResponsibilityProposal(
+            local_ref="r1", outcome="determine and provide the weather forecast for Beijing for this afternoon",
+            output_mode="information", confidence=1.0, source_evidence=span(text.rstrip("?")))])
+    weather = CatalogCapability(
+        capability_id="chromie.weather.lookup", agent_id="chromie.weather", description="Retrieve a forecast.",
+        input_schema={"type": "object", "properties": {"location": {"type": "string"}}, "required": ["location"],
+                      "additionalProperties": False},
+        available=True, interaction_executable=True, prompt_tier="common", idempotent=True, side_effect_free=True,
+        safety_class="safe_read", hints={"side_effect_free": True, "resource_contract": {"provider_role": "acquire_information"},
+                                         "semantic_scope": {"responsibility_type": "acquire_and_deliver_resource",
+                                                            "resource_kinds": ["information"]}})
+    raw = {"ability_needs": [{"need": "read the weather forecast", "closest_loaded": "chromie.weather.lookup",
+                              "closest_loaded_does": "Retrieve a forecast.", "fits": True}],
+           "responsibility_decisions": {"r1": {"needed_abilities_fit": True, "decision": "work", "missing": []}},
+           "activity_count": 1,
+           "activities": [{"role": "capability", "source_responsibility_refs": ["r1"], "capability_id": "chromie.weather.lookup",
+                           "activity_id": "act_weather", "args": {"location": location},
+                           "argument_sources": {"location": span("there")}, "depends_on": []}],
+           "disposition": "execute", "coverage": "complete", "covered_responsibility_refs": ["r1"],
+           "confidence": 1.0, "unresolved": [], "reason_summary": "Read the afternoon forecast."}
+    model = _StreamingModel([json.dumps(raw)])
+    frames = [f async for f in PlannerResolver(model, _Catalog([weather])).stream_advance(request)]
+    if location == "Shanghai" or not earlier:
+        # Not resolved from earlier talk: the person's own words keep authority.
+        assert isinstance(frames[-1], FastPlannerStreamFailure)
+        return
+    assert isinstance(frames[-1], FastPlannerStreamTerminal), frames[-1]
+    cited = frames[-1].advance.activities[0].argument_sources["location"]
+    assert cited.source_start_token_ref.startswith("r1.") and cited.source_end_token_ref.startswith("r1.")
+    assert frames[-1].advance.metadata["citation_reanchoring"][0]["parameter"] == "location"
 
 
 def test_one_activity_for_every_work_responsibility_serves_them_all():

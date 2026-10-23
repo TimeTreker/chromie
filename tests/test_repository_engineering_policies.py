@@ -255,6 +255,16 @@ class RepositoryEngineeringPolicyTests(unittest.TestCase):
         rule_ids = {item.rule_id for item in findings}
         self.assertIn(policies.RULE_HOST_SEMANTIC_AUTHORITY, rule_ids)
         self.assertIn(policies.RULE_LEGACY_PHRASE_AGENTS, rule_ids)
+        # An ignored bytecode cache left by the retired package is not a restored module.
+        with tempfile.TemporaryDirectory() as temp_dir:
+            cache = Path(temp_dir) / "agent" / "app" / "agents" / "__pycache__"
+            cache.mkdir(parents=True)
+            (cache / "tool.cpython-311.pyc").write_bytes(b"")
+            leftover = {item.rule_id for item in policies.audit_semantic_authority_boundaries(Path(temp_dir))}
+            self.assertNotIn(policies.RULE_LEGACY_PHRASE_AGENTS, leftover)
+            (cache.parent / "tool.py").write_text("x = 1\n", encoding="utf-8")
+            restored = {item.rule_id for item in policies.audit_semantic_authority_boundaries(Path(temp_dir))}
+            self.assertIn(policies.RULE_LEGACY_PHRASE_AGENTS, restored)
         self.assertIn(policies.RULE_MEMORY_MODEL_AUTHORED, rule_ids)
         symbols = {item.symbol for item in findings}
         self.assertIn("_STOP_WORDS", symbols)

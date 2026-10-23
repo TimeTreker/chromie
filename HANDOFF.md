@@ -14,16 +14,21 @@ ordered open work are in [STATUS](docs/STATUS.md).
   revision pinned by `capabilities/soridormi.json` and `release/compatibility.json`. The
   MCP container mounts its `src`, so a `docker restart soridormi-runtime-mcp` loads it and
   resets the scene (user at -90 degrees, 1.5 m).
-- Live Agent: `chromie-agent:latest` = `planner-fit-20261023` (`ac2391a00505`), built from the
-  source this delivery records and started with the quiet-mode timeout override;
-  `--verify-agent-source` matches. Rollback image: `ingress-awaiting-20261023` (`42492ddbaf87`). LLM: `chromie-sglang:latest` = `gemma4-fp8`
+- Live Agent: `chromie-agent:latest` = `review-fixes-20261023` (`24d01f31c3ed`), started with the
+  quiet-mode timeout override; `--verify-agent-source` matched its source at deploy
+  (`.chromie/acceptance/review-fixes-20261023/agent-source-verify.json`). That source is one change
+  before the commit: citation re-anchoring did not yet require the value in earlier talk, so it
+  does NOT match the committed source. Rebuild and redeploy before attributing live results to the
+  commit. This file is the single owner of the deployed identity. Rollback image:
+  `planner-fit-20261023` (`ac2391a00505`). LLM: `chromie-sglang:latest` = `gemma4-fp8`
   (`f59a042e6973`); compose resolves `chromie-sglang:${CHROMIE_IMAGE_TAG}`, so the
   `latest` tag must exist for `start_chromie.sh`.
 - Workflow corpus: freeze 47 (`bdb8db08…`; scripts in `.chromie/acceptance/thirsty-offer-20261021/freeze47/`). Restore it with
   `python -m benchmarks.regression restore-fixtures`; do not untar `frozen.tar.xz` over
   `workflow_scenarios/` (its inner `manifest.json` lacks the storage identity).
-- Evidence (README in each): `.chromie/acceptance/planner-fit-20261023/` (this delivery: probes, focused reruns,
-  strict replay, gate log), `ingress-awaiting-20261023/`,
+- Evidence (README in each): `.chromie/acceptance/review-fixes-20261023/` (committed source: cohort and gate running at
+  commit), `merge-reads-20261023/`, `span-owned-20261023/` (umbrella probes), `main-20cce0dfa-20261023/`,
+  `planner-fit-20261023/` (probes, strict replay), `ingress-awaiting-20261023/`,
   `sc-evidence-20261022/` (latest full run; SC schema
   compile check in `.chromie/acceptance/tools/`), `sc-ask-uncertain-20261022/`, `main-ad898cf7f-20261022/`,
   `vj-facts-20261021/` (Value Judgment probes and focused reruns), `thirsty-offer-20261021/` (2026-10-21 run stopped at `errand_remote_en`; freeze 47 scripts), `main-6f8525947-quiet-20261021/` (stopped at
@@ -64,7 +69,7 @@ ordered open work are in [STATUS](docs/STATUS.md).
 
 ```bash
 # owner: rebuild the Agent from a clean main checkout and deploy it
-# (rollback: docker tag chromie-agent:ingress-awaiting-20261023 chromie-agent:latest)
+# (rollback: docker tag chromie-agent:planner-fit-20261023 chromie-agent:latest)
 env -u HTTP_PROXY -u HTTPS_PROXY -u http_proxy -u https_proxy ./scripts/compose.sh build chromie-agent
 CHROMIE_SERVICE_RUNTIME_OVERRIDE_FILE=.chromie/quiet-mode/agent-timeouts.env env -u HTTP_PROXY -u HTTPS_PROXY -u http_proxy -u https_proxy ./scripts/compose.sh up -d --no-build --force-recreate --no-deps chromie-agent
 python scripts/capture_runtime_identity.py --verify-agent-source chromie-agent

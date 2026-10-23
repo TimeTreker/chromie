@@ -33,6 +33,7 @@ from shared.chromie_contracts.plan import (
     FastPlannerResponsibilityArgumentSource,
     FastPlannerSituationArgumentSource,
     FastPlannerProgressAct,
+    responsibility_outcome_source_tokens,
     validate_communicative_activity_identity,
 )
 
@@ -1519,6 +1520,159 @@ def drop_repeated_identical_activities(
     return output.model_copy(update={"activities": retained}), repairs
 
 
+def _read_state_snapshots(
+    activities: list[Any], definitions: dict[str, dict[str, Any]],
+) -> dict[str, frozenset[str] | None]:
+    """The state-changing Activities each Activity waits for, directly or through others.
+
+    Two identical idempotent reads observe the same state only when they wait for the same
+    effects: idempotent means a repeat changes nothing, not that a read after an action sees
+    what a read before it saw (review 2026-10-23: read → walk → read lost its second read).
+    An Activity with an unknown dependency has no snapshot (None) and is never merged, so
+    validation still rejects it.
+    """
+
+    snapshots: dict[str, frozenset[str] | None] = {}
+    for activity in activities:
+        dependencies = list(getattr(activity, "depends_on", None) or [])
+        if any(ref not in snapshots or snapshots[ref] is None for ref in dependencies):
+            snapshots[activity.activity_id] = None
+            continue
+        effects: set[str] = set()
+        for ref in dependencies:
+            effects |= snapshots[ref] or frozenset()
+            if ref in definitions and definitions[ref].get("side_effect_free") is not True:
+                effects.add(ref)
+        snapshots[activity.activity_id] = frozenset(effects)
+    return snapshots
+
+
+def merge_identical_reads_across_responsibilities(
+    output: FastPlannerAdvanceModelOutput,
+    *,
+    capabilities: list[dict[str, Any]],
+) -> tuple[FastPlannerAdvanceModelOutput, list[dict[str, Any]]]:
+    """One identical read serves every Responsibility that wrote it (owner decision 2026-10-23).
+
+    Live 2026-10-22/23 (info_umbrella_zh): "明天北京会下雨吗？我要不要带伞？" planned a second,
+    identical weather read for the umbrella question "using act_1's data"; it cited the first
+    question's "北京" and Host rejected the turn. The count was a 0.27-nat near-tie and no
+    model-input change moved it. Only an idempotent, side-effect-free Capability with
+    byte-identical arguments that waits for the same state changes is merged: the earlier
+    Activity keeps its provenance, serves the union of Responsibilities and is then validated
+    like any authored Activity.
+    """
+
+    by_id = {str(item.get("capability_id") or ""): item for item in capabilities if isinstance(item, dict)}
+    snapshots = _read_state_snapshots(output.activities, {
+        activity.activity_id: by_id.get(getattr(activity, "capability_id", "")) or {}
+        for activity in output.activities if activity.role == "capability"})
+    retained: list[Any] = []
+    first: dict[str, int] = {}
+    removed: dict[str, str] = {}
+    repairs: list[dict[str, Any]] = []
+    for activity in output.activities:
+        if activity.role == "capability" and any(ref in removed for ref in activity.depends_on):
+            activity = activity.model_copy(update={"depends_on": list(dict.fromkeys(
+                removed.get(ref, ref) for ref in activity.depends_on))})
+        definition = by_id.get(getattr(activity, "capability_id", "")) or {}
+        if activity.role != "capability" or not (
+            definition.get("idempotent") is True and definition.get("side_effect_free") is True
+        ):
+            retained.append(activity)
+            continue
+        signature = json.dumps({"capability_id": activity.capability_id, "args": activity.args},
+                               ensure_ascii=False, sort_keys=True)
+        index = first.get(signature)
+        if index is None or snapshots.get(activity.activity_id) is None or (
+            snapshots[activity.activity_id] != snapshots.get(retained[index].activity_id)
+        ):
+            if index is None and snapshots.get(activity.activity_id) is not None:
+                first[signature] = len(retained)
+            retained.append(activity)
+            continue
+        twin = retained[index]
+        refs = list(dict.fromkeys([*twin.source_responsibility_refs, *activity.source_responsibility_refs]))
+        retained[index] = twin.model_copy(update={"source_responsibility_refs": refs})
+        removed[activity.activity_id] = twin.activity_id
+        repairs.append({"normalization": "identical_read_merged_across_responsibilities",
+                        "retained_activity_id": twin.activity_id, "removed_activity_id": activity.activity_id,
+                        "capability_id": activity.capability_id, "source_responsibility_refs": refs})
+    if not repairs:
+        return output, []
+    # depends_on cites only earlier Activities, so every later dependent was remapped above.
+    return output.model_copy(update={"activities": retained}), repairs
+
+
+def reanchor_turn_citations_to_outcomes(
+    output: FastPlannerAdvanceModelOutput, *, source: str,
+    responsibilities: list[CognitiveResponsibilityProposal], capabilities: list[dict[str, Any]],
+    earlier_talk: list[str],
+) -> tuple[FastPlannerAdvanceModelOutput, list[dict[str, Any]]]:
+    """Cite a resolved value where it is: the Responsibility outcome (owner decision 2026-10-23).
+
+    Live 2026-10-23 (long_park_day_en): for "Will it rain there this afternoon?" UMI resolved
+    "there" to Beijing in its outcome; the Planner wrote location "Beijing" but cited the turn's
+    "there", and Host rejected the turn. The turn-versus-outcome choice was a 0.1-nat near-tie.
+    Only an information read's free-text value whose cited turn words lack it, which occurs
+    verbatim exactly once in the outcomes of the Responsibilities that Activity serves, and which
+    earlier talk already said, moves to that outcome span; the value is unchanged and validation
+    follows. A value that only the outcome holds would let UMI override the person's own words
+    ("What is the weather in Paris?" with an outcome saying Chongqing still fails closed).
+    """
+
+    by_id = {str(item.get("capability_id") or ""): item for item in capabilities if isinstance(item, dict)}
+    outcomes = {item.local_ref: item.outcome for item in responsibilities}
+    activities: list[Any] = []
+    repairs: list[dict[str, Any]] = []
+    for activity in output.activities:
+        definition = by_id.get(getattr(activity, "capability_id", "")) or {}
+        if activity.role != "capability" or not activity.argument_sources or not fast_capability_acquires_information(definition):
+            activities.append(activity)
+            continue
+        properties = (definition.get("input_schema") or {}).get("properties") or {}
+        sources = dict(activity.argument_sources)
+        for parameter, span in activity.argument_sources.items():
+            value = activity.args.get(parameter)
+            schema = properties.get(parameter) if isinstance(properties.get(parameter), dict) else {}
+            if (isinstance(span, (FastPlannerResponsibilityArgumentSource, FastPlannerSituationArgumentSource))
+                    or not isinstance(value, str) or schema.get("type") != "string" or schema.get("enum")):
+                continue
+            try:
+                quote = resolve_user_turn_source_span(source, span)
+            except ValueError:
+                continue
+            if _cited_span_supports_string(value, quote) or not any(value in text for text in earlier_talk):
+                continue
+            found = [
+                match for ref in activity.source_responsibility_refs if ref in outcomes
+                for match in _verbatim_outcome_spans(ref, outcomes[ref], value)]
+            if len(found) == 1:
+                sources[parameter] = found[0]
+                repairs.append({"normalization": "turn_citation_reanchored_to_outcome", "activity_id": activity.activity_id,
+                                "parameter": parameter, "source_responsibility_ref": found[0].source_responsibility_ref})
+        activities.append(activity.model_copy(update={"argument_sources": sources})
+                          if sources != activity.argument_sources else activity)
+    if not repairs:
+        return output, []
+    return output.model_copy(update={"activities": activities}), repairs
+
+
+def _verbatim_outcome_spans(ref: str, outcome: str, value: str) -> list[FastPlannerResponsibilityArgumentSource]:
+    """Every outcome token run whose text is exactly ``value``."""
+    tokens = responsibility_outcome_source_tokens(ref, outcome)
+    spans = []
+    for index, first in enumerate(tokens):
+        for last in tokens[index:]:
+            text = outcome[first["start"]:last["end"]]
+            if text == value:
+                spans.append(FastPlannerResponsibilityArgumentSource(
+                    source_responsibility_ref=ref, source_start_token_ref=first["ref"], source_end_token_ref=last["ref"]))
+            if len(text) >= len(value):
+                break
+    return spans
+
+
 def collapse_redundant_idempotent_read_activities(
     output: FastPlannerAdvanceModelOutput,
     *,
@@ -1542,6 +1696,9 @@ def collapse_redundant_idempotent_read_activities(
         for item in capabilities
         if isinstance(item, dict) and str(item.get("capability_id") or "")
     }
+    snapshots = _read_state_snapshots(output.activities, {
+        activity.activity_id: by_id.get(getattr(activity, "capability_id", "")) or {}
+        for activity in output.activities if activity.role == "capability"})
     retained: list[Any] = []
     seen: dict[str, str] = {}
     removed: dict[str, str] = {}
@@ -1565,6 +1722,8 @@ def collapse_redundant_idempotent_read_activities(
                     activity.args, capability=definition
                 ),
                 "source_responsibility_refs": sorted(activity.source_responsibility_refs),
+                # A read after a state change is a different read (review 2026-10-23).
+                "waits_for_effects": sorted(snapshots.get(activity.activity_id) or ()),
             },
             ensure_ascii=False,
             sort_keys=True,

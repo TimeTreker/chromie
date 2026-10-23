@@ -233,5 +233,10 @@ def build_social_interaction_response(
             "social_cognition_resolution": result.model_dump(mode="json"),
             "source_refs": list(request.source_refs), "goal_ids": [],
             "goal_completion_authority": False,
+            # A lasting preference the person stated becomes session Memory when this turn's
+            # response is recorded (owner decision 2026-10-23).
+            **({"memory_updates": [{"type": "memory_entry", "value": {
+                "kind": "preference", "scope": "session", "text": item.text, "confidence": 0.9,
+            }} for item in result.preference_memory_candidates]} if result.preference_memory_candidates else {}),
         },
     )
