@@ -353,20 +353,64 @@ def declared_activity_count(reply: Any, response_format: Any) -> Any:
     return ordered
 
 
+def _fit_decision_refs(schema: Any) -> set[str]:
+    """Responsibilities whose decoder states needed_abilities_fit before their decision."""
+    found: set[str] = set()
+
+    def visit(node: Any) -> None:
+        if isinstance(node, dict):
+            decisions = (node.get("properties") or {}).get("responsibility_decisions")
+            if isinstance(decisions, dict) and isinstance(decisions.get("properties"), dict):
+                found.update(ref for ref, choice in decisions["properties"].items()
+                             if "needed_abilities_fit" in json.dumps(choice))
+            for value in node.values():
+                visit(value)
+        elif isinstance(node, list):
+            for value in node:
+                visit(value)
+
+    visit(schema)
+    return found
+
+
+def declared_needed_abilities_fit(reply: Any, response_format: Any) -> Any:
+    """Adapt a streamed fixture authored before needed_abilities_fit (2026-10-23).
+
+    A Responsibility that could be a limitation now states whether its needed abilities fit
+    before deciding; a fixture's own decision declares it, false exactly for unavailable.
+    An answer from perception states no fit.
+    """
+    refs = _fit_decision_refs(response_format)
+    decisions = reply.get("responsibility_decisions") if isinstance(reply, dict) else None
+    if not refs or not isinstance(decisions, dict):
+        return reply
+    declared = {}
+    for ref, item in decisions.items():
+        if (ref in refs and isinstance(item, dict) and "needed_abilities_fit" not in item
+                and item.get("decision") != "answer_from_perception"):
+            head = {key: value for key, value in item.items() if key in {"answer_source", "observed_refs"}}
+            item = {**head, "needed_abilities_fit": item.get("decision") != "unavailable",
+                    **{key: value for key, value in item.items() if key not in head}}
+        declared[ref] = item
+    return {**reply, "responsibility_decisions": declared}
+
+
 def declared_responsibility_decisions(reply: Any, response_format: Any) -> Any:
     """Adapt a streamed fixture authored before Responsibility decisions (2026-10-12).
 
     Each Responsibility's decision is read from the fixture's own Activities; a former
     ``unavailable`` Activity becomes that Responsibility's unavailable decision and its
     missing facts. A ref the fixture never realized is left undecided (still invalid).
-    Fixtures that author decisions keep them; effect Activities declare ``deferred``,
+    Fixtures that author decisions keep them and declare whether needed abilities fit;
+    effect Activities declare ``deferred``,
     and the Activity count is declared.
     """
     refs = _responsibility_decision_refs(response_format)
     if refs is None or not isinstance(reply, dict):
         return reply
     if "responsibility_decisions" in reply:
-        return declared_activity_count(declared_deferred_effects(reply, response_format), response_format)
+        return declared_activity_count(declared_deferred_effects(
+            declared_needed_abilities_fit(reply, response_format), response_format), response_format)
     role_decision = {"capability": "work", "complete_response": "answer", "clarification": "clarify"}
     activities, decisions = [], {}
     for activity in reply.get("activities") or []:
@@ -382,9 +426,9 @@ def declared_responsibility_decisions(reply: Any, response_format: Any) -> Any:
     ordered = {ref: decisions[ref] for ref in refs if ref in decisions}
     rest = {key: value for key, value in reply.items() if key not in {"ability_needs", "activities"}}
     head = {"ability_needs": reply["ability_needs"]} if "ability_needs" in reply else {}
-    return declared_activity_count(declared_deferred_effects(
+    return declared_activity_count(declared_deferred_effects(declared_needed_abilities_fit(
         {**head, "responsibility_decisions": ordered, "activities": activities, **rest}, response_format),
-        response_format)
+        response_format), response_format)
 
 
 def declared_ability_needs(reply: Any, response_format: Any) -> Any:

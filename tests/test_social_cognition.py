@@ -2713,6 +2713,50 @@ def test_ingress_task_question_needs_an_uncertainty_and_no_pending_value_judgmen
     assert not [act for act in acts if act["properties"]["function"].get("const") == "ask"]
 
 
+@pytest.mark.parametrize("variant", ["meaning_question", "not_a_question", "other_input"])
+def test_the_ingress_question_already_asks_the_planners_later_meaning_need(variant):
+    """Live 2026-10-23 (clarify_bring_that_zh): the Planner then decided clarify for the uncertain
+    "那个"; SC reused its delivered "你是说那个牛奶瓶吗？" for that input need and the contract
+    rejected it ("a prior communicative act cannot answer a later input"), so the turn ended in
+    "抱歉，我没能完成刚才那个任务。". Only a question the ledger records about that uncertain
+    meaning may cover the Planner's need for it; a relabelled acknowledgement still may not."""
+    from agent.app.social_cognition import validate_social_cognition_output
+    from shared.chromie_contracts.plan import SocialCommunicationNeed
+    from shared.chromie_contracts.social_cognition import SocialCognitionOutput
+
+    gap = {"gap_id": "u1", "description": "Which object '那个' names.", "blocking": True, "resolved": False,
+           "required_for": ["soridormi.acquire_and_deliver_resource"], "preferred_resolution": "ask_user",
+           "source_kind": "execution_input" if variant == "other_input" else "unresolved_meaning",
+           "source_reference": "Which object '那个' names.", "resolution_sources_considered": ["authoritative_context"]}
+    need = SocialCommunicationNeed(
+        need_id="need:which", owner="planner", kind="input", reference_id="plan:that",
+        source_goal_ids=["goal:that"], source_responsibility_refs=["r1"],
+        facts={"role": "clarification", "source_responsibility_refs": ["r1"], "information_gaps": [gap]},
+    )
+    asked = {"text": "你是说那个牛奶瓶吗？", "speech_act": "" if variant == "not_a_question" else "ask",
+             "metadata": {"communicative_activity_ids": ["ask-which"], "addressed_need_ids": [],
+                          "source_responsibility_refs": ["r1"]}}
+    ingress = _uncertain_fetch_request()
+    current = ingress.model_copy(update={
+        "trigger": "work_state", "source_refs": ["plan:that"], "goal_ids": ["goal:that"],
+        "communication_needs": [need],
+        "context": {**ingress.context, "work_decision_pending": False, "interaction_context": {
+            "events": [asked], "already_spoken": [asked], "pending_speech": [], "prior_delivered_speech": []}},
+    })
+    reuse = SocialCognitionOutput.model_validate({
+        "disposition": "communicate", "reason_summary": "The question already asks it.",
+        "need_outcomes": {"need:which": "covered"},
+        "activities": [{"activity_id": "ask-which", "text": "你是说那个牛奶瓶吗？", "function": "ask",
+                        "truth_stage": "context_grounded", "source_responsibility_refs": ["r1"],
+                        "source_goal_ids": ["goal:that"], "addressed_need_ids": ["need:which"]}],
+    })
+    if variant == "meaning_question":
+        validate_social_cognition_output(reuse, current, [])
+    else:
+        with pytest.raises(ValueError, match="prior communicative act cannot answer"):
+            validate_social_cognition_output(reuse, current, [])
+
+
 def _weekday_work_state(**changes):
     from shared.chromie_contracts.core_interpretation import CognitiveResponsibilityProposal
 

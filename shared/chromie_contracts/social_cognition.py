@@ -290,6 +290,18 @@ def asks_about_uncertain_meaning(act: "SocialCommunicativeAct", request: "Social
     return act.function == "ask" and bool(cited) and cited <= uncertain_task_responsibility_refs(request)
 
 
+def need_asks_uncertain_meaning(need: Any) -> bool:
+    """An input need whose every gap is meaning UMI left uncertain.
+
+    The ingress question about that meaning may already have asked it (owner decision
+    2026-10-22), before the Planner's need existed.
+    """
+
+    gaps = need.facts.get("information_gaps") if need.kind == "input" else None
+    return isinstance(gaps, list) and bool(gaps) and all(
+        isinstance(gap, dict) and gap.get("source_kind") == "unresolved_meaning" for gap in gaps)
+
+
 def answer_awaited(prior: "SocialCognitionResolution", request: "SocialCognitionRequest") -> bool:
     """A same-turn SC result already asked about every Responsibility of this request.
 

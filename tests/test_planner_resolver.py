@@ -5405,7 +5405,7 @@ class PlannerResolverTests(unittest.TestCase):
                     context={"verified_tool_memory_index": index},
                 )
                 output = FastPlannerAdvanceModelOutput.model_validate({
-                    "responsibility_decisions": {"r1": {"decision": "work", "missing": []}},
+                    "responsibility_decisions": {"r1": {"needed_abilities_fit": True, "decision": "work", "missing": []}},
                     "disposition": "execute", "coverage": "complete", "covered_responsibility_refs": ["r1"],
                     "activities": [{"activity_id": "retrieve", "role": "capability", "capability_id": capability_id,
                                     "args": args, "argument_sources": {}, "depends_on": [],
@@ -6371,7 +6371,7 @@ class PlannerResolverTests(unittest.TestCase):
         )
         self.assertNotIn("clarify", schema["properties"]["disposition"]["enum"])
         raw = {
-            "responsibility_decisions": {"r1": {"decision": "work", "missing": []}},
+            "responsibility_decisions": {"r1": {"needed_abilities_fit": True, "decision": "work", "missing": []}},
             "activities": [{"role": "capability", "capability_id": capability["capability_id"],
                             "activity_id": "acquire-water", "args": {
                                 "resource": {"kind": "physical_object", "description": "water"},

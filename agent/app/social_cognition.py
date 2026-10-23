@@ -25,8 +25,8 @@ from shared.chromie_contracts.plan import FastProgressKind, validate_communicati
 from shared.chromie_contracts.social_cognition import (
     SocialCognitionOutput, SocialCognitionRequest, SocialCognitionResolution,
     SocialStartupGreetingOutput, SocialStartupGreetingRequest, SocialStartupGreetingResolution,
-    asks_about_uncertain_meaning, must_say_now_need_ids, pre_evidence_act_violation,
-    uncertain_task_responsibility_refs,
+    asks_about_uncertain_meaning, must_say_now_need_ids, need_asks_uncertain_meaning,
+    pre_evidence_act_violation, uncertain_task_responsibility_refs,
     value_review_responsibility_refs, value_withheld_need_ids,
 )
 from shared.chromie_contracts.text import normalize_whitespace
@@ -948,11 +948,17 @@ def validate_social_cognition_output(
         raise ValueError(
             "fresh addressed turn without pending or delivered reply requires acknowledgement"
         )
-    # Acts that already exist (pending or delivered) and the needs they addressed then.
+    # Acts that already exist (pending or delivered) and the needs they addressed then, and
+    # which of them the ledger records as a question about meaning UMI left uncertain.
     previous_need_bindings: dict[str, set[str]] = {}
+    meaning_questions: set[str] = set()
+    uncertain_refs = uncertain_task_responsibility_refs(request)
     for key in ("events", "already_spoken", "pending_speech"):
         for row in request.context.get("interaction_context", {}).get(key, []):
             metadata = row.get("metadata", {})
+            asked_refs = set(metadata.get("source_responsibility_refs") or [])
+            if row.get("speech_act") == "ask" and asked_refs and asked_refs <= uncertain_refs:
+                meaning_questions.update(metadata.get("communicative_activity_ids") or [])
             for identity in metadata.get("communicative_activity_ids") or []:
                 addressed = metadata.get("addressed_need_ids")
                 if isinstance(addressed, list):
@@ -1060,9 +1066,14 @@ def validate_social_cognition_output(
             if need.kind in {"input", "confirmation"} and act.function != "ask":
                 raise ValueError("an input or confirmation need requires a question")
             if (need.kind in {"input", "confirmation"} and act.activity_id in previous_need_bindings
-                    and need_id not in previous_need_bindings[act.activity_id]):
+                    and need_id not in previous_need_bindings[act.activity_id]
+                    and not (act.activity_id in meaning_questions and need_asks_uncertain_meaning(need)
+                             and asks_about_uncertain_meaning(act, request))):
                 # Live 2026-10-11 (h_ask_wallet_en): an earlier "Okay." was relabelled as the
-                # confirmation question. A question is asked after its need exists.
+                # confirmation question. A question is asked after its need exists, except the
+                # ingress question about uncertain meaning, which already asked the Planner's
+                # later input need for that meaning (owner decision 2026-10-22; live 2026-10-23:
+                # reusing it failed the turn with "抱歉，我没能完成刚才那个任务。").
                 raise ValueError("a prior communicative act cannot answer a later input or confirmation need")
 
 

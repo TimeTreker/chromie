@@ -860,6 +860,10 @@ class FastPlannerResponsibilityDecision(BaseModel):
     # (live 2026-10-16: a bare answer let "what time is it?" cite a milk bottle).
     answer_source: AnswerSource | None = None
     observed_refs: list[str] = Field(default_factory=list, max_length=8)
+    # A Responsibility that could be a limitation first states whether the abilities it needs
+    # fit; only false opens unavailable (live 2026-10-22: every need fit, yet "which one is
+    # 那个" was named as missing and the uncertain referent was decided unavailable).
+    needed_abilities_fit: bool | None = None
     decision: Literal["work", "answer", "answer_from_perception", "clarify", "unavailable"]
     missing: list[str] = Field(default_factory=list, max_length=4)
 
@@ -873,6 +877,8 @@ class FastPlannerResponsibilityDecision(BaseModel):
     def missing_names_a_limitation(self) -> "FastPlannerResponsibilityDecision":
         if (self.decision == "unavailable") != bool(self.missing):
             raise ValueError("only an unavailable decision names what is missing, and it must")
+        if self.needed_abilities_fit is not None and self.needed_abilities_fit == (self.decision == "unavailable"):
+            raise ValueError("unavailable is decided exactly when a needed ability does not fit")
         if (self.decision == "answer_from_perception") != bool(self.observed_refs):
             raise ValueError("only an answer_from_perception decision cites observed_refs, and it must")
         if self.answer_source is not None and (

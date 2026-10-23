@@ -15,7 +15,7 @@ from orchestrator.runtime.cognitive_runtime import (
     GoalDrivenRuntimeCoordinator,
 )
 from orchestrator.runtime.canonical_plan_adapter import CanonicalPlanRuntimeAdapter
-from shared.chromie_contracts.core_interpretation import CognitiveResponsibilityProposal, CognitiveWorkRequest
+from shared.chromie_contracts.core_interpretation import CognitiveResponsibilityProposal, CognitiveWorkRequest, UserMeaningUncertainty
 from shared.chromie_contracts.plan import FastPlannerAdvanceModelOutput, FastPlannerStreamFailure, FastPlannerStreamTerminal
 from tests.cognitive_runtime_test_support import admitted_core, new_goal_association, respond_plan
 from benchmarks.datasets.fast_planner_daily_life.qualification import declared_ability_needs, declared_ability_needs_text
@@ -99,7 +99,17 @@ def _valid_output() -> dict[str, Any]:
 
 
 def _counted(payload):
-    """A Work output states its Activity count before the Activities (2026-10-14)."""
+    """A Work output states its Activity count before the Activities (2026-10-14).
+
+    Each work, clarify or unavailable decision also states whether the needed abilities
+    fit (2026-10-23), false exactly for unavailable.
+    """
+    if isinstance(payload, dict) and isinstance(payload.get("responsibility_decisions"), dict):
+        payload = {**payload, "responsibility_decisions": {
+            ref: ({"needed_abilities_fit": item["decision"] != "unavailable", **item}
+                  if isinstance(item, dict) and item.get("decision") in {"work", "clarify", "unavailable"}
+                  and "needed_abilities_fit" not in item else item)
+            for ref, item in payload["responsibility_decisions"].items()}}
     if not isinstance(payload, dict) or "activity_count" in payload or not isinstance(payload.get("activities"), list):
         return payload
     counted = {}
@@ -218,6 +228,39 @@ def test_meaning_gaps_preserve_independent_terminal_work(preserve_all: bool, ind
     else:
         with pytest.raises(AuthoritativeGroundingValidationError):
             validate_fast_advance_output(output, request=request, responsibilities=responsibilities, capabilities=capabilities)
+
+def test_needed_abilities_fit_selects_the_decision_before_it_is_written() -> None:
+    """Every ability need fit, yet "把那个拿给我" named the referent as missing (live 2026-10-22).
+
+    Whether the needed abilities fit is stated first: true opens work or clarify, false only
+    unavailable. A speech-only Responsibility, which cannot be a limitation, states nothing.
+    """
+    nod = CognitiveResponsibilityProposal(local_ref='r1', outcome='nod at the indicated person twice', output_mode='body_action', bindings={'count': 2}, confidence=0.9)
+    reply = CognitiveResponsibilityProposal(local_ref='r2', outcome='say hello', output_mode='speech', continuity_scope='turn', confidence=0.9)
+    uncertainty = [UserMeaningUncertainty(local_ref='u1', kind='referent', description='which person 那个 is', responsibility_refs=['r1'])]
+    schema = fast_streaming_advance_response_schema(['r1', 'r2'], responsibilities=[nod, reply], capabilities=[_nod_catalog_capability().model_dump(mode='json')], meaning_uncertainties=uncertainty)
+    decisions = schema['properties']['responsibility_decisions']['properties']
+    offered = {(branch['properties']['needed_abilities_fit'].get('enum') or [branch['properties']['needed_abilities_fit'].get('const')])[0]: branch['properties']['decision']['enum'] for branch in decisions['r1']['oneOf']}
+    assert offered == {True: ['work', 'clarify'], False: ['unavailable']}
+    assert all(list(branch['properties'])[:2] == ['needed_abilities_fit', 'decision'] for branch in decisions['r1']['oneOf'])
+    assert 'needed_abilities_fit' not in json.dumps(decisions['r2'])
+    # The live shape: one fetch-like Responsibility whose referent UMI left uncertain.
+    alone = fast_streaming_advance_response_schema(['r1'], responsibilities=[nod], capabilities=[_nod_catalog_capability().model_dump(mode='json')], meaning_uncertainties=uncertainty)
+    validator = Draft202012Validator(alone)
+    gaps = [{'gap_id': 'gap-person', 'description': 'which person 那个 is', 'blocking': True, 'resolved': False, 'required_for': ['which person 那个 is'], 'preferred_resolution': 'ask_user', 'source_kind': 'unresolved_meaning', 'source_reference': 'which person 那个 is', 'resolution_sources_considered': ['authoritative_context']}]
+    clarify = {'responsibility_decisions': {'r1': {'needed_abilities_fit': True, 'decision': 'clarify', 'missing': []}}, 'disposition': 'clarify', 'coverage': 'complete', 'covered_responsibility_refs': ['r1'], 'activities': [{'activity_id': 'ask-who', 'role': 'clarification', 'source_responsibility_refs': ['r1'], 'information_gaps': gaps}], 'confidence': 0.9, 'unresolved': ['which person 那个 is'], 'reason_summary': 'Ask who is meant.'}
+    assert validator.is_valid(_counted(clarify))
+    lacking = {**clarify, 'responsibility_decisions': {'r1': {'needed_abilities_fit': False, 'decision': 'unavailable', 'missing': ['nod at a person']}}, 'disposition': 'unavailable', 'coverage': 'uncertain', 'activities': [], 'unresolved': ['nod at a person']}
+    assert validator.is_valid(_counted(lacking))
+    contradiction = {**lacking, 'responsibility_decisions': {'r1': {'needed_abilities_fit': True, 'decision': 'unavailable', 'missing': ['which person 那个 is']}}}
+    assert not validator.is_valid(_counted(contradiction))
+    with pytest.raises(ValueError):
+        FastPlannerAdvanceModelOutput.model_validate(contradiction)
+    unstated = {**clarify, 'responsibility_decisions': {'r1': {'decision': 'clarify', 'missing': []}}}
+    assert not validator.is_valid({**unstated, 'activity_count': 1})
+    # A fixture authored before the field declares it from its own decision.
+    assert declared_ability_needs(unstated, alone)['responsibility_decisions'] == clarify['responsibility_decisions']
+
 
 def _body_request() -> tuple[CognitiveWorkRequest, CognitiveResponsibilityProposal]:
     responsibility = CognitiveResponsibilityProposal(local_ref='walk', outcome='walk forward for ten seconds', output_mode='body_action', bindings={'duration_s': 10}, confidence=0.99)
@@ -1738,7 +1781,8 @@ def test_the_activity_count_comes_first_and_fixes_how_many_activities_follow():
                 "depends_on": [], "source_responsibility_refs": ["r1"]}
 
     def output(count, activities):
-        return {"responsibility_decisions": {"r1": {"decision": "work", "missing": []}}, "activity_count": count,
+        return {"responsibility_decisions": {"r1": {"needed_abilities_fit": True, "decision": "work", "missing": []}},
+                "activity_count": count,
                 "activities": activities, "disposition": "execute", "coverage": "complete",
                 "covered_responsibility_refs": ["r1"], "confidence": 1.0, "unresolved": [], "reason_summary": "x"}
 
@@ -1790,8 +1834,8 @@ def test_one_activity_for_every_work_responsibility_serves_them_all():
     schema = fast_streaming_advance_response_schema(["r1", "r2"], responsibilities=sources, capabilities=[read])
 
     def output(refs):
-        return {"responsibility_decisions": {"r1": {"decision": "work", "missing": []},
-                                             "r2": {"decision": "work", "missing": []}},
+        return {"responsibility_decisions": {"r1": {"needed_abilities_fit": True, "decision": "work", "missing": []},
+                                             "r2": {"needed_abilities_fit": True, "decision": "work", "missing": []}},
                 "activity_count": 1,
                 "activities": [{"role": "capability", "source_responsibility_refs": refs,
                                 "capability_id": "test.weather", "activity_id": "act_0", "args": {},

@@ -17,7 +17,8 @@ Run the everyday live-text cohort (`scenarios/everyday/`, 70 cases) against
 Soridormi MuJoCo, judge every case, and repair each failure at its earliest
 responsible owner. One invocation and one debug bundle per run; a hard failure in
 the 15-case `must_pass` smoke stage stops `core` and `challenge` (owner rule).
-Evidence and per-run judgments: `.chromie/acceptance/ingress-awaiting-20261023/` (focused),
+Evidence and per-run judgments: `.chromie/acceptance/planner-fit-20261023/` and
+`ingress-awaiting-20261023/` (focused),
 `sc-evidence-20261022/` (latest full run),
 `sc-ask-uncertain-20261022/`, `main-ad898cf7f-20261022/`, `vj-facts-20261021/`,
 `thirsty-offer-20261021/`,
@@ -27,23 +28,22 @@ Evidence and per-run judgments: `.chromie/acceptance/ingress-awaiting-20261023/`
 
 ## Resume point — 2026-10-23
 
-- Agent `ingress-awaiting-20261023` (= `chromie-agent:latest`, `42492ddbaf87`) is built from the source this
-  delivery records and deployed with the quiet-mode timeout override. Rollback: `sc-evidence-20261022`.
+- Agent `planner-fit-20261023` (= `chromie-agent:latest`, `ac2391a00505`) is built from the source this
+  delivery records and deployed with the quiet-mode timeout override. Rollback: `ingress-awaiting-20261023`.
 - Quiet mode: the owner runs `sudo .chromie/quiet-mode/quiet-mode.sh on` (CPU turbo off, GPU clocks
   210-1800 MHz, GPU power at its 400 W minimum); a reboot resets it unless `enable-at-boot` is used.
   The quiet-mode Host override raises the TTS playback-start barrier to 60 s, which lifts the speech
   request timeout to 65 s.
 - The last full run (`8520d0468`, smoke 15/15, core 22/29) stopped at `info_umbrella_zh`: the Planner
-  cited another Responsibility's words. It also showed Social Cognition reading Chromie's own ingress
-  question as the answer; this delivery holds a goal_state wake-up while that question awaits the person.
-- Focused reruns of this delivery (`.chromie/acceptance/ingress-awaiting-20261023/`): no invented answer
-  after the ingress question; the Planner then chose `unavailable` for the uncertain "那个" and SC had to
-  say it could not fetch, right after asking which one (STATUS open work 1). A Chinese-answer preference
-  was not kept (open work 2).
-- Next: the Planner's clarify-versus-unavailable decision for an uncertain referent whose need fits,
-  then the cross-Responsibility citation, then the complete cohort.
+  cited another Responsibility's words.
+- Since then (focused reruns, `.chromie/acceptance/ingress-awaiting-20261023/` and `planner-fit-20261023/`):
+  an ingress question is no longer followed by an invented answer; the Planner states whether the
+  needed abilities fit before deciding, so an uncertain referent is clarified rather than declared
+  unavailable, and the ingress question covers that clarification. A Chinese-answer preference was
+  not kept (STATUS open work 2).
+- Next: the Planner's cross-Responsibility citation, then the complete cohort on a fresh LLM lifetime.
 
-Verification: the new regression is red without its fix. Gate on the GPU host: pytest 4,007
+Verification: the new regressions are red without their fixes. Gate on the GPU host: pytest 4,011
 passed + 5 skipped (`xgrammar` not installed), benchmarks 172, legacy Agent tests 20; policies,
 docs, test ownership, ruff, mypy and runtime-structure ratchets pass (the `cognitive_runtime.py`
 line baseline rises 3690 → 3694 for the goal_state hold; owner review). Freeze 47 is unchanged.
@@ -78,6 +78,11 @@ line baseline rises 3690 → 3694 for the goal_state hold; owner review). Freeze
   its own Activity (live: "我考了满分！快跟我一起庆祝一下！" spent its one Activity on the
   sibling answer). Social Cognition's first act names every result need that must be
   said now (live: "我不会后空翻" said the limitation but named only the answer need).
+- A Responsibility that could be a limitation states `needed_abilities_fit` right before its
+  decision; only `false` opens `unavailable` (live 2026-10-22: every ability need fit, yet
+  "把那个拿给我" named the uncertain referent as missing and was decided unavailable, so SC
+  had to say it could not fetch right after asking which one). An answer from perception
+  states no fit.
 - An information Responsibility that perception could answer first states `answer_source`
   ("a current observation shows it" or "a Capability or what Chromie knows answers it"),
   then `observed_refs`, then its decision (live: "帮我拿瓶水，顺便告诉我现在几点。" cited the
@@ -107,7 +112,10 @@ line baseline rises 3690 → 3694 for the goal_state hold; owner review). Freeze
   turn's reply until the person answers: a later goal_state wake-up for only those
   Responsibilities in the same turn returns that delivered result and is not sent to SC (live
   2026-10-22: a goal_state SC read "你是说那个牛奶瓶吗？" as the answer, "是的，就是那个。").
-  The Planner's clarify need for the same meaning may stay pending or reuse the question.
+  The Planner's clarify need for the same meaning may stay pending or reuse the question:
+  a prior act may cover a later input need only when the ledger records it as a question
+  about that uncertain meaning and every gap of the need is that meaning (the 2026-10-11
+  relabelled "Okay." stays rejected).
 - After ingress, an informing, answering, asking or repairing act about task Work needs that
   Work's Evidence (post_evidence), a supplied need, or only speech Responsibilities; otherwise it
   is pre_evidence. The decoder offers pre_evidence at every trigger with task Work, and Host and

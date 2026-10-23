@@ -230,7 +230,17 @@ def host_work(activities):
 
 
 def _counted(payload):
-    """A streamed Work output states its Activity count before the Activities (2026-10-14)."""
+    """A streamed Work output states its Activity count before the Activities (2026-10-14).
+
+    Each work, clarify or unavailable decision also states whether the needed abilities
+    fit (2026-10-23), false exactly for unavailable.
+    """
+    if isinstance(payload, dict) and isinstance(payload.get("responsibility_decisions"), dict):
+        payload = {**payload, "responsibility_decisions": {
+            ref: ({"needed_abilities_fit": item["decision"] != "unavailable", **item}
+                  if isinstance(item, dict) and item.get("decision") in {"work", "clarify", "unavailable"}
+                  and "needed_abilities_fit" not in item else item)
+            for ref, item in payload["responsibility_decisions"].items()}}
     return declared_activity_count(payload, {"properties": {"activity_count": {}}})
 
 

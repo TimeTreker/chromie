@@ -5,6 +5,19 @@ remains available in Git history.
 
 ## Unreleased
 
+### Unavailable only when an ability is missing; the ingress question covers the Planner's (2026-10-23)
+
+- Before deciding a Responsibility that could be a limitation, the Planner states whether the
+  abilities it needs fit: true offers work, answer or clarify, false only unavailable. Live,
+  every ability need fit, yet "把那个拿给我" named the uncertain referent as missing and was
+  decided unavailable, so Social Cognition said it could not fetch right after asking which
+  one. Replayed recorded requests: both uncertain referents now clarify; backflip, dance,
+  singing, reminders and coffee stay unavailable; work, answers and perceived answers are
+  unchanged (margins 6-10 nats).
+- A question Social Cognition asked at ingress about meaning UMI left uncertain may cover the
+  Planner's later input need for that same meaning; the ledger must record it as that
+  question. Live, reusing it was rejected and the turn ended in "抱歉，我没能完成刚才那个任务。".
+
 ### A question asked at ingress waits for the person's answer (2026-10-23)
 
 - After Chromie asks which thing the person means, a later Goal-state wake-up in the same

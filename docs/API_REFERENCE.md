@@ -311,7 +311,10 @@ carry content only the model authors and fail closed without their Activity, so 
 requires a `clarify` state's Activity, and an `unresolved_meaning` gap cites the exact UMI
 uncertainty wording. A mixed
 state may therefore hold only a response or an input Need beside a limitation.
-Ordinary speech is always answered, never decided unavailable. An information
+Ordinary speech is always answered, never decided unavailable. A Responsibility that
+could be a limitation first states `needed_abilities_fit`: `true` offers `work`, `answer`
+or `clarify`, `false` only `unavailable`, and the DTO rejects any other pairing (an uncertain
+referent whose abilities fit is a clarification, not a limitation). An information
 Responsibility that current established perception already answers first names those
 `situation.interpretations` IDs in its decision's `observed_refs`, then decides
 `answer_from_perception`; only a non-empty `observed_refs` opens that decision, which

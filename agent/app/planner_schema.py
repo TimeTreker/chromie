@@ -2150,6 +2150,14 @@ def fast_advance_response_schema(
             # does not know, or will not say (live 2026-10-12: a joke was "unavailable").
             branches = ([answered] if ref in speech_only and "answer" in choices
                         else [limitation] if not choices else [answered, limitation])
+            if len(branches) == 2:
+                # Whether the needed abilities fit is stated first and selects the branch: an
+                # uncertain referent was decided unavailable although every need fit (live
+                # 2026-10-22, "把那个拿给我").
+                branches = [{**branch, "required": ["needed_abilities_fit", *branch["required"]],
+                             "properties": {"needed_abilities_fit": {"type": "boolean", "const": fits},
+                                            **branch["properties"]}}
+                            for branch, fits in zip(branches, (True, False), strict=True)]
             if ref in perceived_answer_refs and not (committed_communicative or suppress_new_communicative):
                 # Say where the answer comes from, then name the observations; only a cited
                 # observation opens answer_from_perception. An opaque observation list alone let
