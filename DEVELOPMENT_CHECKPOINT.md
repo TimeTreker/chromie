@@ -17,33 +17,36 @@ Run the everyday live-text cohort (`scenarios/everyday/`, 70 cases) against
 Soridormi MuJoCo, judge every case, and repair each failure at its earliest
 responsible owner. One invocation and one debug bundle per run; a hard failure in
 the 15-case `must_pass` smoke stage stops `core` and `challenge` (owner rule).
-Evidence and per-run judgments: `.chromie/acceptance/sc-evidence-20261022/` (latest),
+Evidence and per-run judgments: `.chromie/acceptance/ingress-awaiting-20261023/` (focused),
+`sc-evidence-20261022/` (latest full run),
 `sc-ask-uncertain-20261022/`, `main-ad898cf7f-20261022/`, `vj-facts-20261021/`,
 `thirsty-offer-20261021/`,
 `main-6f8525947-quiet-20261021/`, `umi-time-margin-20261021/`, `main-3178a822c-20261021/`,
 `playback-race-20261020/`, `answer-source-20261020/`, `gaze-turn-20261020/`, `said-now-20261020/`, `decided-activity-20261020/`,
 `main-03974435e-20261020/` and `everyday-20261016/` (README.md in each).
 
-## Resume point — 2026-10-22
+## Resume point — 2026-10-23
 
-- Agent `sc-evidence-20261022` (= `chromie-agent:latest`, `2eadc0bbc248`) is built from the source this
-  delivery records and deployed with the quiet-mode timeout override. Rollback: `vj-facts-20261021`.
+- Agent `ingress-awaiting-20261023` (= `chromie-agent:latest`, `42492ddbaf87`) is built from the source this
+  delivery records and deployed with the quiet-mode timeout override. Rollback: `sc-evidence-20261022`.
 - Quiet mode: the owner runs `sudo .chromie/quiet-mode/quiet-mode.sh on` (CPU turbo off, GPU clocks
   210-1800 MHz, GPU power at its 400 W minimum); a reboot resets it unless `enable-at-boot` is used.
   The quiet-mode Host override raises the TTS playback-start barrier to 60 s, which lifts the speech
-  request timeout to 65 s (six slow TTS chunks had passed the fixed 30 s and were cancelled).
-- On `ad898cf7f` the cohort stopped in must_pass: ingress Social Cognition asked "which one?" inside
-  an acknowledgement. The owner decided that SC may ask right away about a meaning uncertainty UMI
-  listed. With that and the later repairs the cohort reached smoke 15/15 and core 22/29.
-- The last run stopped at `info_umbrella_zh`: the Planner cited another Responsibility's words.
-  It also showed a truthfulness defect caused by the ingress question (STATUS open work 1).
-- Next: make an ingress question count as asked and awaiting the person, so later turns of that
-  request neither invent the answer nor repeat it; then STATUS open work 1 and the complete cohort.
+  request timeout to 65 s.
+- The last full run (`8520d0468`, smoke 15/15, core 22/29) stopped at `info_umbrella_zh`: the Planner
+  cited another Responsibility's words. It also showed Social Cognition reading Chromie's own ingress
+  question as the answer; this delivery holds a goal_state wake-up while that question awaits the person.
+- Focused reruns of this delivery (`.chromie/acceptance/ingress-awaiting-20261023/`): no invented answer
+  after the ingress question; the Planner then chose `unavailable` for the uncertain "那个" and SC had to
+  say it could not fetch, right after asking which one (STATUS open work 1). A Chinese-answer preference
+  was not kept (open work 2).
+- Next: the Planner's clarify-versus-unavailable decision for an uncertain referent whose need fits,
+  then the cross-Responsibility citation, then the complete cohort.
 
-Verification: the new regressions are red without their fixes. Gate on the GPU host: pytest 4,005
+Verification: the new regression is red without its fix. Gate on the GPU host: pytest 4,007
 passed + 5 skipped (`xgrammar` not installed), benchmarks 172, legacy Agent tests 20; policies,
-docs, test ownership, ruff, mypy and runtime-structure ratchets pass. All 300 Social Cognition
-schema shapes compile on live SGLang. Freeze 47 is unchanged.
+docs, test ownership, ruff, mypy and runtime-structure ratchets pass (the `cognitive_runtime.py`
+line baseline rises 3690 → 3694 for the goal_state hold; owner review). Freeze 47 is unchanged.
 
 ## Repairs in force from this Issue
 
@@ -100,6 +103,11 @@ schema shapes compile on live SGLang. Freeze 47 is unchanged.
   uncertainty for it: the decoder offers that question branch and Host and the DTO admit it
   only then. Its task receipt no longer suggests "好的", matching the authority prompt's
   "嗯，我看看。" (live 2026-10-22: "好的，请问是哪一个？" was rejected as an acknowledgement).
+- A question Social Cognition asked about a Responsibility's uncertain meaning stands as the
+  turn's reply until the person answers: a later goal_state wake-up for only those
+  Responsibilities in the same turn returns that delivered result and is not sent to SC (live
+  2026-10-22: a goal_state SC read "你是说那个牛奶瓶吗？" as the answer, "是的，就是那个。").
+  The Planner's clarify need for the same meaning may stay pending or reuse the question.
 - After ingress, an informing, answering, asking or repairing act about task Work needs that
   Work's Evidence (post_evidence), a supplied need, or only speech Responsibilities; otherwise it
   is pre_evidence. The decoder offers pre_evidence at every trigger with task Work, and Host and

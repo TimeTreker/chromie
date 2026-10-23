@@ -283,6 +283,25 @@ def uncertain_task_responsibility_refs(request: "SocialCognitionRequest") -> set
     return task_refs & named
 
 
+def asks_about_uncertain_meaning(act: "SocialCommunicativeAct", request: "SocialCognitionRequest") -> bool:
+    """The act is the question that settles task meaning UMI left uncertain."""
+
+    cited = set(act.source_responsibility_refs)
+    return act.function == "ask" and bool(cited) and cited <= uncertain_task_responsibility_refs(request)
+
+
+def answer_awaited(prior: "SocialCognitionResolution", request: "SocialCognitionRequest") -> bool:
+    """A same-turn SC result already asked about every Responsibility of this request.
+
+    The question stands until the person answers; committed Goal state adds nothing to say
+    (live 2026-10-22: a goal_state SC read "你是说那个牛奶瓶吗？" as the answer, "是的，就是那个。").
+    """
+
+    asked = {ref for act in prior.activities if asks_about_uncertain_meaning(act, request)
+             for ref in act.source_responsibility_refs}
+    return bool(asked) and {item.local_ref for item in request.responsibilities} <= asked
+
+
 def pre_evidence_act_violation(act: "SocialCommunicativeAct", request: "SocialCognitionRequest") -> str | None:
     """After ingress, words about task Work without its Evidence or a supplied need are pre-evidence.
 
@@ -384,10 +403,7 @@ class SocialCognitionResolution(SocialCognitionOutput):
                     if item.continuity_scope == "turn"
                 }
                 cited_refs = set(act.source_responsibility_refs)
-                asks_uncertain_meaning = act.function == "ask" and bool(cited_refs) and cited_refs.issubset(
-                    uncertain_task_responsibility_refs(request)
-                )
-                if not asks_uncertain_meaning and (
+                if not asks_about_uncertain_meaning(act, request) and (
                     not cited_refs or not cited_refs.issubset(turn_local_refs - value_review_responsibility_refs(request))
                 ):
                     raise ValueError(

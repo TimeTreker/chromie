@@ -25,7 +25,8 @@ from shared.chromie_contracts.plan import FastProgressKind, validate_communicati
 from shared.chromie_contracts.social_cognition import (
     SocialCognitionOutput, SocialCognitionRequest, SocialCognitionResolution,
     SocialStartupGreetingOutput, SocialStartupGreetingRequest, SocialStartupGreetingResolution,
-    must_say_now_need_ids, pre_evidence_act_violation, uncertain_task_responsibility_refs,
+    asks_about_uncertain_meaning, must_say_now_need_ids, pre_evidence_act_violation,
+    uncertain_task_responsibility_refs,
     value_review_responsibility_refs, value_withheld_need_ids,
 )
 from shared.chromie_contracts.text import normalize_whitespace
@@ -1010,9 +1011,7 @@ def validate_social_cognition_output(
                 if item.output_mode != "speech"
             }
             cited_refs = set(act.source_responsibility_refs)
-            asks_uncertain_meaning = act.function == "ask" and bool(cited_refs) and cited_refs.issubset(
-                uncertain_task_responsibility_refs(request)
-            )
+            asks_uncertain_meaning = asks_about_uncertain_meaning(act, request)
             if asks_uncertain_meaning:
                 if act.truth_stage != "context_grounded":
                     raise ValueError("a question about uncertain meaning is context-grounded")

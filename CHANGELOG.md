@@ -5,6 +5,16 @@ remains available in Git history.
 
 ## Unreleased
 
+### A question asked at ingress waits for the person's answer (2026-10-23)
+
+- After Chromie asks which thing the person means, a later Goal-state wake-up in the same
+  turn no longer asks Social Cognition again: the question stands as the turn's reply until
+  the person answers. Live, a goal_state Social Cognition read "你是说那个牛奶瓶吗？" as the
+  answer, said "是的，就是那个。", and the Planner's question then became "好的，我这就拿给你。".
+- One contract definition of a question about uncertain meaning replaces the copies in the
+  contract and Agent validation.
+- The Host runtime file's size ratchet rises by four lines for this check and its log line.
+
 ### Asking right away, no results before Evidence, decoder control characters (2026-10-22)
 
 - When UMI lists a meaning uncertainty for a task ("把那个拿给我" with two bottles in view),

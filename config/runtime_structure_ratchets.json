@@ -58,7 +58,7 @@
     "agent/app/planner_validation.py": 3559,
     "orchestrator/orchestrator.py": 1994,
     "orchestrator/runtime/capability_runtime.py": 2676,
-    "orchestrator/runtime/cognitive_runtime.py": 3690,
+    "orchestrator/runtime/cognitive_runtime.py": 3694,
     "orchestrator/runtime/conversation_state.py": 2418
   },
   "size_baseline_revision": "33279855fad390b68cba496ee5cc373f02cf570e"

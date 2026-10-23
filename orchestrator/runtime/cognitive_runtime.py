@@ -33,7 +33,7 @@ from shared.chromie_contracts.semantic_artifact import (
     merge_semantic_artifact_lineage,
     semantic_artifact_ref,
 )
-from shared.chromie_contracts.social_cognition import SocialCognitionRequest, SocialCognitionResolution
+from shared.chromie_contracts.social_cognition import SocialCognitionRequest, SocialCognitionResolution, answer_awaited
 from shared.chromie_contracts.reflex import CancellationDirective
 from shared.chromie_contracts.plan import (
     communication_need_id,
@@ -536,6 +536,11 @@ class GoalDrivenRuntimeCoordinator:
             await self._finish_or_cancel_social_turn(previous, turn_id=turn_id)
             if not current():
                 return
+            prior = previous[1] if previous is not None and previous[2] == turn_id else None
+            prior_result = prior.result() if prior and prior.done() and not prior.cancelled() and not prior.exception() else None
+            if request.trigger == "goal_state" and prior_result and answer_awaited(prior_result[0], request):
+                logger.info("goal_state_social_waits_for_answer sid=%s turn=%s", sid, turn_id)
+                return prior_result  # the same-turn question stands until the person answers
             if primary_plan is not None:
                 # Bind optional Work-state reporting to its actual execution
                 # scope. Independent interpretation/greeting does not expire
@@ -873,7 +878,6 @@ class GoalDrivenRuntimeCoordinator:
         status = str(getattr(output, "status", "") or "").strip()
         if status:
             return status
-        disposition = str(getattr(output, "disposition", "") or "").strip()
         return "accepted"
 
     @staticmethod

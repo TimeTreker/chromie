@@ -831,6 +831,87 @@ async def test_silent_goal_update_keeps_delivered_initial_response_on_late_work_
         assert state.active_goal_snapshots()[0]["responsibility_status"] == "open"
 
 
+@pytest.mark.asyncio
+@pytest.mark.parametrize("asked", [True, False])
+async def test_goal_state_waits_for_the_answer_to_an_ingress_question(asked):
+    """A question asked at ingress stands until the person answers (live 2026-10-22).
+
+    Chromie asked "你是说那个牛奶瓶吗？"; GA then related the Goal to the earlier turn and its
+    goal_state SC said "是的，就是那个。", reading Chromie's own question as the answer.
+    """
+    import asyncio
+    from shared.chromie_contracts.plan import FastPlannerAdvance, FastPlannerInputNeed
+    from tests.cognitive_runtime_test_support import ScriptedClient
+
+    goal_id = "goal-that-bottle"
+    data = body_goal_association(goal_id).model_dump(mode="json")
+    data["cognitive_requests"] = [{"authority": "social_cognition", "responsibility_refs": ["r1"],
+                                   "reason_summary": "Observe Goal state."}]
+    data["new_goals"][0]["related_goal_ids"] = ["goal-earlier"]
+    association = GoalAssociationResolution.model_validate(data)
+    delivered = asyncio.Event()
+
+    class Runtime(FakeRuntime):
+        async def record_social_delivery(self, *args, **kwargs):
+            delivered.set()
+            return True
+
+    class Agent(ScriptedClient):
+        async def resolve_goal_association(self, *args, **kwargs):
+            # GA commits after the ingress reply was delivered, as in the live turn.
+            await delivered.wait()
+            return await super().resolve_goal_association(*args, **kwargs)
+
+        async def resolve_social_cognition(self, session, *, request, **kwargs):
+            if request.trigger != "interpretation":
+                return await super().resolve_social_cognition(session, request=request, **kwargs)
+            self.social_requests.append(request)
+            act = ({"text": "你是说那个牛奶瓶吗？", "function": "ask", "truth_stage": "context_grounded"}
+                   if asked else
+                   {"text": "好的。", "function": "acknowledge", "truth_stage": "pre_evidence",
+                    "progress_kind": "acknowledge_work"})
+            return SocialCognitionResolution(
+                request_id=request.request_id, snapshot_digest=request.snapshot_digest(),
+                disposition="communicate",
+                activities=[{"activity_id": "ingress", "source_responsibility_refs": ["r1"], **act}],
+                need_outcomes={}, reason_summary="Ingress reply.", model_call_count=1,
+            )
+
+    gap = {
+        "gap_id": "gap-bottle", "description": "Which bottle should be brought?", "blocking": True,
+        "required_for": ["object"], "preferred_resolution": "ask_user", "source_kind": "unresolved_meaning",
+        "source_reference": "u1", "resolution_sources_considered": ["authoritative_context"],
+    }
+    agent = Agent(association=association, fast_plans=[], fast_advances=[FastPlannerAdvance(
+        turn_id="turn-that-bottle", disposition="clarify", coverage="uncertain",
+        covered_responsibility_refs=["r1"], confidence=0.9, unresolved=["u1"],
+        activities=[FastPlannerInputNeed(activity_id="ask-bottle", role="clarification",
+                                         information_gaps=[gap], source_responsibility_refs=["r1"])],
+        reason_summary="Which bottle is meant is unresolved.",
+    )])
+    state = ConversationStateManager(base_conversation_id="that-bottle")
+    coordinator = GoalDrivenRuntimeCoordinator(
+        agent_client=agent, adapter=RecordingPlannerAdapter(Runtime()),
+        policy=CognitiveRuntimePolicy(mode="apply"),
+        goal_state_apply=state.apply_goal_association_resolution,
+        communicative_goal_completion_apply=state.reconcile_communicative_goal_completion,
+    )
+    text = "把那个拿给我"
+    core, envelope = admitted_core(
+        text, sid="that-bottle", language="zh-CN",
+        responsibilities=[{"local_ref": "r1", "outcome": "把那个瓶子拿给说话的人",
+                           "output_mode": "body_action", "confidence": 0.9}],
+        meaning_uncertainties=["那个 could be the water bottle or the milk bottle."],
+    )
+    await asyncio.wait_for(coordinator.resolve(
+        object(), text=text, sid="that-bottle", core_interpretation=core,
+        turn_envelope=envelope, context={"history": []}, history=[], language="zh-CN",
+    ), 3)
+    triggers = [request.trigger for request in agent.social_requests]
+    assert triggers[0] == "interpretation"
+    assert ("goal_state" in triggers) is not asked, triggers
+
+
 def test_umi_states_value_review_for_every_result_type() -> None:
     """UMI records whether a request would deceive or harm, whatever its result type."""
     schema = OllamaUserMeaningInterpreter._user_meaning_interpretation_response_schema(

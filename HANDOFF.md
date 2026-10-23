@@ -5,31 +5,32 @@ exact commands. Replace it on each delivery; do not append history. The resume
 boundary is in the [checkpoint](DEVELOPMENT_CHECKPOINT.md); current status and the
 ordered open work are in [STATUS](docs/STATUS.md).
 
-## Current snapshot — 2026-10-22
+## Current snapshot — 2026-10-23
 
 - Checkout `/home/chromie/github/chromie`, branch `main`; the expected resume revision is
   the latest `origin/main` commit containing this file (the 2026-10-20 repair and build
   branches are merged; the owner merged them without a post-merge gate).
-- Soridormi `/home/chromie/github/soridormi` on `main` at `e6257f4`, which contains `51a2afa`, the
+- Soridormi `/home/chromie/github/soridormi` on `main` at `5b39f14` (its branches merged 2026-10-22), which contains `51a2afa`, the
   revision pinned by `capabilities/soridormi.json` and `release/compatibility.json`. The
   MCP container mounts its `src`, so a `docker restart soridormi-runtime-mcp` loads it and
   resets the scene (user at -90 degrees, 1.5 m).
-- Live Agent: `chromie-agent:latest` = `sc-evidence-20261022` (`2eadc0bbc248`), built from the
+- Live Agent: `chromie-agent:latest` = `ingress-awaiting-20261023` (`42492ddbaf87`), built from the
   source this delivery records and started with the quiet-mode timeout override;
-  `--verify-agent-source` matches. Rollback image: `vj-facts-20261021`. LLM: `chromie-sglang:latest` = `gemma4-fp8`
+  `--verify-agent-source` matches. Rollback image: `sc-evidence-20261022` (`2eadc0bbc248`). LLM: `chromie-sglang:latest` = `gemma4-fp8`
   (`f59a042e6973`); compose resolves `chromie-sglang:${CHROMIE_IMAGE_TAG}`, so the
   `latest` tag must exist for `start_chromie.sh`.
 - Workflow corpus: freeze 47 (`bdb8db08…`; scripts in `.chromie/acceptance/thirsty-offer-20261021/freeze47/`). Restore it with
   `python -m benchmarks.regression restore-fixtures`; do not untar `frozen.tar.xz` over
   `workflow_scenarios/` (its inner `manifest.json` lacks the storage identity).
-- Evidence (README in each): `.chromie/acceptance/sc-evidence-20261022/` (latest runs; SC schema
+- Evidence (README in each): `.chromie/acceptance/ingress-awaiting-20261023/` (this delivery's focused reruns and gate log),
+  `sc-evidence-20261022/` (latest full run; SC schema
   compile check in `.chromie/acceptance/tools/`), `sc-ask-uncertain-20261022/`, `main-ad898cf7f-20261022/`,
   `vj-facts-20261021/` (Value Judgment probes and focused reruns), `thirsty-offer-20261021/` (2026-10-21 run stopped at `errand_remote_en`; freeze 47 scripts), `main-6f8525947-quiet-20261021/` (stopped at
   `multi_thirsty_yes_en`), `umi-time-margin-20261021/` (LLM-lifetime drift), `main-3178a822c-20261021/`,
   `playback-race-20261020/`, `answer-source-20261020/`, `gaze-turn-20261020/`, `said-now-20261020/`,
   `decided-activity-20261020/`, `main-03974435e-20261020/`.
   Bundles `~/Downloads/chromie_debug_bundle_2026102*.tar.gz`. Earlier runs: `.chromie/acceptance/everyday-20261016/`.
-- Last gate and strict replay (this delivery's source, GPU host): pytest 4,005 passed + 5 skipped (`xgrammar` not installed), benchmarks 172, legacy Agent tests 20; policies, docs, test ownership, ruff, mypy and runtime-structure ratchets pass; `scripts/run_workflow_replay.py` 6,000 cases passed on freeze 47 (2026-10-21; freeze unchanged since). The gate needs `anthropic==1.15.0` from `requirements-test.txt` (`INSTALL_TEST_DEPS=1`).
+- Last gate and strict replay (this delivery's source, GPU host, 2026-10-23): pytest 4,007 passed + 5 skipped (`xgrammar` not installed), benchmarks 172, legacy Agent tests 20; policies, docs, test ownership, ruff, mypy and runtime-structure ratchets pass; `scripts/run_workflow_replay.py` 6,000 cases passed on freeze 47 (2026-10-21; freeze unchanged since). The gate needs `anthropic==1.15.0` from `requirements-test.txt` (`INSTALL_TEST_DEPS=1`).
 - `start_chromie.sh --build` reuses the layer cache, takes package downloads from BuildKit
   cache mounts, and recreates only the services whose image changed. The first build
   after this change reruns the cache-mount layers once.
@@ -62,7 +63,7 @@ ordered open work are in [STATUS](docs/STATUS.md).
 
 ```bash
 # owner: rebuild the Agent from a clean main checkout and deploy it
-# (rollback: docker tag chromie-agent:vj-facts-20261021 chromie-agent:latest)
+# (rollback: docker tag chromie-agent:sc-evidence-20261022 chromie-agent:latest)
 env -u HTTP_PROXY -u HTTPS_PROXY -u http_proxy -u https_proxy ./scripts/compose.sh build chromie-agent
 CHROMIE_SERVICE_RUNTIME_OVERRIDE_FILE=.chromie/quiet-mode/agent-timeouts.env env -u HTTP_PROXY -u HTTPS_PROXY -u http_proxy -u https_proxy ./scripts/compose.sh up -d --no-build --force-recreate --no-deps chromie-agent
 python scripts/capture_runtime_identity.py --verify-agent-source chromie-agent
