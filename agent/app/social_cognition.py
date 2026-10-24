@@ -1172,6 +1172,40 @@ def _social_mind_projection(context: dict[str, Any]) -> dict[str, Any]:
     return projected
 
 
+_GOAL_BOUND_TRIGGERS = frozenset({"goal_state", "work_state", "evidence"})
+_GOAL_RESTATEMENT_KEYS = (
+    "goal_association_candidates", "user_meaning_goal_context", "working_goal_memory",
+    "long_term_goal_memory", "recent_goal_snapshots", "active_task_contexts", "active_task_snapshots",
+    "task_contexts", "current_task_context", "current_task", "pending_tasks", "active_pending_tasks",
+)
+_REPEATED_SUBTREE_MIN_CHARS = 256
+
+
+def _without_repeated_subtrees(packet: dict[str, Any]) -> dict[str, Any]:
+    """Replace each repeated subtree with a pointer to its first copy (performance, 2026-10-24).
+
+    Mechanical and lossless: a dict or list whose canonical JSON reaches the size floor and
+    already appeared earlier in the snapshot becomes {"same_as": "<path>"} (live: one Goal
+    list three times, Evidence in four places).
+    """
+
+    seen: dict[str, str] = {}
+
+    def visit(node: Any, path: str) -> Any:
+        if isinstance(node, (dict, list)):
+            encoded = json.dumps(node, sort_keys=True, ensure_ascii=False)
+            if len(encoded) >= _REPEATED_SUBTREE_MIN_CHARS:
+                if encoded in seen:
+                    return {"same_as": seen[encoded]}
+                seen[encoded] = path
+            if isinstance(node, dict):
+                return {key: visit(value, f"{path}.{key}" if path else key) for key, value in node.items()}
+            return [visit(value, f"{path}[{index}]") for index, value in enumerate(node)]
+        return node
+
+    return visit(packet, "")
+
+
 def _social_model_context(
     context: dict[str, Any],
     *,
@@ -1237,6 +1271,20 @@ def _social_model_context(
             # outer context leaves an unrelated retained Goal in SC's foreground.
             if isinstance(memory, dict):
                 memory.pop(key, None)
+    elif trigger in _GOAL_BOUND_TRIGGERS and goal_ids:
+        # A Goal-bound SC speaks about its bound Goals (owner choice 2026-10-24, performance).
+        # GA's association inputs and the legacy task views restate those Goals in other
+        # shapes; the canonical Goal snapshots and statuses of the bound Goals, the Plan,
+        # Evidence and GA's resolution stay (live: a 165k-character prompt exceeded the budget).
+        memory = projected.get("session_memory")
+        for key in _GOAL_RESTATEMENT_KEYS:
+            projected.pop(key, None)
+            if isinstance(memory, dict):
+                memory.pop(key, None)
+        for key in ("active_goal_snapshots", "goal_statuses"):
+            if isinstance(projected.get(key), list):
+                projected[key] = [item for item in projected[key]
+                                  if not isinstance(item, dict) or item.get("goal_id") in goal_ids]
     for key in ("canonical_plan_resolution", "source_canonical_plan"):
         if key in projected:
             projected[key] = _social_plan_facts(projected[key])
@@ -1433,11 +1481,11 @@ def social_cognition_prompt(
         terminal_result_notice += "\n"
     if must_say_now_need_ids(request):
         terminal_result_notice += LIMITATION_RESULT_NOTICE
-    packet = _local_instants({
+    packet = _without_repeated_subtrees(_local_instants({
         "interaction_context": interaction,
         "request": payload,
         "social_expression": auxiliary_social_prompt_context(request.context, candidates),
-    })
+    }))
     opportunity = _local_instants(opportunity)
     return (
         STABLE_MIND_SEMANTIC_CONTRACT

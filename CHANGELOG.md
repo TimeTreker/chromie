@@ -5,6 +5,18 @@ remains available in Git history.
 
 ## Unreleased
 
+### Smaller Social Cognition prompts and a playback wait above TTS latency (performance, 2026-10-24)
+
+- Social Cognition's model snapshot replaces each repeated subtree with a pointer to its
+  first copy, and a Goal-bound call (goal state, Work state, Evidence) keeps its bound Goals'
+  canonical snapshots, Plan, Evidence and GA resolution instead of GA's association inputs and
+  the legacy task views that restate them (owner choice). Live, one Goal list appeared three
+  times and Evidence four times; a 165k-character prompt exceeded the context budget and
+  stopped the cohort. On that run's real calls the Evidence prompts shrink about 28-33% and
+  Work-state prompts about 20%.
+- The interactive playback-start wait rises from 3.5 s to 6 s (owner choice): TTS first audio
+  reached 3.0-3.3 s at p95 and three of four answer chunks were cancelled before playback.
+
 ### Argument spans stay inside the Responsibility's own words; one identical read serves both questions; stated preferences are kept (2026-10-23)
 
 - A merged read must wait for the same state changes as its twin: a read after an action

@@ -2408,10 +2408,28 @@ def test_social_model_context_does_not_reinterpret_generic_dialogue_history() ->
     assert projected["other_evidence"] == {"status": "retain"}
 
 
+def test_a_repeated_snapshot_subtree_points_to_its_first_copy():
+    """Live 2026-10-24: one Goal list appeared three times and Evidence in four places in a
+    165k-character SC prompt. Repeats are replaced by a pointer; nothing unique is removed."""
+    from agent.app.social_cognition import _without_repeated_subtrees
+
+    goals = [{"goal_id": "g1", "description": "read tomorrow's forecast " * 12}]
+    packet = {"request": {"context": {"working_goal_memory": goals, "goal_association_candidates": goals,
+                                      "small": ["r1"], "also_small": ["r1"]}}}
+    compact = _without_repeated_subtrees(packet)
+    context = compact["request"]["context"]
+    assert context["working_goal_memory"] == goals
+    assert context["goal_association_candidates"] == {"same_as": "request.context.working_goal_memory"}
+    assert context["small"] == context["also_small"] == ["r1"]
+    assert packet["request"]["context"]["goal_association_candidates"] == goals  # input untouched
+
+
 @pytest.mark.parametrize("trigger,goal_ids,failure,retain", [
     ("interpretation", [], {}, False),
     ("work_state", [], {"status": "failed"}, False),
-    ("work_state", ["current-goal"], {}, True),
+    # A Goal-bound SC keeps its bound Goals' canonical snapshots, not the legacy task views
+    # that restate them (owner choice 2026-10-24: a 165k-character SC prompt exceeded the budget).
+    ("work_state", ["current-goal"], {}, False),
 ])
 def test_social_context_filters_nested_unbound_tasks_without_losing_memory(
     trigger, goal_ids, failure, retain,
@@ -2428,8 +2446,11 @@ def test_social_context_filters_nested_unbound_tasks_without_losing_memory(
         "recent_tool_evidence": [{"source_ref": "observed-scene"}],
     }
     context = {"session_memory": memory, "current_task": memory["current_task"],
-               "work_failure": failure}
+               "work_failure": failure,
+               "active_goal_snapshots": [{"goal_id": "current-goal"}, {"goal_id": "other-goal"}]}
     projected = _social_model_context(context, trigger=trigger, goal_ids=goal_ids)
+    if goal_ids:
+        assert projected["active_goal_snapshots"] == [{"goal_id": "current-goal"}]
     for key in ("active_task_contexts", "active_task_snapshots", "current_task_context"):
         assert (key in projected["session_memory"]) is retain
     # A bound current_task remains once at the top level, without a Memory mirror.

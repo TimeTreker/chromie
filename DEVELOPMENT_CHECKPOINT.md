@@ -17,7 +17,8 @@ Run the everyday live-text cohort (`scenarios/everyday/`, 70 cases) against
 Soridormi MuJoCo, judge every case, and repair each failure at its earliest
 responsible owner. One invocation and one debug bundle per run; a hard failure in
 the 15-case `must_pass` smoke stage stops `core` and `challenge` (owner rule).
-Evidence and per-run judgments: `.chromie/acceptance/review-fixes-20261023/` (running at commit),
+Evidence and per-run judgments: `.chromie/acceptance/perf2-20261024/` and `perf-4f64f5120-20261024/` (performance
+mode), `review-fixes-20261023/` (stopped),
 `merge-reads-20261023/`, `span-owned-20261023/`, `main-20cce0dfa-20261023/` (complete cohorts),
 `planner-fit-20261023/` and `ingress-awaiting-20261023/` (focused),
 `sc-evidence-20261022/` (latest full run),
@@ -27,27 +28,22 @@ Evidence and per-run judgments: `.chromie/acceptance/review-fixes-20261023/` (ru
 `playback-race-20261020/`, `answer-source-20261020/`, `gaze-turn-20261020/`, `said-now-20261020/`, `decided-activity-20261020/`,
 `main-03974435e-20261020/` and `everyday-20261016/` (README.md in each).
 
-## Resume point — 2026-10-23 (evening)
+## Resume point — 2026-10-24 (performance mode)
 
-- Agent `review-fixes-20261023` (= `chromie-agent:latest`, `24d01f31c3ed`) is deployed from the source one change
-  before the commit (re-anchoring without the earlier-talk condition); its source check matched that source, not
-  the commit. Rebuild before attributing live results to the commit. Rollback: `planner-fit-20261023`.
-- Quiet mode: the owner runs `sudo .chromie/quiet-mode/quiet-mode.sh on`; the quiet-mode Host override raises the
-  TTS playback-start barrier to 60 s (speech request timeout 65 s).
-- Complete cohorts today: on `20cce0dfa` core stopped at `mix_water_time_zh` (a citation past the fetch's words);
-  with owned spans core stopped at `info_umbrella_zh` (a duplicate read); with the read merge smoke 15/15, core
-  46/50 completed, challenge stopped at `long_park_day_en` (a value resolved from earlier talk cited from the
-  turn). A second review then found the read merge lost a read after a state change; this delivery fixes that,
-  re-anchors resolved values to the outcome (owner decision) and keeps stated preferences (owner decision).
-- At commit time a complete cohort of that deployed build was running (`.chromie/acceptance/review-fixes-20261023/`);
-  its gate found one failure, fixed in the commit (earlier-talk condition). Rerun the full gate on the commit,
-  rebuild the Agent, and judge a cohort of the commit before any revision-level claim.
-- Next: STATUS open work 1-2.
+- The workstation runs in performance mode (CPU turbo on, GPU 575 W default); the Agent and Host use the profile's
+  default timeouts, not the quiet-mode overrides. `./scripts/start_chromie.sh --keep-services --no-orchestrator`
+  regenerates the env files.
+- Agent `perf2-20261024` (= `chromie-agent:latest`, `b27810d373c0`) is built from this delivery's source;
+  `--verify-agent-source` matched (`.chromie/acceptance/perf2-20261024/`).
+- Complete cohorts today: on `4f64f5120` smoke 15/15, core 29/33 then a hard stop (SC prompt 165k characters over
+  the budget); with the SC snapshot dedup, Goal-bound trimming and the 6 s playback wait, every case was attempted
+  for the first time: smoke 15/15, core 47/50 (42 judged), challenge 5/5 (3 judged).
+- Next: STATUS open work 1-2 by general mechanisms (no case-by-case prompt rules, owner 2026-10-24); further latency
+  work (UMI and SC ingress run before first audio; Planner prompt p50 about 81k characters).
 
-Verification: each new regression is red without its fix. Last complete gate (before the last three
-repairs): pytest 4,015 passed + 5 skipped (`xgrammar` not installed), benchmarks 172, legacy Agent tests 20,
-all checks; the committed source's gate was running at commit time. Strict replay 6,000/6,000 on freeze 47
-(unchanged). 300 SC schema shapes compile on live SGLang.
+Verification: gate on this delivery's source: pytest 4,024 passed + 5 skipped (`xgrammar` not installed),
+benchmarks 172, legacy Agent tests 20, all checks. Strict replay 6,000/6,000 on freeze 47 (unchanged corpus).
+300 SC schema shapes compile on live SGLang (2026-10-23; the SC schema is unchanged since).
 
 ## Repairs in force from this Issue
 
@@ -85,6 +81,12 @@ all checks; the committed source's gate was running at commit time. Strict repla
   first question's "北京"). Both read merges require the same state snapshot: identical reads
   merge only when they wait for the same state-changing Activities, and a read with an unknown
   dependency is never merged (second review 2026-10-23).
+- Social Cognition's model snapshot points each repeated subtree at its first copy, and a
+  Goal-bound call keeps its bound Goals' canonical snapshots, Plan, Evidence and GA resolution,
+  not GA's association inputs or the legacy task views (owner choice 2026-10-24, performance;
+  live: a 165k-character prompt exceeded the context budget).
+- The interactive playback-start wait is 6 s, above TTS first-audio p95 (owner choice
+  2026-10-24; at 3.5 s three of four answer chunks were cancelled).
 - A Planner argument's turn-span citation is offered only inside the source words of a
   Responsibility its Capability can serve, which the Host requires (live 2026-10-23:
   "瓶水，" ran past the fetch's words into the comma and stopped the cohort).

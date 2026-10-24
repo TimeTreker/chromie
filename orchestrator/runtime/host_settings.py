@@ -454,7 +454,7 @@ class HostSettingsSnapshot:
             playback_start_timeout_ms=_int(
                 values,
                 "ORCH_TTS_PLAYBACK_START_TIMEOUT_MS",
-                3500,
+                6000,
                 minimum=100,
             ),
             ready_greeting_enabled=_bool(

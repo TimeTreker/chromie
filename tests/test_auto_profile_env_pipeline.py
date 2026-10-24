@@ -291,7 +291,7 @@ class AutomaticProfileEnvironmentTests(unittest.TestCase):
         )
         self.assertEqual(
             manifest["cognitive_budgets"]["ORCH_TTS_PLAYBACK_START_TIMEOUT_MS"],
-            "3500",
+            "6000",
         )
         self.assertEqual(
             manifest["cognitive_budgets"]["OLLAMA_NUM_CTX"],
@@ -408,7 +408,7 @@ class AutomaticProfileEnvironmentTests(unittest.TestCase):
         self.assertEqual(values["ORCH_PLANNER_TIMEOUT_MS"], "65000")
         self.assertEqual(values["ORCH_DELIBERATIVE_TIMEOUT_MS"], "125000")
         self.assertEqual(values["ORCH_COGNITIVE_RUNTIME_TIMEOUT_MS"], "300000")
-        self.assertEqual(values["ORCH_TTS_PLAYBACK_START_TIMEOUT_MS"], "3500")
+        self.assertEqual(values["ORCH_TTS_PLAYBACK_START_TIMEOUT_MS"], "6000")
 
     def test_primary_gpu_profiles_do_not_own_foreground_latency(self) -> None:
         retired_profile_owned_budgets = {
