@@ -17,8 +17,8 @@ Run the everyday live-text cohort (`scenarios/everyday/`, 70 cases) against
 Soridormi MuJoCo, judge every case, and repair each failure at its earliest
 responsible owner. One invocation and one debug bundle per run; a hard failure in
 the 15-case `must_pass` smoke stage stops `core` and `challenge` (owner rule).
-Evidence and per-run judgments: `.chromie/acceptance/perf2-20261024/` and `perf-4f64f5120-20261024/` (performance
-mode), `review-fixes-20261023/` (stopped),
+Evidence and per-run judgments: `.chromie/acceptance/acc3-20261024/` (running at commit), `acc2-focused-20261024/`,
+`acc1-20261024/`, `perf2-20261024/` and `perf-4f64f5120-20261024/` (performance mode), `review-fixes-20261023/` (stopped),
 `merge-reads-20261023/`, `span-owned-20261023/`, `main-20cce0dfa-20261023/` (complete cohorts),
 `planner-fit-20261023/` and `ingress-awaiting-20261023/` (focused),
 `sc-evidence-20261022/` (latest full run),
@@ -28,22 +28,28 @@ mode), `review-fixes-20261023/` (stopped),
 `playback-race-20261020/`, `answer-source-20261020/`, `gaze-turn-20261020/`, `said-now-20261020/`, `decided-activity-20261020/`,
 `main-03974435e-20261020/` and `everyday-20261016/` (README.md in each).
 
-## Resume point — 2026-10-24 (performance mode)
+## Resume point — 2026-10-24 (accuracy round, performance mode)
 
-- The workstation runs in performance mode (CPU turbo on, GPU 575 W default); the Agent and Host use the profile's
-  default timeouts, not the quiet-mode overrides. `./scripts/start_chromie.sh --keep-services --no-orchestrator`
-  regenerates the env files.
-- Agent `perf2-20261024` (= `chromie-agent:latest`, `b27810d373c0`) is built from this delivery's source;
-  `--verify-agent-source` matched (`.chromie/acceptance/perf2-20261024/`).
-- Complete cohorts today: on `4f64f5120` smoke 15/15, core 29/33 then a hard stop (SC prompt 165k characters over
-  the budget); with the SC snapshot dedup, Goal-bound trimming and the 6 s playback wait, every case was attempted
-  for the first time: smoke 15/15, core 47/50 (42 judged), challenge 5/5 (3 judged).
-- Next: STATUS open work 1-2 by general mechanisms (no case-by-case prompt rules, owner 2026-10-24); further latency
-  work (UMI and SC ingress run before first audio; Planner prompt p50 about 81k characters).
+- The workstation runs in performance mode (CPU turbo on, GPU 575 W default; the platform profile read `quiet` /
+  `power-saver` during acc1); the Agent and Host use the profile's default timeouts.
+  `./scripts/start_chromie.sh --keep-services --no-orchestrator` regenerates the env files but does not rebuild the
+  Agent; build and recreate it with the Handoff commands.
+- Agent `acc2-20261024` (= `chromie-agent:latest`, `1c7d4fecab20`) is built from this delivery's source;
+  `--verify-agent-source` matched.
+- acc1 complete cohort (2026-10-24, before this delivery's last three repairs): smoke 15/15, core 46/50 automatic
+  (44/50 judged), challenge 5/5 automatic (3/5 judged); first audio p50 19.6 s, p95 27.6 s. acc2 focused reruns of
+  the three cases those repairs address: 3/3 (Chinese weekday answer after the stated preference, the quiet nod,
+  Shanghai tomorrow's weather).
+- The owner asked for this commit without waiting for tests: acc3, the complete cohort of this delivery's source,
+  was running at commit (29/70: smoke 15/15, core 11/13; `clarify_go_there_zh` walked because the Planner's `fits`
+  flipped to true for the same need and capability, likely LLM-lifetime drift; `body_celebrate_zh` waved). Resume
+  by collecting its single bundle once it has ended and judging every case (Handoff commands).
+- Next: judge acc3; measure the `fits` margin of `clarify_go_there_zh` on two lifetimes; STATUS open work 1-3 by
+  general mechanisms (no case-by-case prompt rules, owner 2026-10-24); then latency.
 
-Verification: gate on this delivery's source: pytest 4,024 passed + 5 skipped (`xgrammar` not installed),
-benchmarks 172, legacy Agent tests 20, all checks. Strict replay 6,000/6,000 on freeze 47 (unchanged corpus).
-300 SC schema shapes compile on live SGLang (2026-10-23; the SC schema is unchanged since).
+Verification: clean-worktree gate on this delivery's source: pytest 4,039 passed + 5 skipped (`xgrammar` not
+installed), benchmarks 172, legacy Agent tests 20, all checks. Strict replay not rerun (last 6,000/6,000 on freeze
+47, 2026-10-23).
 
 ## Repairs in force from this Issue
 
@@ -140,6 +146,21 @@ benchmarks 172, legacy Agent tests 20, all checks. Strict replay 6,000/6,000 on 
   privacy, consent, deception or family needs someone besides the person asking, and no concern
   decides proceed (live: "nobody_else" with "others_property" asked whose a household TV remote
   was; with no concern it asked where to wait).
+
+- The Fast decoder writes every argument a Capability declares as realizing what the person said
+  (`argument_realization`) or as its repetition count; its own default needs no span (live: four reads of
+  "明天" omitted date and read today; "点两下头" omitted count). Host still removes an unowned exact default.
+- A Plan whose every step acquires information starts no Work-state Social Cognition call; its Evidence speaks next
+  (live: a progress call after the clock read said "Monday" on a Saturday).
+- An act said before Work Evidence reached Social Cognition cannot be reused to cover a need that reports that
+  Evidence (`completed_work_dependencies`); the Agent decoder offers no such reuse and Host rejects it.
+- Social Cognition's stated preference is kept once its words have played (`record_social_delivery`), also when Work
+  ends the turn; the reply-language guard defers to a kept language preference (live: a kept "以后先用中文回答我",
+  then the last guard line "Reply language: en-US" won).
+- A Planner `respond` outcome that leaves its own Goal unmet with no Work, unresolved need or named unmet requirement
+  is a contract failure (`validate_unmet_response_accounting`), so a failed GA revision keeps the first Plan (live:
+  the GA-requested Plan for "那上海呢？" planned no read and replaced the first Plan's valid read).
+- The live-text harness keeps Capability contracts on the reflex path too, so acceptance reads declared defaults.
 
 ## Owner decisions in force
 

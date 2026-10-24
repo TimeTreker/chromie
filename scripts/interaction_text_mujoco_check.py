@@ -133,6 +133,23 @@ def _field(value: Any, name: str, default: Any = None) -> Any:
     return getattr(value, name, default)
 
 
+def _retained_capability_contracts(assistant: Any, response: Any) -> dict[str, Any]:
+    """The exact contract of each emitted Capability, so acceptance reads its declared defaults.
+
+    The reflex path (deterministic silence plus a residual request) retains it too (live
+    2026-10-24: "别说话，点两下头。" nodded with the default count 2, read as no count).
+    """
+    contracts = {}
+    for capability in getattr(response, "capabilities", []):
+        definition = assistant.interaction_runtime.capability_definition(capability.capability_id)
+        contracts[capability.request_id] = {
+            "capability_id": definition.capability_id,
+            "capability_version": definition.version,
+            "input_schema": copy.deepcopy(definition.input_schema),
+        }
+    return contracts
+
+
 def validate_contract(
     *,
     interpretation: Any,
@@ -1118,14 +1135,16 @@ async def run_check(
                 time.perf_counter() - reflex_start
             ) * 1000.0
             errors.extend(reflex_errors)
+            capability_contracts = _retained_capability_contracts(assistant, response)
             errors.extend(
                 validate_contract(
                     interpretation=reflex_projection,
                     response=response,
-                        expected_capabilities=args.expect_capability,
+                    expected_capabilities=args.expect_capability,
                     expect_no_capabilities=args.expect_no_capabilities,
                     expected_args=args.expect_arg,
                     arg_tolerance=args.arg_tolerance,
+                    capability_contracts=capability_contracts,
                 )
             )
             reject_speech_patterns = list(
@@ -1195,6 +1214,7 @@ async def run_check(
                 "errors": errors,
                 "reflex_outcome": reflex_projection,
                 "interaction_response": response.model_dump(mode="json"),
+                "capability_contracts": capability_contracts,
                 "reflex": reflex_evidence,
                 "cognitive_runtime": reflex_evidence.get("cognitive_runtime"),
                 "execution": reflex_evidence.get("execution"),
@@ -1389,14 +1409,7 @@ async def run_check(
             },
         )
         response = _apply_soridormi_skill_timeout(response, args.capability_timeout_s)
-        capability_contracts = {}
-        for capability in response.capabilities:
-            definition = assistant.interaction_runtime.capability_definition(capability.capability_id)
-            capability_contracts[capability.request_id] = {
-                "capability_id": definition.capability_id,
-                "capability_version": definition.version,
-                "input_schema": copy.deepcopy(definition.input_schema),
-            }
+        capability_contracts = _retained_capability_contracts(assistant, response)
         _write_json(
             evidence_dir / "interaction_response.json",
             response.model_dump(mode="json"),

@@ -108,6 +108,7 @@ from shared.chromie_contracts.plan import (
     FastPlannerStreamFailure,
     FastPlannerStreamFrame,
     FastPlannerStreamTerminal,
+    validate_unmet_response_accounting,
 )
 
 from .planner_prompt import (
@@ -751,6 +752,8 @@ class PlannerResolver:
                     reentry_scope=request.planner_reentry_scope,
                     future_goal_times=future_goal_times,
                 )
+                validate_unmet_response_accounting(validated_model_output.goal_outcomes, {
+                    goal_id for step in validated_model_output.steps for goal_id in step.source_goal_ids})
                 validate_resource_responsibility_capability_grounding(
                     validated_model_output,
                     authoritative_goals=authoritative_goals,

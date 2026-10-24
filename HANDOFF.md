@@ -5,7 +5,7 @@ exact commands. Replace it on each delivery; do not append history. The resume
 boundary is in the [checkpoint](DEVELOPMENT_CHECKPOINT.md); current status and the
 ordered open work are in [STATUS](docs/STATUS.md).
 
-## Current snapshot — 2026-10-23
+## Current snapshot — 2026-10-24
 
 - Checkout `/home/chromie/github/chromie`, branch `main`; the expected resume revision is
   the latest `origin/main` commit containing this file (the 2026-10-20 repair and build
@@ -14,17 +14,20 @@ ordered open work are in [STATUS](docs/STATUS.md).
   revision pinned by `capabilities/soridormi.json` and `release/compatibility.json`. The
   MCP container mounts its `src`, so a `docker restart soridormi-runtime-mcp` loads it and
   resets the scene (user at -90 degrees, 1.5 m).
-- Live Agent: `chromie-agent:latest` = `perf2-20261024` (`b27810d373c0`), built from this delivery's source and
-  started by `start_chromie.sh` with the profile's default timeouts (performance mode, no quiet-mode override);
-  `--verify-agent-source` matched (`.chromie/acceptance/perf2-20261024/agent-source-verify.json`). This file is the
-  single owner of the deployed identity. Rollback image: `perf-4f64f5120` (`ce023695b1a0`, built from 4f64f5120).
+- Live Agent: `chromie-agent:latest` = `acc2-20261024` (`1c7d4fecab20`), built from this delivery's source and
+  recreated with the profile's default timeouts (performance mode, no quiet-mode override); `--verify-agent-source`
+  matched (`.chromie/acceptance/acc2-focused-20261024/agent-source-verify.json`). This file is the single owner of the
+  deployed identity. Rollback image: `perf2-20261024` (`b27810d373c0`, built from 399894a5a).
   LLM: `chromie-sglang:latest` = `gemma4-fp8`
   (`f59a042e6973`); compose resolves `chromie-sglang:${CHROMIE_IMAGE_TAG}`, so the
   `latest` tag must exist for `start_chromie.sh`.
 - Workflow corpus: freeze 47 (`bdb8db08…`; scripts in `.chromie/acceptance/thirsty-offer-20261021/freeze47/`). Restore it with
   `python -m benchmarks.regression restore-fixtures`; do not untar `frozen.tar.xz` over
   `workflow_scenarios/` (its inner `manifest.json` lacks the storage identity).
-- Evidence (README in each): `.chromie/acceptance/perf2-20261024/` (this delivery, complete cohort, latency, gate),
+- Evidence (README in each): `.chromie/acceptance/acc3-20261024/` (complete cohort of this delivery's source, started
+  17:20 and still running at commit; at 29/70: smoke 15/15, core 11/13; not yet judged, no bundle yet),
+  `acc2-focused-20261024/` (this delivery: focused 3/3, gate), `acc1-20261024/` (complete cohort before this
+  delivery's last three repairs, judged, latency), `perf2-20261024/` (previous delivery),
   `perf-4f64f5120-20261024/` (performance-mode baseline), `review-fixes-20261023/` (stopped), `merge-reads-20261023/`, `span-owned-20261023/` (umbrella probes), `main-20cce0dfa-20261023/`,
   `planner-fit-20261023/` (probes, strict replay), `ingress-awaiting-20261023/`,
   `sc-evidence-20261022/` (latest full run; SC schema
@@ -34,7 +37,7 @@ ordered open work are in [STATUS](docs/STATUS.md).
   `playback-race-20261020/`, `answer-source-20261020/`, `gaze-turn-20261020/`, `said-now-20261020/`,
   `decided-activity-20261020/`, `main-03974435e-20261020/`.
   Bundles `~/Downloads/chromie_debug_bundle_2026102*.tar.gz`. Earlier runs: `.chromie/acceptance/everyday-20261016/`.
-- Last gate and strict replay (this delivery's source, GPU host, 2026-10-23): pytest 4,011 passed + 5 skipped (`xgrammar` not installed), benchmarks 172, legacy Agent tests 20; policies, docs, test ownership, ruff, mypy and runtime-structure ratchets pass; `scripts/run_workflow_replay.py` 6,000 cases passed on freeze 47 with this delivery's source (2026-10-23; the corpus Planner steps are canonical plans, so no request changed). The gate needs `anthropic==1.15.0` from `requirements-test.txt` (`INSTALL_TEST_DEPS=1`).
+- Last gate (this delivery's source, clean worktree, GPU host, 2026-10-24): pytest 4,039 passed + 5 skipped (`xgrammar` not installed), benchmarks 172, legacy Agent tests 20; policies, docs, test ownership, ruff, mypy and runtime-structure ratchets pass (`agent/app/planner_validation.py` is at its line ratchet). Strict replay was not rerun for this delivery; its last pass is 6,000/6,000 on freeze 47 (2026-10-23). The gate needs `anthropic==1.15.0` from `requirements-test.txt` (`INSTALL_TEST_DEPS=1`).
 - `start_chromie.sh --build` reuses the layer cache, takes package downloads from BuildKit
   cache mounts, and recreates only the services whose image changed. The first build
   after this change reruns the cache-mount layers once.
@@ -66,10 +69,14 @@ ordered open work are in [STATUS](docs/STATUS.md).
 ## Deploy and run
 
 ```bash
-# owner: rebuild the Agent from a clean main checkout and deploy it
-# (rollback: docker tag chromie-agent:perf-4f64f5120 chromie-agent:latest)
+# resume: when acc3 has ended (its ended_at file exists), collect its one bundle if bundle.log is missing, then judge
+D=.chromie/acceptance/acc3-20261024; cat $D/ended_at; [ -s $D/bundle.log ] || ./scripts/collect_debug_bundle.sh > $D/bundle.log 2>&1
+python .chromie/acceptance/tools/brief.py $D/live
+# owner: rebuild the Agent from a clean main checkout and deploy it (performance mode; in quiet mode prefix
+# CHROMIE_SERVICE_RUNTIME_OVERRIDE_FILE=.chromie/quiet-mode/agent-timeouts.env)
+# (rollback: docker tag chromie-agent:perf2-20261024 chromie-agent:latest)
 env -u HTTP_PROXY -u HTTPS_PROXY -u http_proxy -u https_proxy ./scripts/compose.sh build chromie-agent
-CHROMIE_SERVICE_RUNTIME_OVERRIDE_FILE=.chromie/quiet-mode/agent-timeouts.env env -u HTTP_PROXY -u HTTPS_PROXY -u http_proxy -u https_proxy ./scripts/compose.sh up -d --no-build --force-recreate --no-deps chromie-agent
+env -u HTTP_PROXY -u HTTPS_PROXY -u http_proxy -u https_proxy ./scripts/compose.sh up -d --no-build --force-recreate --no-deps chromie-agent
 python scripts/capture_runtime_identity.py --verify-agent-source chromie-agent
 # Soridormi water scene (replaces the simulator only when the runtime is idle)
 (cd ../soridormi && ./scripts/run_scenario.sh --scenario configs/simulation_scenarios/thirst_water_delivery.json --profile open_duck_forward --viewer)

@@ -17,6 +17,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from scripts.interaction_text_mujoco_check import (
     INTERNAL_SPEECH_PATTERNS,
     _apply_soridormi_skill_timeout,
+    _retained_capability_contracts,
     _configure_environment,
     _endpoint_source_revision,
     _planner_communication_already_scheduled,
@@ -228,6 +229,25 @@ def test_admitted_runtime_rejection_retains_final_status_without_dispatch(tmp_pa
         assert json.loads((tmp_path / "status_after.json").read_text()) == final
         if post_state == "unsafe":
             assert any("safe_idle" in error for error in result["errors"])
+
+
+def test_retained_contracts_let_acceptance_read_a_declared_default() -> None:
+    """Live 2026-10-24 (ctrl_quiet_nod_zh): the reflex path ("别说话" plus a residual request)
+    kept no Capability contracts, so a nod run with its declared default count 2 read as no count."""
+    from scripts.outcome_observations import collect_observations
+
+    definition = SimpleNamespace(capability_id="soridormi.nod_yes", version="0.1.0", input_schema={
+        "type": "object", "properties": {"count": {"type": "number", "default": 2}}})
+    assistant = SimpleNamespace(interaction_runtime=SimpleNamespace(capability_definition=Mock(return_value=definition)))
+    response = InteractionResponse(capabilities=[{
+        "request_id": "nod", "capability_id": "soridormi.nod_yes", "capability_version": "0.1.0", "args": {}}])
+    contracts = _retained_capability_contracts(assistant, response)
+    assert contracts["nod"]["input_schema"] == definition.input_schema
+    summary = {"interaction_response": response.model_dump(mode="json"), "capability_contracts": contracts,
+               "execution": {"results": [{"request_id": "nod", "capability_id": "soridormi.nod_yes",
+                                          "capability_version": "0.1.0", "status": "completed"}]}}
+    nod = [item for item in collect_observations(summary) if item["capability_id"] == "soridormi.nod_yes"]
+    assert nod and nod[0]["args"].get("count") == 2
 
 
 @pytest.mark.parametrize("version,required,emitted,expected_ok", [

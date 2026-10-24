@@ -1735,8 +1735,11 @@ def _fast_enum_source_branches(
                 or not isinstance(contract, dict) or contract.get("type") != "string"
                 or not isinstance(contract.get("enum"), list)):
             continue
+        # The schema's own default means "no stated scope" and claims no source; Host strips
+        # it as an unowned default (2026-10-24: a written period "day" needed no span).
         literal_values = [value for value in contract["enum"]
-                          if any(literal_intent_argument(value, outcome=outcome,
+                          if value == contract.get("default")
+                          or any(literal_intent_argument(value, outcome=outcome,
                                      source_text=original_user_text) for outcome in owning_outcomes)]
         mapped_values = [value for value in contract["enum"] if value not in literal_values]
         expanded = []
@@ -2221,6 +2224,24 @@ def fast_advance_response_schema(
                     "enum": [capability_id_value],
                 }
                 branch_properties["args"] = _ordered_capability_arguments(input_schema)
+                # An argument the Capability declares as realizing what the person said
+                # (argument_realization) or as its repetition count is written explicitly,
+                # never implied by its default (live 2026-10-24: four weather reads for "明天"
+                # omitted date and read today; "点两下头" omitted count).
+                realization_arguments = [
+                    str(name)
+                    for names in (
+                        *(contract.get("arguments") or []
+                          for contract in ((capability.get("hints") or {}).get("argument_realization") or {}).values()
+                          if isinstance(contract, dict) and contract.get("planner_owned") is True),
+                        sorted(_count_argument_names(capability)),
+                    )
+                    for name in names
+                    if str(name) in (branch_properties["args"].get("properties") or {})
+                ]
+                if realization_arguments:
+                    branch_properties["args"]["required"] = list(dict.fromkeys(
+                        [*branch_properties["args"].get("required", []), *realization_arguments]))
                 # Host accepts a target argument only as the exact current trusted target.
                 target_property = (branch_properties["args"].get("properties") or {}).get("target_ref")
                 if trusted_target_ref and isinstance(target_property, dict):

@@ -247,6 +247,36 @@ def previously_addressed_need_ids(context: Any) -> set[str]:
     return addressed
 
 
+def earlier_act_need_bindings(context: Any) -> dict[str, set[str]]:
+    """Each pending or delivered communicative act's identity and the needs it was bound to."""
+
+    interaction = context.get("interaction_context") if isinstance(context, dict) else None
+    bindings: dict[str, set[str]] = {}
+    for key in ("events", "already_spoken", "pending_speech", "prior_delivered_speech"):
+        for row in (interaction or {}).get(key, []) if isinstance(interaction, dict) else []:
+            if not isinstance(row, dict):
+                continue
+            metadata = row.get("metadata")
+            metadata = metadata if isinstance(metadata, dict) else {}
+            ids = metadata.get("communicative_activity_ids") or row.get("communicative_activity_ids") or []
+            addressed = metadata.get("addressed_need_ids")
+            for identity in ids if isinstance(ids, list) else []:
+                bindings.setdefault(str(identity).strip(), set()).update(
+                    item for item in addressed or [] if isinstance(item, str))
+    return bindings
+
+
+def completed_work_need_ids(request: "SocialCognitionRequest") -> set[str]:
+    """Needs that report Work Evidence; only words written with that Evidence can cover them.
+
+    Live 2026-10-24: a progress line said "Monday" before the clock Evidence reached Social
+    Cognition, then was reused unchanged to cover the clock answer (Saturday).
+    """
+
+    return {need.need_id for need in request.communication_needs
+            if need.facts.get("completed_work_dependencies")}
+
+
 def must_say_now_need_ids(request: "SocialCognitionRequest") -> set[str]:
     """Limitations and value questions Social Cognition must say in this turn.
 
@@ -414,6 +444,8 @@ class SocialCognitionResolution(SocialCognitionOutput):
             for item in self.preference_memory_candidates
         )):
             raise ValueError("a stated preference is kept only at ingress from the person's own Responsibility")
+        evidence_need_ids = completed_work_need_ids(request)
+        earlier_bindings = earlier_act_need_bindings(request.context) if evidence_need_ids else {}
         situation = request.situation
         if (self.memory_candidates or self.self_memory_candidates) and (
             request.trigger != "situation" or situation is None
@@ -457,6 +489,9 @@ class SocialCognitionResolution(SocialCognitionOutput):
                 interaction_context=request.context.get("interaction_context"),
                 repair_of_activity_ids=act.repair_of_activity_ids,
             )
+            if act.activity_id in earlier_bindings and (
+                set(act.addressed_need_ids) & evidence_need_ids) - earlier_bindings[act.activity_id]:
+                raise ValueError("words said before Work Evidence cannot report it")
             for need_id in act.addressed_need_ids:
                 need = needs[need_id]
                 if not set(need.source_goal_ids).issubset(act.source_goal_ids):

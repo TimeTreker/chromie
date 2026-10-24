@@ -25,8 +25,8 @@ from shared.chromie_contracts.plan import FastProgressKind, validate_communicati
 from shared.chromie_contracts.social_cognition import (
     SocialCognitionOutput, SocialCognitionRequest, SocialCognitionResolution,
     SocialStartupGreetingOutput, SocialStartupGreetingRequest, SocialStartupGreetingResolution,
-    asks_about_uncertain_meaning, must_say_now_need_ids, need_asks_uncertain_meaning,
-    pre_evidence_act_violation, uncertain_task_responsibility_refs,
+    asks_about_uncertain_meaning, completed_work_need_ids, must_say_now_need_ids,
+    need_asks_uncertain_meaning, pre_evidence_act_violation, uncertain_task_responsibility_refs,
     value_review_responsibility_refs, value_withheld_need_ids,
 )
 from shared.chromie_contracts.text import normalize_whitespace
@@ -350,6 +350,18 @@ def _constrain_social_activity_identity(
             reuse = copy.deepcopy(branch)
             reuse["properties"]["activity_id"]["const"] = identity
             reuse["properties"]["text"]["const"] = text
+            # Words written before Work Evidence reached Social Cognition cannot report it.
+            unbound = completed_work_need_ids(request) - known_need_bindings.get(identity, set())
+            addressed = reuse["properties"].get("addressed_need_ids") or {}
+            if unbound and "enum" in (addressed.get("items") or {}):
+                allowed = [key for key in addressed["items"]["enum"] if key not in unbound]
+                if allowed:
+                    addressed["items"] = {"type": "string", "enum": allowed}
+                elif addressed.get("minItems", 0):
+                    continue
+                else:
+                    addressed.pop("items")
+                    addressed["maxItems"] = 0
             variants.append(reuse)
         for variant in variants:
             properties = variant["properties"]
@@ -1091,6 +1103,9 @@ def validate_social_cognition_output(
                 # later input need for that meaning (owner decision 2026-10-22; live 2026-10-23:
                 # reusing it failed the turn with "抱歉，我没能完成刚才那个任务。").
                 raise ValueError("a prior communicative act cannot answer a later input or confirmation need")
+            if (act.activity_id in previous_need_bindings and need_id in completed_work_need_ids(request)
+                    and need_id not in previous_need_bindings[act.activity_id]):
+                raise ValueError("words said before Work Evidence cannot report it")
 
 
 def _social_plan_facts(value: Any) -> Any:
@@ -1374,6 +1389,14 @@ def _social_language_guard(request: SocialCognitionRequest) -> str:
     language = str(request.language or "").strip()
     if not language or language.casefold() == "auto":
         return ""
+    memory = (request.context.get("session_memory") or {}).get("active_memory") or {}
+    if any(isinstance(entry, dict) and entry.get("kind") == "preference" for entry in memory.get("entries") or []):
+        # A language the person asked for outranks the turn's own language; naming only the
+        # turn language contradicted it (live 2026-10-24: "以后先用中文回答我" was kept, then
+        # "What day is it today?" was answered in English).
+        return (f"\nReply language: {language}, unless session_memory.active_memory holds a preference "
+                "the person stated about which language you answer them in; then that language. Every "
+                "spoken text is in the reply language.\n")
     return f"\nReply language: {language}. Every spoken text is in this language.\n"
 
 

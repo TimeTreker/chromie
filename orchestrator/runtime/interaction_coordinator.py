@@ -152,6 +152,7 @@ class InteractionRuntimeCoordinator:
         communicative_goal_completion_recorder: (
             CommunicativeGoalCompletionRecorder | None
         ) = None,
+        social_memory_recorder: Callable[[str | None, list[Any]], None] | None = None,
         speech_timeout_ms: int | None = None,
     ) -> None:
         self.registry = CapabilityDefinitionRegistry()
@@ -215,6 +216,7 @@ class InteractionRuntimeCoordinator:
         self.communicative_goal_completion_recorder = (
             communicative_goal_completion_recorder
         )
+        self.social_memory_recorder = social_memory_recorder
         self._preexecuted: dict[tuple[str, str], tuple[CapabilityResult, CapabilityTrace | None]] = {}
 
     async def ensure_capability_definitions(self, capability_ids: Iterable[str]) -> None:
@@ -305,6 +307,11 @@ class InteractionRuntimeCoordinator:
                         "source": "social_cognition_communicative_completion",
                     },
                 )
+        # What SC decided to remember (a stated preference) is kept once its words were
+        # heard, even when another response ends the turn (live 2026-10-24).
+        memory_updates = response.metadata.get("memory_updates")
+        if delivered and memory_updates and self.social_memory_recorder is not None:
+            self.social_memory_recorder(session_id, list(memory_updates))
         return delivered
 
     async def start_fast_planner_communicative_act(

@@ -34,8 +34,13 @@ At an interpretation trigger the resolution also states `preference_memory_candi
 talks or acts with them, as one short sentence citing that turn's Responsibility. Host
 rejects them at any other trigger, carries them on the response as session `preference`
 Memory updates, and Social Cognition reads them back from `session_memory.active_memory`
-(for example the language to answer in). A preference stated in a turn whose final response
-comes from Work is not yet kept.
+(for example the language to answer in). Host keeps them once that response's words have
+played, also when Work produces the turn's final response; one Memory ID per entry makes a
+second application idempotent.
+An act already pending or delivered in the turn may be reused unchanged to cover a need only
+if it was written with that need in hand: a need that reports completed Work Evidence
+(`completed_work_dependencies`) cannot be covered by words said before that Evidence reached
+Social Cognition.
 The Host client rechecks identity/provenance; the runtime entrypoint requires the
 state owner's freshness predicate before and after inference. Expression execution
 uses the existing catalog/target/resource/duplicate-dispatch validators. Empty

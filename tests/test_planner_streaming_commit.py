@@ -1320,7 +1320,8 @@ def _compound_count_case(variant: str):
     caps[4] = caps[4].model_copy(update={'input_schema': {'type': 'object', 'properties': {
         **caps[4].input_schema['properties'], 'count': {'type': 'integer', 'minimum': 1, 'maximum': 8, 'default': 1}},
         'additionalProperties': False}})
-    expected = variant in {'compound_defaults', 'omitted_turn_default', 'matching_turn_count', 'distinct_explicit_count'}
+    # A declared repetition count is written, never implied by its default (2026-10-24).
+    expected = variant in {'compound_defaults', 'matching_turn_count', 'distinct_explicit_count'}
     if variant in {'matching_turn_count', 'distinct_explicit_count'}:
         from shared.chromie_contracts.user_turn import user_turn_source_tokens
         text = request.text + (' twice' if variant == 'matching_turn_count' else ' 3 times')

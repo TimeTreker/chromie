@@ -14,6 +14,7 @@ from orchestrator.runtime.conversation_state import ConversationStateManager
 from orchestrator.runtime.evidence_identity import load_runtime_evidence_identity
 from orchestrator.runtime.episode import EpisodeRecorder
 from orchestrator.runtime.experience import ExperienceManager
+from orchestrator.runtime.goal_planning_state import record_memory_updates
 from orchestrator.runtime.host_settings import (
     HostConfigurationError,
     HostSettingsSnapshot,
@@ -174,6 +175,9 @@ def build_interaction_runtime(
                 goal_ids,
                 metadata=metadata,
             )
+        ),
+        social_memory_recorder=(
+            lambda sid, updates: record_memory_updates(assistant.conversation_state, sid, updates)
         ),
         # Runtime owns the outer request timeout. It must not preempt the
         # Host-owned playback-start barrier during a cold provider restart.

@@ -1132,6 +1132,23 @@ def validate_goal_satisfaction_conservation(
         raise ValueError("aggregate satisfaction must preserve every unmet Goal outcome")
 
 
+def validate_unmet_response_accounting(outcomes: dict[str, Any], working_goal_ids: set[str]) -> None:
+    """A response that leaves its own Goal unmet works toward it or names what is missing.
+
+    Waiting on a time condition and reporting a cancellation each name their unmet
+    requirement; a response with none plans nothing toward its Goal (live 2026-10-24:
+    "那上海呢？" was "respond", no step, "must first acquire", and that Plan replaced the
+    first Plan's valid weather read).
+    """
+
+    for goal_id, outcome in outcomes.items():
+        satisfaction = outcome.satisfaction
+        if (outcome.disposition == "respond" and satisfaction is not None
+                and goal_id in satisfaction.unmet_goal_ids and not satisfaction.unmet_requirements
+                and not outcome.unresolved and goal_id not in working_goal_ids):
+            raise ValueError("a response cannot leave its own Goal unmet without Work or a named gap: " + goal_id)
+
+
 def validate_acquisition_stage_isolation(steps: list[tuple[list[str], str]]) -> None:
     """One Goal's executable steps either acquire or achieve; an effect waiting on the
     acquisition's result is a deferred step, never an executable one."""
@@ -1373,6 +1390,18 @@ class CanonicalPlan(BaseModel):
     @classmethod
     def reject_low_level_metadata(cls, value: dict[str, Any]) -> dict[str, Any]:
         return reject_forbidden_low_level_fields(value)
+
+    def only_acquires_information(self) -> bool:
+        """Every step reads information and no effect waits on it.
+
+        Its Evidence arrives next and is said then; a Work-state line before it has
+        no result to report (live 2026-10-24: a progress line said "Monday" while the
+        clock read Saturday, then covered the answer).
+        """
+
+        return bool(self.steps) and not self.deferred_steps and all(
+            step.step_purpose == "acquire_information" for step in self.steps
+        )
 
     def prompt_projection(self) -> dict[str, Any]:
         """Return the closed semantic Plan projection permitted in prompts.

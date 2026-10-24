@@ -3330,10 +3330,10 @@ class GoalDrivenRuntimeCoordinator:
             for step in run.terminal_plan.steps
         ):
             if self.policy.mode == "apply":
-                run.state_social_task = self.start_state_interaction(
-                    run.session, work_request=run.work_request.model_copy(update={"context": run.planning_context}),
-                    turn_id=run.turn_id, plan=run.terminal_plan,
-                )
+                if not run.terminal_plan.only_acquires_information():  # its Evidence speaks next
+                    run.state_social_task = self.start_state_interaction(
+                        run.session, work_request=run.work_request.model_copy(update={"context": run.planning_context}),
+                        turn_id=run.turn_id, plan=run.terminal_plan)
                 run.stage = time.perf_counter()
                 run.interaction = await self._observe_workflow_stage(
                     sid=run.sid,

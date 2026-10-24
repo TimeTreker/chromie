@@ -5,6 +5,20 @@ remains available in Git history.
 
 ## Unreleased
 
+### Said arguments are written, no progress line before a read's Evidence, kept preferences are honored (accuracy, 2026-10-24)
+
+- The Fast decoder writes every argument a Capability declares as realizing what the person said, and every
+  repetition count, instead of leaving it to a default: four reads of "明天" had read today, and "点两下头" omitted
+  its count.
+- A Plan that only reads information starts no Work-state Social Cognition call, and words said before Work
+  Evidence cannot be reused to cover the answer: a progress line had said "Monday" on a Saturday and was then
+  reused as the clock answer.
+- A preference Social Cognition keeps is stored once its words have played, also when Work ends the turn, and the
+  reply-language guard defers to it ("以后先用中文回答我" was kept, then English questions were answered in English).
+- A Planner response that leaves its own Goal unmet with no Work and no named gap is a contract failure, so a failed
+  GA revision keeps the first Plan's valid read ("那上海呢？" had planned nothing and said it was checking).
+- The live-text harness reads declared defaults on the reflex path too.
+
 ### Smaller Social Cognition prompts and a playback wait above TTS latency (performance, 2026-10-24)
 
 - Social Cognition's model snapshot replaces each repeated subtree with a pointer to its

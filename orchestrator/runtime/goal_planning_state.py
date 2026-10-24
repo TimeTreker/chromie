@@ -887,11 +887,21 @@ def record_interaction_response(
     # shared wire contract remains narrow. Historical top-level
     # ``memory_updates`` is intentionally not a compatibility input.
     metadata = data.get("metadata")
-    memory_updates = (
-        metadata.get("memory_updates", []) or []
-        if isinstance(metadata, dict)
-        else []
+    record_memory_updates(
+        state, sid, metadata.get("memory_updates", []) or [] if isinstance(metadata, dict) else [],
     )
+
+
+def record_memory_updates(state: Any, sid: str | None, memory_updates: list[Any]) -> None:
+    """Apply the Memory mutations an InteractionResponse carries in its metadata.
+
+    Social Cognition's own Memory decision is also applied when its words are delivered,
+    not only when its response ends the turn (live 2026-10-24: a preference agreed at
+    ingress was lost because the turn's Planner response was the one recorded). One
+    Memory ID per entry makes a second application idempotent.
+    """
+    if not state.enabled:
+        return
     for update in memory_updates:
         if not isinstance(update, dict):
             continue

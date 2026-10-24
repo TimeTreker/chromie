@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import unittest
 
+import pytest
+
 from jsonschema import Draft202012Validator
 
 from agent.app.planner_prompt import EXPLICIT_NUMERIC_ARGUMENT_GROUNDING_PROMPT
@@ -1295,6 +1297,9 @@ def test_compound_repetition_uses_its_own_step_and_provider_format():
     for variant in ['compound_defaults', 'omitted_turn_default', 'matching_turn_count', 'distinct_explicit_count',
                     'missing_count', 'wrong_nod_count', 'nondefault_turn_count', 'duration_masks_count', 'single_wrong_count']:
         request, caps, raw, expected = _compound_count_case(variant)
+        # Only the fast decoder requires a declared count written; this Host check of a
+        # canonical Plan still accepts an omitted provider default.
+        expected = expected or variant == 'omitted_turn_default'
         goal = {'goal_id': 'goal-weather', 'description': request.text,
                 'metadata': {'output_mode': 'body_action'},
                 'object': {'bindings': {'count': {'entity_type': 'count', 'value': 2}}}}
@@ -1336,3 +1341,31 @@ def test_compound_repetition_uses_its_own_step_and_provider_format():
             import pytest
             with pytest.raises(ValueError, match='count realization'):
                 validate_goal_binding_argument_grounding(output, authoritative_goals=[goal], capabilities=capabilities)
+
+
+@pytest.mark.parametrize("variant", ["no_work", "acquires", "names_gap"])
+def test_a_response_cannot_leave_its_own_goal_unmet_without_work_or_a_named_gap(variant):
+    """Live 2026-10-24 (multi_weather_followup_zh T2): the GA-requested Plan for "那上海呢？" was
+    respond, no step, its own Goal unmet "until the weather is acquired"; it replaced the first
+    Plan's valid read and Chromie said she was checking but never did."""
+    from shared.chromie_contracts.plan import validate_unmet_response_accounting
+
+    output = _weather_output(extra_args={"location": "上海", "date": "tomorrow"})
+    outcome = output.goal_outcomes["goal-weather"]
+    outcome.satisfaction = outcome.satisfaction.model_copy(update={
+        "score": 0.75, "status": "substantial", "satisfied_goal_ids": [], "unmet_goal_ids": ["goal-weather"],
+        "unmet_requirements": ["the weather for Shanghai tomorrow"] if variant != "no_work" else [],
+    })
+    outcome.disposition = "respond" if variant != "acquires" else "execute"
+    if variant != "acquires":
+        output.steps = []
+        outcome.step_ids = []
+    else:
+        output.steps[0].step_purpose = "acquire_information"
+        output.steps[0].expected_outcome = "Tomorrow's Shanghai forecast."
+    working = {goal_id for step in output.steps for goal_id in step.source_goal_ids}
+    if variant == "no_work":
+        with pytest.raises(ValueError, match="cannot leave its own Goal unmet"):
+            validate_unmet_response_accounting(output.goal_outcomes, working)
+    else:
+        validate_unmet_response_accounting(output.goal_outcomes, working)

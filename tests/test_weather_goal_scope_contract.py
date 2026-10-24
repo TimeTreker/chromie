@@ -390,6 +390,73 @@ def test_canonical_literal_provenance_preserves_goal_ownership_and_explicit_bind
             validate_user_supplied_parameter_provenance(output, authoritative_goals=goals)
 
 
+def test_declared_realization_arguments_are_written_not_implied_by_default() -> None:
+    """Live 2026-10-24: four weather reads for "明天" omitted date, the provider default read
+    today, and Chromie reported today's weather as tomorrow's. An argument a Capability
+    declares as realizing what the person said is always written; its own default needs no
+    source span because it claims nothing the person said."""
+    from jsonschema import Draft202012Validator
+    from agent.app.capabilities.catalog import CatalogCapability
+    from agent.app.planner_context import fast_capability_payload
+    from agent.app.planner_schema import fast_streaming_advance_response_schema
+    from benchmarks.datasets.fast_planner_daily_life.qualification import declared_ability_needs
+    from shared.chromie_contracts.core_interpretation import CognitiveWorkRequest
+
+    tool = next(t for a in chromie_capability_bundle().agents for t in a.tools if t.name == "chromie.weather.lookup")
+    weather = CatalogCapability(capability_id=tool.name, agent_id="chromie.weather", description=tool.description,
+        input_schema=tool.input_schema, output_schema=tool.output_schema, available=True,
+        interaction_executable=True, hints=tool.llm_hints, idempotent=True, side_effect_free=True)
+    request = CognitiveWorkRequest(sid="w", text="what's the weather in chongqing?", language="en-US",
+        responsibilities=[{"local_ref": "r1", "outcome": "the weather in chongqing", "bindings": {"location": "chongqing"},
+                           "output_mode": "information", "continuity_scope": "goal", "confidence": 1.0}],
+        interpretation_confidence=1.0)
+    schema = fast_streaming_advance_response_schema(["r1"], responsibilities=request.responsibilities,
+        capabilities=[fast_capability_payload(weather, include_side_effect_free=True)])
+
+    def valid(args):
+        raw = {"disposition": "execute", "coverage": "complete", "covered_responsibility_refs": ["r1"],
+               "activities": [{"activity_id": "a", "role": "capability", "capability_id": "chromie.weather.lookup",
+                               "args": args, "depends_on": [], "source_responsibility_refs": ["r1"]}],
+               "confidence": 1.0, "unresolved": [], "reason_summary": "x"}
+        return Draft202012Validator(schema).is_valid(declared_ability_needs(raw, schema))
+
+    assert valid({"location": "chongqing", "date": "today", "period": "day"})
+    assert not valid({"location": "chongqing", "period": "day"})
+    assert not valid({"location": "chongqing"})
+
+
+def test_a_repetition_count_is_written_not_implied_by_default() -> None:
+    """Live 2026-10-24 (ctrl_quiet_nod_zh): "别说话，点两下头。" planned a nod with no count and
+    relied on the provider default. A Capability's declared repetition count is always written."""
+    from jsonschema import Draft202012Validator
+    from agent.app.capabilities.catalog import CatalogCapability
+    from agent.app.planner_schema import fast_streaming_advance_response_schema
+    from benchmarks.datasets.fast_planner_daily_life.qualification import declared_ability_needs
+    from shared.chromie_contracts.core_interpretation import CognitiveResponsibilityProposal
+
+    nod = CatalogCapability(
+        capability_id="soridormi.nod_yes", agent_id="soridormi", description="Nod the head.",
+        input_schema={"type": "object", "additionalProperties": False, "properties": {
+            "count": {"type": "number", "minimum": 1, "maximum": 8, "default": 2},
+            "duration_s": {"type": "number", "minimum": 1.0, "maximum": 10.0, "default": 4.0}}},
+        effects=["physical_motion"], available=True, interaction_executable=True)
+    responsibility = CognitiveResponsibilityProposal(
+        local_ref="r1", outcome="点两下头", output_mode="body_action", continuity_scope="goal", confidence=1.0)
+    schema = fast_streaming_advance_response_schema(
+        ["r1"], responsibilities=[responsibility], capabilities=[nod.model_dump(mode="json")])
+
+    def valid(args):
+        raw = {"disposition": "execute", "coverage": "complete", "covered_responsibility_refs": ["r1"],
+               "activities": [{"activity_id": "a", "role": "capability", "capability_id": "soridormi.nod_yes",
+                               "args": args, "depends_on": [], "source_responsibility_refs": ["r1"]}],
+               "confidence": 1.0, "unresolved": [], "reason_summary": "x"}
+        return Draft202012Validator(schema).is_valid(declared_ability_needs(raw, schema))
+
+    assert valid({"count": 2})
+    assert not valid({})
+    assert not valid({"duration_s": 4.0})
+
+
 @pytest.mark.asyncio
 async def test_fast_weather_collapses_duplicate_read_after_default_cleanup() -> None:
     from tests.planner_test_support import (
@@ -451,7 +518,9 @@ async def test_fast_weather_collapses_duplicate_read_after_default_cleanup() -> 
                 "activity_id": "weather-implicit-default",
                 "role": "capability",
                 "capability_id": "chromie.weather.lookup",
-                "args": {"location": "chongqing"},
+                # Realized temporal arguments are always written (2026-10-24); the units
+                # default is the one that cleanup removes.
+                "args": {"location": "chongqing", "date": "today", "period": "day", "units": "metric"},
                 "depends_on": [],
                 "source_responsibility_refs": ["r1"],
             },

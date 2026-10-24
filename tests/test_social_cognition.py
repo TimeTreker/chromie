@@ -2781,6 +2781,66 @@ def test_the_ingress_question_already_asks_the_planners_later_meaning_need(varia
             validate_social_cognition_output(reuse, current, [])
 
 
+@pytest.mark.parametrize("earlier_binding", [False, True])
+def test_words_said_before_work_evidence_cannot_cover_its_answer(earlier_binding):
+    """Live 2026-10-24 (memory_language_pref_zh): a Work-state line said "Today is Monday." before
+    the clock Evidence reached Social Cognition; the evidence call reused it unchanged, relabelled
+    context_grounded, to cover the clock answer, and the person heard Monday on a Saturday. Only
+    words written with the Evidence, or the same act already bound to that answer, can cover it."""
+    from agent.app.social_cognition import social_cognition_response_schema, validate_social_cognition_output
+    from shared.chromie_contracts.core_interpretation import CognitiveResponsibilityProposal
+    from shared.chromie_contracts.plan import SocialCommunicationNeed
+    from shared.chromie_contracts.social_cognition import SocialCognitionOutput, SocialCognitionResolution
+
+    need = SocialCommunicationNeed(
+        need_id="need:date", owner="planner", kind="answer", reference_id="plan:date",
+        source_goal_ids=["goal:date"],
+        facts={"disposition": "respond", "completed_work_dependencies": [
+            {"evidence_id": "evidence:clock", "step_id": "act_0", "status": "completed"}]},
+    )
+    said = {"text": "Today is Monday.", "speech_act": "inform", "metadata": {
+        "communicative_activity_ids": ["inform_date"], "source_responsibility_refs": ["r1"],
+        "addressed_need_ids": ["need:date"] if earlier_binding else []}}
+    current = request(
+        trigger="evidence", source_refs=["evidence:clock"], goal_ids=["goal:date"],
+        evidence_refs=["evidence:clock"], communication_needs=[need],
+        source_turn={"turn_id": "turn:date", "original_text": "今天星期几？"},
+        responsibilities=[CognitiveResponsibilityProposal(
+            local_ref="r1", outcome="今天星期几", output_mode="information", continuity_scope="goal",
+            confidence=1.0)],
+        context={"interaction_context": {"events": [said], "already_spoken": [said], "pending_speech": [],
+                                         "prior_delivered_speech": []}},
+    )
+
+    def covering(activity_id, text):
+        return SocialCognitionOutput.model_validate({
+            "disposition": "communicate", "reason_summary": "Answer the date.",
+            "need_outcomes": {"need:date": "covered"},
+            "activities": [{"activity_id": activity_id, "text": text, "function": "inform",
+                            "truth_stage": "post_evidence", "evidence_refs": ["evidence:clock"],
+                            "source_responsibility_refs": ["r1"], "source_goal_ids": ["goal:date"],
+                            "addressed_need_ids": ["need:date"]}],
+        })
+
+    acts = social_cognition_response_schema(current, [])["$defs"]["SocialCommunicativeAct"]["oneOf"]
+    reused = [act["properties"]["addressed_need_ids"] for act in acts
+              if act["properties"]["activity_id"].get("const") == "inform_date"]
+    assert reused
+    reuse_covers = any("need:date" in (item.get("items") or {}).get("enum", []) for item in reused)
+    assert reuse_covers is earlier_binding
+    validate_social_cognition_output(covering("answer_date", "今天是星期六。"), current, [])
+    if earlier_binding:
+        validate_social_cognition_output(covering("inform_date", "Today is Monday."), current, [])
+    else:
+        with pytest.raises(ValueError, match="before Work Evidence"):
+            validate_social_cognition_output(covering("inform_date", "Today is Monday."), current, [])
+        host = SocialCognitionResolution(**covering("inform_date", "Today is Monday.").model_dump(),
+                                         request_id=current.request_id,
+                                         snapshot_digest=current.snapshot_digest(), model_call_count=1)
+        with pytest.raises(ValueError, match="before Work Evidence"):
+            host.validate_request(current)
+
+
 def _preference_turn(**changes):
     from shared.chromie_contracts.core_interpretation import CognitiveResponsibilityProposal
 
@@ -2836,6 +2896,63 @@ def test_a_stated_preference_is_kept_as_session_memory_and_read_back():
     state.record_interaction_response("pref", response)
     entries = state.session_memory()["active_memory"]["entries"]
     assert any(item.get("kind") == "preference" and item.get("text") == "Answer me in Chinese." for item in entries)
+
+
+@pytest.mark.parametrize("kept", [False, True])
+def test_the_reply_language_defers_to_a_kept_language_preference(kept):
+    """Live 2026-10-24 (memory_language_pref_zh): "以后先用中文回答我" was kept in Active Memory, but
+    the last instruction before decoding named only the turn language ("Reply language: en-US"),
+    and "What day is it today?" was answered in English."""
+    from agent.app.social_cognition import _social_language_guard
+
+    entries = [{"kind": "preference", "text": "以后先用中文回答我"}] if kept else [{"kind": "outcome", "text": "x"}]
+    current = request(language="en-US", context={"session_memory": {"active_memory": {"entries": entries}}})
+    guard = _social_language_guard(current)
+    assert guard.startswith("\nReply language: en-US")
+    assert ("unless session_memory.active_memory holds a preference" in guard) is kept
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("playback_completed", [False, True])
+async def test_a_stated_preference_is_kept_once_its_agreement_is_heard(playback_completed):
+    """Live 2026-10-24 (memory_language_pref_zh): the ingress agreement was heard, but the same
+    turn also ran the Planner, whose response was the one recorded, so the preference was lost
+    and the next English question was answered in English. SC's Memory decision is kept when its
+    words are delivered, whichever response ends the turn."""
+    from orchestrator.runtime.conversation_state import ConversationStateManager
+    from orchestrator.runtime.goal_planning_state import record_memory_updates
+    from orchestrator.runtime.interaction_coordinator import InteractionRuntimeCoordinator
+    from orchestrator.runtime.response_plan import build_social_interaction_response
+    from shared.chromie_contracts.social_cognition import SocialCognitionResolution
+
+    current = _preference_turn()
+    result = SocialCognitionResolution.model_validate({
+        "disposition": "communicate", "reason_summary": "Agree and keep it.", "need_outcomes": {},
+        "activities": [{"activity_id": "agree", "text": "好的，以后我用中文回答你。", "function": "respond",
+                        "truth_stage": "context_grounded", "source_responsibility_refs": ["r1"]}],
+        "preference_memory_candidates": [{"text": "Answer me in Chinese.", "source_responsibility_refs": ["r1"]}],
+        "request_id": current.request_id, "snapshot_digest": current.snapshot_digest(), "model_call_count": 1,
+    })
+    response = build_social_interaction_response(current, result, session_id="pref", interaction_context=None)
+    state = ConversationStateManager(enabled=True)
+
+    async def waiter(_session_id, _output):
+        return playback_completed
+
+    runtime = InteractionRuntimeCoordinator(
+        lambda *args, **kwargs: None, speech_delivery_waiter=waiter,
+        social_memory_recorder=lambda sid, updates: record_memory_updates(state, sid, updates),
+    )
+    execution = SimpleNamespace(results=[SimpleNamespace(
+        request_id=speech.id, capability_id="chromie.speak", status="completed", output={},
+    ) for speech in response.speech])
+    assert await runtime.record_social_delivery(response, execution, session_id="pref") is playback_completed
+    kept = [item for item in state.session_memory()["active_memory"]["entries"]
+            if item.get("kind") == "preference" and item.get("text") == "Answer me in Chinese."]
+    assert len(kept) == int(playback_completed)
+    state.record_interaction_response("pref", response)  # the same decision recorded again stays one
+    assert len([item for item in state.session_memory()["active_memory"]["entries"]
+                if item.get("kind") == "preference"]) == 1
 
 
 def _weekday_work_state(**changes):

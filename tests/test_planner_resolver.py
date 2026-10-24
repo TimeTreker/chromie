@@ -1646,6 +1646,9 @@ class PlannerResolverTests(unittest.TestCase):
                     prompt_tier="common",
                 )]
 
+        # A declared repetition count is always written (2026-10-24), so omitting it
+        # fails the decoder contract before binding conservation; its own default is
+        # then removed as an unowned redundant value.
         cases = [
             ("wrong_count_decoy", {"count": 1}, {"count": 2, "intensity": 1.0}, False),
             ("omitted_count_decoy", {"count": 1}, {"intensity": 1.0}, False),
@@ -1653,7 +1656,7 @@ class PlannerResolverTests(unittest.TestCase):
             ("reverse_count", {"count": 2}, {"count": 1, "intensity": 2.0}, False),
             ("wrong_intensity", {"intensity": 1.0}, {"count": 1, "intensity": 0.5}, False),
             ("correct_intensity", {"intensity": 0.5}, {"count": 2, "intensity": 0.5}, True),
-            ("unbound_default", {}, {}, True),
+            ("unbound_default", {}, {"count": 2}, True),
         ]
         for name, bindings, args, accepted in cases:
             with self.subTest(name=name):
@@ -1688,7 +1691,8 @@ class PlannerResolverTests(unittest.TestCase):
                 else:
                     self.assertEqual(result.disposition, "unavailable", result.metadata)
                     self.assertEqual(result.activities, [])
-                    self.assertIn("numeric Capability input contradicts UMI binding", result.metadata["error"])
+                    self.assertIn("is not valid under any of the given schemas" if "count" not in args
+                                  else "numeric Capability input contradicts UMI binding", result.metadata["error"])
 
 
     def test_repetition_cannot_be_witnessed_by_duration_without_count_input(self):
@@ -3668,6 +3672,36 @@ class PlannerResolverTests(unittest.TestCase):
             "unresolved effectful goal requires an executable step",
             plan.metadata["error"],
         )
+
+    def test_response_leaving_its_own_goal_unmet_without_work_fails_closed(self):
+        """Live 2026-10-24 (multi_weather_followup_zh T2): the GA-requested Plan for "那上海呢？"
+        answered respond, no step, its own Goal unmet "until the weather is acquired"; as a
+        contract failure the first Plan's valid read is kept instead."""
+        unmet = {"score": 0.75, "status": "substantial", "satisfied_goal_ids": [],
+                 "unmet_goal_ids": ["goal-weather"], "unmet_requirements": [],
+                 "rationale": "The weather must first be acquired."}
+        invalid = {
+            "disposition": "respond", "coverage": "complete", "confidence": 1.0,
+            "goal_summary": "Shanghai weather tomorrow.", "steps": [],
+            "goal_outcomes": {"goal-weather": {**respond_outcome("goal-weather", "", "Acquire first."),
+                                               "satisfaction": unmet}},
+            "unresolved": [], "parameter_resolutions": [], "plan_relation": "exact",
+            "user_confirmation_required": False,
+        }
+        ollama = ScriptedOllama([invalid, invalid])
+        run_request = request("那上海呢？", goal_ids=["goal-weather"])
+        context = dict(run_request.context)
+        association = dict(context["goal_association_resolution"])
+        association["new_goals"] = [{**association["new_goals"][0], "metadata": {"output_mode": "information"}}]
+        context["goal_association_resolution"] = association
+
+        plan = asyncio.run(
+            PlannerResolver(ollama, FakeCatalog()).resolve(run_request.model_copy(update={"context": context}))
+        )
+
+        self.assertEqual(plan.metadata["path_classification"], "contract_failure")
+        self.assertEqual(plan.steps, [])
+        self.assertIn("cannot leave its own Goal unmet", plan.metadata["error"])
 
     def test_missing_resource_provider_is_unavailable_without_hard_model_failure(self):
         goal_id = "goal-resource"

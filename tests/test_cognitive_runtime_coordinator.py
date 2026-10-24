@@ -4773,3 +4773,53 @@ class IndependentPlanningTests(unittest.IsolatedAsyncioTestCase):
         dispatch = await runtime.submit_response(response, session_id="chat-publication")
         await runtime.wait_dispatch(dispatch)
         self.assertEqual(spoken, ["你好。"])
+
+
+class ExecutionOnlyWorkStateTests(unittest.IsolatedAsyncioTestCase):
+    """Live 2026-10-24 (memory_language_pref_zh): after a clock read completed, the optional
+    Work-state Social Cognition call had no Evidence and said "Today is Monday." on a Saturday;
+    the evidence call then reused it. A read-only Plan's Evidence speaks next, so no Work-state
+    call starts; effectful Work keeps its progress line."""
+
+    async def finish(self, purpose: str) -> list[dict]:
+        step = {"step_id": "s1", "capability_id": "chromie.local_clock.now", "source_goal_ids": ["g1"],
+                "step_purpose": purpose}
+        if purpose == "acquire_information":
+            step["expected_outcome"] = "Today's weekday."
+        plan = CanonicalPlan(plan_id="plan-1", planner_tier="fast", disposition="execute",
+                             coverage="complete", goal_ids=["g1"], steps=[step])
+        started: list[dict] = []
+
+        async def observe(**kwargs):
+            return await kwargs["operation"]
+
+        async def build_execution_only_response(**_kwargs):
+            return SimpleNamespace(metadata={})
+
+        coordinator = SimpleNamespace(
+            policy=SimpleNamespace(mode="apply"), interaction_ledger=None,
+            _interaction_context=lambda **_kwargs: {},
+            adapter=SimpleNamespace(
+                interaction_runtime=SimpleNamespace(
+                    capability_definition=lambda _cid: SimpleNamespace(requires_confirmation=False)),
+                build_execution_only_response=build_execution_only_response),
+            start_state_interaction=lambda *_args, **kwargs: started.append(kwargs) or "work_state",
+            _observe_workflow_stage=observe, _finish=lambda **kwargs: kwargs,
+            _resolution_path_metadata=lambda _run: {},
+        )
+        run = SimpleNamespace(
+            sid="sid", planning_context={}, terminal_plan=plan, session=None, turn_id="turn-1",
+            work_request=SimpleNamespace(model_copy=lambda **_kwargs: None), language="zh-CN",
+            timings={}, association=SimpleNamespace(model_dump=lambda **_kwargs: {}),
+            goal_state_commit_stage="", ready_fast_capability_status="", fast_plan=None,
+            goal_state_results=[], started=0.0, stage_diagnostics=[], state_social_task="ingress",
+        )
+        await GoalDrivenRuntimeCoordinator._finish_execution_only_plan(coordinator, run)
+        self.assertEqual(run.state_social_task, "work_state" if started else "ingress")
+        return started
+
+    async def test_read_only_plan_starts_no_work_state_social_cognition(self):
+        self.assertEqual(await self.finish("acquire_information"), [])
+
+    async def test_effectful_plan_keeps_its_work_state_social_cognition(self):
+        self.assertEqual(len(await self.finish("achieve_effect")), 1)

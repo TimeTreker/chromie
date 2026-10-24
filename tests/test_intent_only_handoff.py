@@ -1544,7 +1544,8 @@ async def test_conditional_action_reads_first_and_names_its_deferred_decision():
     first = {"ability_needs": [need("read the rain forecast for Shanghai today")],
              **limitation_outcome("No loaded contract reads the forecast.")}
     read = {"role": "capability", "capability_id": "chromie.weather.lookup", "activity_id": "read",
-            "args": {"location": "Shanghai"}, "argument_sources": source_spans(text, {"location": "Shanghai"}),
+            "args": {"location": "Shanghai", "date": "today", "period": "day"},
+            "argument_sources": source_spans(text, {"location": "Shanghai"}),
             "depends_on": [], "step_purpose": "acquire_information", "source_responsibility_refs": ["r1"]}
     decided = {**read, "deferred_requirement": "Nod twice only if the Shanghai forecast says rain today."}
     nod_after = {"role": "capability", "capability_id": "test.nod", "activity_id": "nod", "args": {"count": 2},
