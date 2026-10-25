@@ -24,7 +24,8 @@ ordered open work are in [STATUS](docs/STATUS.md).
 - Workflow corpus: freeze 47 (`bdb8db08…`; scripts in `.chromie/acceptance/thirsty-offer-20261021/freeze47/`). Restore it with
   `python -m benchmarks.regression restore-fixtures`; do not untar `frozen.tar.xz` over
   `workflow_scenarios/` (its inner `manifest.json` lacks the storage identity).
-- Evidence (README in each): `.chromie/acceptance/iter2-20261025/` (iteration 2 on a3b8e2b82: hard stop at 34/70),
+- Evidence (README in each): `.chromie/acceptance/iter3-20261025/` (iteration 3 on 12bfb0e95: hard stop at 16/70,
+  SC prompt over budget), `iter2-20261025/` (iteration 2 on a3b8e2b82: hard stop at 34/70),
   `iter1-20261025/` (iteration 1 on 2fd36c9ea: hard stop at 32/70, root causes and probes; its
   `soridormi-run.log` is the running scene's log), `acc3-20261024/` (stopped at 57/70 by the machine shutdown),
   `acc2-focused-20261024/`, `acc1-20261024/` (last complete judged cohort), `perf2-20261024/`,

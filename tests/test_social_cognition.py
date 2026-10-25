@@ -2864,10 +2864,9 @@ def test_an_acknowledgement_does_not_say_an_answer(function):
                                          "prior_delivered_speech": []}},
     )
     acts = social_cognition_response_schema(current, [])["$defs"]["SocialCommunicativeAct"]["oneOf"]
-    for act in acts:
-        functions = set(act["properties"]["function"].get("enum") or [act["properties"]["function"].get("const")])
-        if functions & {"acknowledge", "nonverbal"}:
-            assert "need:water" not in (act["properties"]["addressed_need_ids"].get("items") or {}).get("enum", [])
+    reused = [act["properties"]["addressed_need_ids"] for act in acts
+              if act["properties"]["activity_id"].get("const") == "ack"]
+    assert reused and not any("need:water" in (item.get("items") or {}).get("enum", []) for item in reused)
     output = SocialCognitionOutput.model_validate({
         "disposition": "communicate", "reason_summary": "Answer.", "need_outcomes": {"need:water": "covered"},
         "activities": [{"activity_id": "ack" if function == "acknowledge" else "answer",

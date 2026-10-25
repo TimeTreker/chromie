@@ -264,6 +264,7 @@ def _constrain_social_activity_identity(
     """
     known: dict[str, set[str]] = {}
     known_need_bindings: dict[str, set[str]] = {}
+    acknowledged_ids: set[str] = set()
     prior_ids: set[str] = set()
     terminal_failure_need_ids = _result_needs_said_now(request)
     context = request.context.get("interaction_context", {})
@@ -283,6 +284,8 @@ def _constrain_social_activity_identity(
                         )
                     if key == "prior_delivered_speech":
                         prior_ids.add(identity)
+                    if (row.get("speech_act") or row.get("metadata", {}).get("speech_act")) in {"acknowledge", "nonverbal"}:
+                        acknowledged_ids.add(identity)
 
     def fresh_identity_suffix(excluded: list[str], remaining: int) -> str | None:
         # The serving decoder ignores `not: {enum: ...}` and does not support
@@ -350,8 +353,13 @@ def _constrain_social_activity_identity(
             reuse = copy.deepcopy(branch)
             reuse["properties"]["activity_id"]["const"] = identity
             reuse["properties"]["text"]["const"] = text
-            # Words written before Work Evidence reached Social Cognition cannot report it.
+            # Words written before Work Evidence reached Social Cognition cannot report it, and
+            # a delivered acknowledgement says no answer or result (live 2026-10-25: the ingress
+            # "嗯，我看看。" was reused to cover "家里还有水吗？"). Fresh acts are held to the
+            # same rule by validation; splitting every branch by function overflowed the prompt.
             unbound = completed_work_need_ids(request) - known_need_bindings.get(identity, set())
+            if identity in acknowledged_ids:
+                unbound |= {need.need_id for need in request.communication_needs if need.kind in {"answer", "result"}}
             addressed = reuse["properties"].get("addressed_need_ids") or {}
             if unbound and "enum" in (addressed.get("items") or {}):
                 allowed = [key for key in addressed["items"]["enum"] if key not in unbound]
@@ -704,36 +712,29 @@ def social_cognition_response_schema(
         schema["$defs"]["SocialCommunicativeAct"] = {"oneOf": expression_branches}
     question_ids = {need.need_id for need in request.communication_needs
                     if need.kind in {"input", "confirmation"}}
-    answer_ids = {need.need_id for need in request.communication_needs if need.kind in {"answer", "result"}}
-    if question_ids or answer_ids:
-        # Realize the Host's existing Need-kind/function implications without
-        # requiring an extra act or selecting whether to communicate: an input or
-        # confirmation need takes a question, and an acknowledgement or wordless act
-        # says no answer or result (live 2026-10-25: the ingress "嗯，我看看。" was
-        # reused to cover "家里还有水吗？" and the person never heard the answer).
+    if question_ids:
+        # Realize the Host's existing Need-kind/function implication without
+        # requiring an extra act or selecting whether to communicate.
         existing = schema["$defs"]["SocialCommunicativeAct"]
         question_branches = []
-        groups = (({"ask"}, set()), ({"acknowledge", "nonverbal"}, question_ids | answer_ids), (None, question_ids))
         for branch in existing.get("oneOf", [existing]):
             function = branch["properties"]["function"]
             functions = function.get("enum", [function.get("const")])
-            for members, excluded in groups:
-                allowed = [value for value in functions if (
-                    value in members if members is not None else value not in {"ask", "acknowledge", "nonverbal"})]
+            for is_question in (True, False):
+                allowed = [value for value in functions if (value == "ask") == is_question]
                 if not allowed:
                     continue
                 variant = copy.deepcopy(branch)
                 properties = variant["properties"]
                 properties["function"] = {"type": "string", "enum": allowed}
-                if excluded:
+                if not is_question:
                     addressed = properties["addressed_need_ids"]
-                    compatible = [key for key in addressed["items"].get("enum", []) if key not in excluded]
+                    compatible = [key for key in addressed["items"].get("enum", []) if key not in question_ids]
                     if compatible:
                         addressed["items"] = {"type": "string", "enum": compatible}
                     elif addressed.get("minItems", 0):
-                        continue  # an act that must address a need has none this function may say
+                        continue  # an act that must address a need has no non-question need
                     else:
-                        addressed.pop("items", None)
                         addressed["maxItems"] = 0
                 question_branches.append(variant)
         schema["$defs"]["SocialCommunicativeAct"] = {"oneOf": question_branches}

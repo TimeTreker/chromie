@@ -17,7 +17,7 @@ Run the everyday live-text cohort (`scenarios/everyday/`, 70 cases) against
 Soridormi MuJoCo, judge every case, and repair each failure at its earliest
 responsible owner. One invocation and one debug bundle per run; a hard failure in
 the 15-case `must_pass` smoke stage stops `core` and `challenge` (owner rule).
-Evidence and per-run judgments: `.chromie/acceptance/iter2-20261025/`, `iter1-20261025/`, `acc3-20261024/` (stopped at 57/70), `acc2-focused-20261024/`,
+Evidence and per-run judgments: `.chromie/acceptance/iter3-20261025/`, `iter2-20261025/`, `iter1-20261025/`, `acc3-20261024/` (stopped at 57/70), `acc2-focused-20261024/`,
 `acc1-20261024/`, `perf2-20261024/` and `perf-4f64f5120-20261024/` (performance mode), `review-fixes-20261023/` (stopped),
 `merge-reads-20261023/`, `span-owned-20261023/`, `main-20cce0dfa-20261023/` (complete cohorts),
 `planner-fit-20261023/` and `ingress-awaiting-20261023/` (focused),
@@ -35,12 +35,15 @@ Evidence and per-run judgments: `.chromie/acceptance/iter2-20261025/`, `iter1-20
 - Iteration 1 (2fd36c9ea) hard-stopped at 32/70 on an invalid GA re-plan DTO (fixed in a3b8e2b82: a link to a
   finished Goal keeps the running Plan; celebrate is common). Iteration 2 (a3b8e2b82) hard-stopped at 34/70 (smoke
   15/15, core 17/19 automatic, 16/19 judged): the Planner cited "上海" with outcome tokens one off. This delivery:
-  an outcome citation that misses its value moves to the value's single verbatim run in that outcome, and an
-  acknowledgement or wordless act can no longer cover an answer or result need (the ingress "嗯，我看看。" had
-  covered "家里还有水吗？").
+  an outcome citation that misses its value moves to the value's single verbatim run in that outcome (12bfb0e95).
+  Iteration 3 (12bfb0e95) hard-stopped at 16/70: iteration 2 had enforced "an acknowledgement says no answer or
+  result" by splitting every Social Cognition act branch by function, growing the output schema 1.5-1.66x, and a
+  large call overflowed the context. This delivery moves that rule into the reuse variants of delivered
+  acknowledgements (fresh acts stay held to it by validation); the schema is now smaller than before iteration 2.
 - The workstation runs in performance mode; Agent and Host use profile default timeouts. After a reboot start the
   Soridormi scene detached (Handoff).
-- Next: iteration 3 — rebuild and deploy this revision, run the complete cohort, judge, fix.
+- Next: iteration 4 — rebuild and deploy this revision, run the complete cohort, judge, fix. Measure the schema size
+  of any Social Cognition schema change before deploying it.
 
 Verification: clean-worktree gate on this delivery's source: pytest 4,039 passed + 5 skipped (`xgrammar` not
 installed), benchmarks 172, legacy Agent tests 20, all checks. Strict replay not rerun (last 6,000/6,000 on freeze
@@ -161,8 +164,9 @@ installed), benchmarks 172, legacy Agent tests 20, all checks. Strict replay not
   erased a correct weather read and failed the Planner contract; acc1 had 7 of 8 GA re-plans of this shape).
 - An outcome citation whose tokens miss its value moves to that value's single verbatim run in the same outcome
   (extends the 2026-10-23 re-anchoring decision; a value the outcome does not hold still fails closed).
-- An acknowledgement or wordless act cannot cover an answer or result need: the Social Cognition decoder does not
-  offer it and the Agent and Host validators reject it (live: the ingress "嗯，我看看。" covered the answer need).
+- An acknowledgement or wordless act cannot cover an answer or result need: the reuse variant of a delivered
+  acknowledgement does not offer it and the Agent and Host validators reject it (live: the ingress "嗯，我看看。"
+  covered the answer need; a per-function split of every act branch overflowed the prompt and was replaced).
 
 ## Owner decisions in force
 

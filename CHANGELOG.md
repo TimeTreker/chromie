@@ -5,6 +5,12 @@ remains available in Git history.
 
 ## Unreleased
 
+### The acknowledgement rule without a larger prompt (iteration 3, 2026-10-25)
+
+- "An acknowledgement says no answer or result" is enforced on the reuse of a delivered acknowledgement and by
+  validation instead of by splitting every Social Cognition act branch, which had grown the embedded output schema
+  1.5-1.66x and overflowed the context on a large call.
+
 ### Citations land on their value; an acknowledgement never answers (iteration 2, 2026-10-25)
 
 - An outcome citation whose tokens miss the value moves to the value's single verbatim run in that outcome; the
