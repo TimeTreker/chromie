@@ -415,6 +415,35 @@ class GoalAssociationResolution(BaseModel):
         return projection
 
 
+def open_goal_ids(snapshots: Any) -> set[str]:
+    """IDs of the goal snapshots whose Responsibility is still open."""
+
+    return {str(item.get("goal_id")) for item in snapshots or []
+            if isinstance(item, dict) and item.get("goal_id") and item.get("responsibility_status", "open") == "open"}
+
+
+def continuity_unchanged(association: GoalAssociationResolution, refs: set[str], open_goals: set[str]) -> bool:
+    """Whether GA left everything a cognition already reading ``refs`` saw unchanged.
+
+    A Goal created from a Responsibility with no association, supersession or referent change,
+    related at most to Goals already finished, only names what UMI already handed over; a link to
+    a still-open Goal may need that Goal's Work coordinated. Charter: GA continuity never erases a
+    valid Planner result (live 2026-10-13: a GA re-plan of an unchanged "Nod twice" replaced the
+    nod with a reply; 2026-10-24/25: re-plans of "那上海呢？" and "Yes, please.", related only to
+    finished Goals, erased a correct weather read and failed the Planner contract).
+    """
+
+    if association.referent_updates or association.resolved_references:
+        return False
+    if any(set(item.source_responsibility_refs) & refs for item in association.associations):
+        return False
+    return not any(
+        goal.supersedes_goal_ids or set(goal.related_goal_ids) & open_goals
+        for goal in association.new_goals
+        if set(goal.source_responsibility_refs) & refs
+    )
+
+
 def goal_association_fingerprint(resolution: GoalAssociationResolution) -> str:
     """Stable fingerprint of one canonical Goal Association projection."""
 

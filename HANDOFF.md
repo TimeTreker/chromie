@@ -5,7 +5,7 @@ exact commands. Replace it on each delivery; do not append history. The resume
 boundary is in the [checkpoint](DEVELOPMENT_CHECKPOINT.md); current status and the
 ordered open work are in [STATUS](docs/STATUS.md).
 
-## Current snapshot — 2026-10-24
+## Current snapshot — 2026-10-25
 
 - Checkout `/home/chromie/github/chromie`, branch `main`; the expected resume revision is
   the latest `origin/main` commit containing this file (the 2026-10-20 repair and build
@@ -24,10 +24,9 @@ ordered open work are in [STATUS](docs/STATUS.md).
 - Workflow corpus: freeze 47 (`bdb8db08…`; scripts in `.chromie/acceptance/thirsty-offer-20261021/freeze47/`). Restore it with
   `python -m benchmarks.regression restore-fixtures`; do not untar `frozen.tar.xz` over
   `workflow_scenarios/` (its inner `manifest.json` lacks the storage identity).
-- Evidence (README in each): `.chromie/acceptance/acc3-20261024/` (complete cohort of this delivery's source, started
-  17:20 and still running at commit; at 29/70: smoke 15/15, core 11/13; not yet judged, no bundle yet),
-  `acc2-focused-20261024/` (this delivery: focused 3/3, gate), `acc1-20261024/` (complete cohort before this
-  delivery's last three repairs, judged, latency), `perf2-20261024/` (previous delivery),
+- Evidence (README in each): `.chromie/acceptance/iter1-20261025/` (owner iteration loop, iteration 1 on 2fd36c9ea:
+  hard stop at 32/70, root causes and probes), `acc3-20261024/` (stopped at 57/70 by the machine shutdown),
+  `acc2-focused-20261024/`, `acc1-20261024/` (last complete judged cohort), `perf2-20261024/`,
   `perf-4f64f5120-20261024/` (performance-mode baseline), `review-fixes-20261023/` (stopped), `merge-reads-20261023/`, `span-owned-20261023/` (umbrella probes), `main-20cce0dfa-20261023/`,
   `planner-fit-20261023/` (probes, strict replay), `ingress-awaiting-20261023/`,
   `sc-evidence-20261022/` (latest full run; SC schema
@@ -43,7 +42,8 @@ ordered open work are in [STATUS](docs/STATUS.md).
   after this change reruns the cache-mount layers once.
 - After a host reboot start the Soridormi water scene (command below); its runner also starts
   `soridormi-runtime-mcp`. The runner stays in the foreground; stopping it (or a command
-  timeout around it) removes the simulator container, so start it as a background job. `/tmp` (scratch probes) does not survive a reboot.
+  timeout around it) removes the simulator container, so start it detached (`setsid nohup … &`); start long cohorts
+  the same way so a closed session cannot stop them. `/tmp` (scratch probes) does not survive a reboot.
 - Live runs use the local `chromie-gemma4-12b`. Restart `chromie-llm` before a cohort, never
   during one: SGLang greedy output depends on earlier traffic in one server lifetime, and a
   near-tie decision can also flip between lifetimes (about 3 nats observed for the same request).
@@ -69,9 +69,8 @@ ordered open work are in [STATUS](docs/STATUS.md).
 ## Deploy and run
 
 ```bash
-# resume: when acc3 has ended (its ended_at file exists), collect its one bundle if bundle.log is missing, then judge
-D=.chromie/acceptance/acc3-20261024; cat $D/ended_at; [ -s $D/bundle.log ] || ./scripts/collect_debug_bundle.sh > $D/bundle.log 2>&1
-python .chromie/acceptance/tools/brief.py $D/live
+# resume the owner's iteration loop (up to 8): rebuild and deploy this revision, fresh LLM and scene, complete
+# cohort, one bundle, judge every case, fix at the earliest boundary, gate, commit and push
 # owner: rebuild the Agent from a clean main checkout and deploy it (performance mode; in quiet mode prefix
 # CHROMIE_SERVICE_RUNTIME_OVERRIDE_FILE=.chromie/quiet-mode/agent-timeouts.env)
 # (rollback: docker tag chromie-agent:perf2-20261024 chromie-agent:latest)

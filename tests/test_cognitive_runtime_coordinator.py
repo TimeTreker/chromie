@@ -797,6 +797,7 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
         text="hello",
         intent=None,
         responsibilities=None,
+        active_goal_snapshots=(),
     ):
         del intent
         core, envelope = admitted_core(
@@ -808,7 +809,7 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
                 text=text,
                 sid="sid-goal-runtime",
                 core_interpretation=core,
-                context={"history": [], "active_goal_snapshots": []},
+                context={"history": [], "active_goal_snapshots": list(active_goal_snapshots)},
                 history=[],
                 language="zh-CN",
                 turn_envelope=envelope,
@@ -923,6 +924,37 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
         self.assertFalse(result.metadata["umi_planning_superseded"])
         self.assertFalse(result.metadata["independent_goal_planning"])
         self.assertNotIn("goal_state", [request.trigger for request in client.social_requests])
+
+    def test_a_link_only_to_a_finished_goal_joins_the_running_plan(self):
+        """Live 2026-10-24/25: for "那上海呢？" and "Yes, please." GA only related the new Goal to
+        the finished previous one, yet re-planned from scratch; one re-plan erased the first
+        Plan's correct weather read, the other failed the Planner contract and stopped the cohort.
+        A link to a still-open Goal may need its Work coordinated, so that one still re-plans."""
+        for open_goal in (False, True):
+            with self.subTest(open_goal=open_goal):
+                advance = FastPlannerAdvance(
+                    turn_id="turn-follow", disposition="respond", coverage="complete",
+                    covered_responsibility_refs=["r1"],
+                    activities=[FastPlannerResponseNeed(activity_id="answer", role="complete_response",
+                        source_responsibility_refs=["r1"], rationale="Scripted Work decision.")],
+                    confidence=0.98, reason_summary="Scripted.",
+                )
+                data = new_goal_association().model_dump(mode="json")
+                data["new_goals"][0]["related_goal_ids"] = ["goal-earlier"]
+                data["cognitive_requests"] = [{"authority": "planner", "responsibility_refs": ["r1"],
+                                               "reason_summary": ""}]
+                association = GoalAssociationResolution.model_validate(data)
+                client = ScriptedClient(association=association, fast_plans=[respond_plan("goal-1")],
+                                        fast_advances=[advance])
+                coordinator = GoalDrivenRuntimeCoordinator(
+                    agent_client=client, adapter=CanonicalPlanRuntimeAdapter(FastAdvanceRuntime()),
+                    policy=CognitiveRuntimePolicy(mode="apply"),
+                )
+                earlier = {"goal_id": "goal-earlier", "responsibility_status": "open" if open_goal else "satisfied"}
+                result = self.run_resolution(coordinator, client, text="那上海呢？", active_goal_snapshots=[earlier])
+
+                self.assertEqual(result.status, "applied", (result.fallback_reason, result.metadata))
+                self.assertEqual("fast" in client.calls, open_goal, client.calls)
 
     def test_fast_failure_retrieves_already_failed_goal_association_task(self):
         class Client:

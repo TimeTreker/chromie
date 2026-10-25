@@ -20,7 +20,9 @@ from shared.chromie_contracts.core_interpretation import (
 )
 from shared.chromie_contracts.goal import (
     GoalAssociationResolution,
+    continuity_unchanged,
     goal_association_fingerprint,
+    open_goal_ids,
 )
 from shared.chromie_contracts.interaction import (
     InteractionResponse,
@@ -1384,27 +1386,6 @@ class GoalDrivenRuntimeCoordinator:
         )
 
     @staticmethod
-    def _continuity_unchanged(association: GoalAssociationResolution, refs: set[str]) -> bool:
-        """Whether GA left everything a cognition already reading ``refs`` saw unchanged.
-
-        A Goal created from a Responsibility with no association, relation, supersession
-        or referent change only names what UMI already handed over. Charter: a purely
-        identity-preserving GA result is bound without another model call, and GA
-        continuity never erases a valid Planner result (live 2026-10-13: a GA re-plan of
-        an unchanged "Nod twice" replaced the correct nod with a spoken reply).
-        """
-
-        if association.referent_updates or association.resolved_references:
-            return False
-        if any(set(item.source_responsibility_refs) & refs for item in association.associations):
-            return False
-        return not any(
-            goal.related_goal_ids or goal.supersedes_goal_ids
-            for goal in association.new_goals
-            if set(goal.source_responsibility_refs) & refs
-        )
-
-    @staticmethod
     def _remaining_meaning_uncertainties(
         request: CognitiveWorkRequest,
         association: GoalAssociationResolution,
@@ -1822,7 +1803,7 @@ class GoalDrivenRuntimeCoordinator:
         if (
             ga_planner_refs
             and ga_planner_refs <= planner_refs_in_flight
-            and self._continuity_unchanged(association, ga_planner_refs)
+            and continuity_unchanged(association, ga_planner_refs, open_goal_ids(context.get("active_goal_snapshots")))
         ):
             # The UMI-triggered Planner already plans exactly this unchanged meaning.
             logger.info("ga_planner_request_coalesced sid=%s refs=%s", sid, ",".join(sorted(ga_planner_refs)))
@@ -2757,7 +2738,8 @@ class GoalDrivenRuntimeCoordinator:
         if (
             ga_social_request is not None
             and run.initial_social_task is not None
-            and self._continuity_unchanged(run.association, set(ga_social_request.responsibility_refs))
+            and continuity_unchanged(run.association, set(ga_social_request.responsibility_refs),
+                                     open_goal_ids(run.planning_context.get("active_goal_snapshots")))
         ):
             # The standing SC of this turn already holds this unchanged meaning.
             logger.info("ga_social_request_coalesced sid=%s refs=%s", run.sid,

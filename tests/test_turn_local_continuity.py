@@ -726,6 +726,11 @@ async def test_late_sc_request_failure_preserves_delivered_conversation_but_not_
         assert result.interaction_response.capabilities == []
 
 
+# A still-open Goal a new Goal may be related to; a link to a finished Goal changes nothing a
+# running Planner reads (2026-10-25).
+EARLIER_OPEN_GOAL = {"goal_id": "goal-earlier", "responsibility_status": "open"}
+
+
 @pytest.mark.asyncio
 @pytest.mark.parametrize("speech_only", [True, False])
 async def test_silent_goal_update_keeps_delivered_initial_response_on_late_work_failure(speech_only):
@@ -742,7 +747,7 @@ async def test_silent_goal_update_keeps_delivered_initial_response_on_late_work_
         {"authority": "social_cognition", "responsibility_refs": ["r1"],
          "reason_summary": "Observe Goal state."},
     ]
-    # GA relates the new Goal to retained history, so its requests are new cognition;
+    # GA relates the new Goal to a still-open Goal, so its requests are new cognition;
     # an unchanged GA result would join the running plan instead (no late GA failure).
     data["new_goals"][0]["related_goal_ids"] = ["goal-earlier"]
     association = type(association).model_validate(data)
@@ -814,7 +819,8 @@ async def test_silent_goal_update_keeps_delivered_initial_response_on_late_work_
     )
     result = await asyncio.wait_for(coordinator.resolve(
         object(), text=text, sid="silent-state", core_interpretation=core,
-        turn_envelope=envelope, context={"history": []}, history=[], language="en-US",
+        turn_envelope=envelope, context={"history": [], "active_goal_snapshots": [EARLIER_OPEN_GOAL]},
+        history=[], language="en-US",
     ), 3)
     if speech_only:
         assert result.status == "applied", result.fallback_reason
@@ -905,7 +911,8 @@ async def test_goal_state_waits_for_the_answer_to_an_ingress_question(asked):
     )
     await asyncio.wait_for(coordinator.resolve(
         object(), text=text, sid="that-bottle", core_interpretation=core,
-        turn_envelope=envelope, context={"history": []}, history=[], language="zh-CN",
+        turn_envelope=envelope, context={"history": [], "active_goal_snapshots": [EARLIER_OPEN_GOAL]},
+        history=[], language="zh-CN",
     ), 3)
     triggers = [request.trigger for request in agent.social_requests]
     assert triggers[0] == "interpretation"

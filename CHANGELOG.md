@@ -5,6 +5,14 @@ remains available in Git history.
 
 ## Unreleased
 
+### A link to a finished Goal no longer re-plans; celebrate is in the common repertoire (iteration 1, 2026-10-25)
+
+- When Goal Association only relates a new Goal to Goals that are already finished, the running Planner result
+  stays in force instead of a second Planner planning from scratch and replacing it. Such re-plans erased a correct
+  weather read for "那上海呢？" and, for "Yes, please.", produced an invalid Plan that stopped the live cohort.
+- `celebrate` joins the common prompt tier: a loaded hand wave was always judged to fit a celebration, so the rare
+  contract was never loaded.
+
 ### Said arguments are written, no progress line before a read's Evidence, kept preferences are honored (accuracy, 2026-10-24)
 
 - The Fast decoder writes every argument a Capability declares as realizing what the person said, and every

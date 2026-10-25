@@ -23,6 +23,10 @@
       "prompt_tier": "common",
       "reason": "Simple hand-wave expression commonly requested in conversation."
     },
+    "soridormi.celebrate": {
+      "prompt_tier": "common",
+      "reason": "Celebrating good news is an everyday social expression. As a rare contract it was unreachable: the loaded hand wave was always judged to fit a celebration, so the library search never loaded it (live 2026-10-24/25)."
+    },
     "soridormi.express_attention": {
       "prompt_tier": "common",
       "reason": "Simple attention expression commonly requested in conversation."

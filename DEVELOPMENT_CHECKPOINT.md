@@ -17,7 +17,7 @@ Run the everyday live-text cohort (`scenarios/everyday/`, 70 cases) against
 Soridormi MuJoCo, judge every case, and repair each failure at its earliest
 responsible owner. One invocation and one debug bundle per run; a hard failure in
 the 15-case `must_pass` smoke stage stops `core` and `challenge` (owner rule).
-Evidence and per-run judgments: `.chromie/acceptance/acc3-20261024/` (running at commit), `acc2-focused-20261024/`,
+Evidence and per-run judgments: `.chromie/acceptance/iter1-20261025/`, `acc3-20261024/` (stopped at 57/70), `acc2-focused-20261024/`,
 `acc1-20261024/`, `perf2-20261024/` and `perf-4f64f5120-20261024/` (performance mode), `review-fixes-20261023/` (stopped),
 `merge-reads-20261023/`, `span-owned-20261023/`, `main-20cce0dfa-20261023/` (complete cohorts),
 `planner-fit-20261023/` and `ingress-awaiting-20261023/` (focused),
@@ -28,24 +28,17 @@ Evidence and per-run judgments: `.chromie/acceptance/acc3-20261024/` (running at
 `playback-race-20261020/`, `answer-source-20261020/`, `gaze-turn-20261020/`, `said-now-20261020/`, `decided-activity-20261020/`,
 `main-03974435e-20261020/` and `everyday-20261016/` (README.md in each).
 
-## Resume point — 2026-10-24 (accuracy round, performance mode)
+## Resume point — 2026-10-25 (owner iteration loop, performance mode)
 
-- The workstation runs in performance mode (CPU turbo on, GPU 575 W default; the platform profile read `quiet` /
-  `power-saver` during acc1); the Agent and Host use the profile's default timeouts.
-  `./scripts/start_chromie.sh --keep-services --no-orchestrator` regenerates the env files but does not rebuild the
-  Agent; build and recreate it with the Handoff commands.
-- Agent `acc2-20261024` (= `chromie-agent:latest`, `1c7d4fecab20`) is built from this delivery's source;
-  `--verify-agent-source` matched.
-- acc1 complete cohort (2026-10-24, before this delivery's last three repairs): smoke 15/15, core 46/50 automatic
-  (44/50 judged), challenge 5/5 automatic (3/5 judged); first audio p50 19.6 s, p95 27.6 s. acc2 focused reruns of
-  the three cases those repairs address: 3/3 (Chinese weekday answer after the stated preference, the quiet nod,
-  Shanghai tomorrow's weather).
-- The owner asked for this commit without waiting for tests: acc3, the complete cohort of this delivery's source,
-  was running at commit (29/70: smoke 15/15, core 11/13; `clarify_go_there_zh` walked because the Planner's `fits`
-  flipped to true for the same need and capability, likely LLM-lifetime drift; `body_celebrate_zh` waved). Resume
-  by collecting its single bundle once it has ended and judging every case (Handoff commands).
-- Next: judge acc3; measure the `fits` margin of `clarify_go_there_zh` on two lifetimes; STATUS open work 1-3 by
-  general mechanisms (no case-by-case prompt rules, owner 2026-10-24); then latency.
+- Owner 2026-10-25: up to 8 iterations of complete cohort → earliest-boundary root cause → fix → gate → commit and
+  push; when a cohort passes every case, add everyday scenarios to `scenarios/everyday/`.
+- Iteration 1 ran on 2fd36c9ea and hard-stopped at 32/70 (smoke 15/15, core 13/17): a GA-requested re-plan of
+  "Yes, please." returned an invalid Planner DTO (contained, water delivered, but a model-contract failure stops
+  the cohort). This delivery: GA requests whose new Goal only links to finished Goals join the running Plan
+  (`continuity_unchanged` in the goal contract), and `celebrate` joins the common prompt tier.
+- The workstation runs in performance mode; Agent and Host use profile default timeouts. After a reboot start the
+  Soridormi scene detached (Handoff).
+- Next: iteration 2 — rebuild and deploy this revision, run the complete cohort, judge, fix.
 
 Verification: clean-worktree gate on this delivery's source: pytest 4,039 passed + 5 skipped (`xgrammar` not
 installed), benchmarks 172, legacy Agent tests 20, all checks. Strict replay not rerun (last 6,000/6,000 on freeze
@@ -161,6 +154,9 @@ installed), benchmarks 172, legacy Agent tests 20, all checks. Strict replay not
   is a contract failure (`validate_unmet_response_accounting`), so a failed GA revision keeps the first Plan (live:
   the GA-requested Plan for "那上海呢？" planned no read and replaced the first Plan's valid read).
 - The live-text harness keeps Capability contracts on the reflex path too, so acceptance reads declared defaults.
+- A GA result whose new Goal only links to finished Goals (no association, supersession or referent change, no link
+  to a still-open Goal) leaves the running UMI Plan in force instead of re-planning from scratch (live: such re-plans
+  erased a correct weather read and failed the Planner contract; acc1 had 7 of 8 GA re-plans of this shape).
 
 ## Owner decisions in force
 
