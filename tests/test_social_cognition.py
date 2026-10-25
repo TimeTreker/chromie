@@ -2841,6 +2841,53 @@ def test_words_said_before_work_evidence_cannot_cover_its_answer(earlier_binding
             host.validate_request(current)
 
 
+@pytest.mark.parametrize("function", ["acknowledge", "respond"])
+def test_an_acknowledgement_does_not_say_an_answer(function):
+    """Live 2026-10-25 (multi_that_water_zh T1): "家里还有水吗？" was answered from perception, but
+    Social Cognition reused its ingress "嗯，我看看。" to cover the answer need, and the person never
+    heard whether there was water. An acknowledgement or wordless act says no answer or result."""
+    from agent.app.social_cognition import social_cognition_response_schema, validate_social_cognition_output
+    from shared.chromie_contracts.core_interpretation import CognitiveResponsibilityProposal
+    from shared.chromie_contracts.plan import SocialCommunicationNeed
+    from shared.chromie_contracts.social_cognition import SocialCognitionOutput, SocialCognitionResolution
+
+    need = SocialCommunicationNeed(need_id="need:water", owner="planner", kind="answer", reference_id="plan:water",
+                                   source_goal_ids=["goal:water"], facts={"disposition": "respond"})
+    said = {"text": "嗯，我看看。", "speech_act": "acknowledge", "metadata": {
+        "communicative_activity_ids": ["ack"], "source_responsibility_refs": ["r1"], "addressed_need_ids": []}}
+    current = request(
+        trigger="goal_state", source_refs=["plan:water"], goal_ids=["goal:water"], communication_needs=[need],
+        source_turn={"turn_id": "turn:water", "original_text": "家里还有水吗？"},
+        responsibilities=[CognitiveResponsibilityProposal(
+            local_ref="r1", outcome="家里还有水吗", output_mode="information", continuity_scope="goal", confidence=1.0)],
+        context={"interaction_context": {"events": [said], "already_spoken": [said], "pending_speech": [],
+                                         "prior_delivered_speech": []}},
+    )
+    acts = social_cognition_response_schema(current, [])["$defs"]["SocialCommunicativeAct"]["oneOf"]
+    for act in acts:
+        functions = set(act["properties"]["function"].get("enum") or [act["properties"]["function"].get("const")])
+        if functions & {"acknowledge", "nonverbal"}:
+            assert "need:water" not in (act["properties"]["addressed_need_ids"].get("items") or {}).get("enum", [])
+    output = SocialCognitionOutput.model_validate({
+        "disposition": "communicate", "reason_summary": "Answer.", "need_outcomes": {"need:water": "covered"},
+        "activities": [{"activity_id": "ack" if function == "acknowledge" else "answer",
+                        "text": "嗯，我看看。" if function == "acknowledge" else "有的，我身后有一瓶水。",
+                        "function": function, "truth_stage": "context_grounded",
+                        "source_responsibility_refs": ["r1"], "source_goal_ids": ["goal:water"],
+                        "addressed_need_ids": ["need:water"]}],
+    })
+    host = SocialCognitionResolution(**output.model_dump(), request_id=current.request_id,
+                                     snapshot_digest=current.snapshot_digest(), model_call_count=1)
+    if function == "acknowledge":
+        with pytest.raises(ValueError, match="acknowledgement does not say an answer"):
+            validate_social_cognition_output(output, current, [])
+        with pytest.raises(ValueError, match="acknowledgement does not say an answer"):
+            host.validate_request(current)
+    else:
+        validate_social_cognition_output(output, current, [])
+        host.validate_request(current)
+
+
 def _preference_turn(**changes):
     from shared.chromie_contracts.core_interpretation import CognitiveResponsibilityProposal
 

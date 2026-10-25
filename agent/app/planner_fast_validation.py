@@ -1618,7 +1618,9 @@ def reanchor_turn_citations_to_outcomes(
     verbatim exactly once in the outcomes of the Responsibilities that Activity serves, and which
     earlier talk already said, moves to that outcome span; the value is unchanged and validation
     follows. A value that only the outcome holds would let UMI override the person's own words
-    ("What is the weather in Paris?" with an outcome saying Chongqing still fails closed).
+    ("What is the weather in Paris?" with an outcome saying Chongqing still fails closed). An
+    outcome citation whose tokens miss its value moves to that value's single verbatim run in the
+    same outcome.
     """
 
     by_id = {str(item.get("capability_id") or ""): item for item in capabilities if isinstance(item, dict)}
@@ -1635,21 +1637,35 @@ def reanchor_turn_citations_to_outcomes(
         for parameter, span in activity.argument_sources.items():
             value = activity.args.get(parameter)
             schema = properties.get(parameter) if isinstance(properties.get(parameter), dict) else {}
-            if (isinstance(span, (FastPlannerResponsibilityArgumentSource, FastPlannerSituationArgumentSource))
+            if (isinstance(span, FastPlannerSituationArgumentSource)
                     or not isinstance(value, str) or schema.get("type") != "string" or schema.get("enum")):
                 continue
-            try:
-                quote = resolve_user_turn_source_span(source, span)
-            except ValueError:
-                continue
-            if _cited_span_supports_string(value, quote) or not any(value in text for text in earlier_talk):
-                continue
-            found = [
-                match for ref in activity.source_responsibility_refs if ref in outcomes
-                for match in _verbatim_outcome_spans(ref, outcomes[ref], value)]
+            if isinstance(span, FastPlannerResponsibilityArgumentSource):
+                # A cited outcome run that misses the value moves to the value's single verbatim run in
+                # that same outcome; value and source stay the Planner's (live 2026-10-25: "上海" was
+                # cited as r1.t1-r1.t2, which reads "答上", and the turn failed closed).
+                outcome = outcomes.get(span.source_responsibility_ref, "")
+                try:
+                    quote = resolve_user_turn_source_span(outcome, span.local_span())
+                except ValueError:
+                    continue
+                found = ([] if _cited_span_supports_string(value, quote)
+                         else _verbatim_outcome_spans(span.source_responsibility_ref, outcome, value))
+                normalization = "outcome_citation_reanchored_in_outcome"
+            else:
+                try:
+                    quote = resolve_user_turn_source_span(source, span)
+                except ValueError:
+                    continue
+                if _cited_span_supports_string(value, quote) or not any(value in text for text in earlier_talk):
+                    continue
+                found = [
+                    match for ref in activity.source_responsibility_refs if ref in outcomes
+                    for match in _verbatim_outcome_spans(ref, outcomes[ref], value)]
+                normalization = "turn_citation_reanchored_to_outcome"
             if len(found) == 1:
                 sources[parameter] = found[0]
-                repairs.append({"normalization": "turn_citation_reanchored_to_outcome", "activity_id": activity.activity_id,
+                repairs.append({"normalization": normalization, "activity_id": activity.activity_id,
                                 "parameter": parameter, "source_responsibility_ref": found[0].source_responsibility_ref})
         activities.append(activity.model_copy(update={"argument_sources": sources})
                           if sources != activity.argument_sources else activity)

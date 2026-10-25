@@ -2018,6 +2018,52 @@ async def test_a_value_resolved_from_earlier_talk_is_cited_from_the_outcome(loca
     assert frames[-1].advance.metadata["citation_reanchoring"][0]["parameter"] == "location"
 
 
+@pytest.mark.asyncio
+@pytest.mark.parametrize("location", ["上海", "北京"])
+async def test_an_outcome_citation_off_its_value_moves_to_the_value_in_that_outcome(location):
+    """Live 2026-10-25 (multi_weather_followup_zh T2): for "那上海呢？" the Planner wrote location
+    "上海" but cited outcome tokens r1.t1-r1.t2 ("答上" in "回答上海明天…"), and Host failed the
+    turn closed. The tokens move to the value's single verbatim run in that same outcome; a value
+    the outcome does not hold still fails closed."""
+    from shared.chromie_contracts.user_turn import user_turn_source_tokens
+
+    text, outcome = "那上海呢？", "回答上海明天的天气情况"
+    tokens = user_turn_source_tokens(text)
+    request = CognitiveWorkRequest(sid="follow", text=text, language="zh-CN", interpretation_confidence=1.0,
+        responsibilities=[CognitiveResponsibilityProposal(
+            local_ref="r1", outcome=outcome, output_mode="information", confidence=1.0,
+            source_evidence={"source_start_token_ref": tokens[0]["ref"], "source_end_token_ref": tokens[-1]["ref"]})])
+    weather = CatalogCapability(
+        capability_id="chromie.weather.lookup", agent_id="chromie.weather", description="Retrieve a forecast.",
+        input_schema={"type": "object", "properties": {"location": {"type": "string"}}, "required": ["location"],
+                      "additionalProperties": False},
+        available=True, interaction_executable=True, prompt_tier="common", idempotent=True, side_effect_free=True,
+        safety_class="safe_read", hints={"side_effect_free": True, "resource_contract": {"provider_role": "acquire_information"},
+                                         "semantic_scope": {"responsibility_type": "acquire_and_deliver_resource",
+                                                            "resource_kinds": ["information"]}})
+    raw = {"ability_needs": [{"need": "read the weather forecast", "closest_loaded": "chromie.weather.lookup",
+                              "closest_loaded_does": "Retrieve a forecast.", "fits": True}],
+           "responsibility_decisions": {"r1": {"needed_abilities_fit": True, "decision": "work", "missing": []}},
+           "activity_count": 1,
+           "activities": [{"role": "capability", "source_responsibility_refs": ["r1"], "capability_id": "chromie.weather.lookup",
+                           "activity_id": "act_weather", "args": {"location": location},
+                           "argument_sources": {"location": {"source_responsibility_ref": "r1",
+                                                             "source_start_token_ref": "r1.t1",
+                                                             "source_end_token_ref": "r1.t2"}},
+                           "depends_on": []}],
+           "disposition": "execute", "coverage": "complete", "covered_responsibility_refs": ["r1"],
+           "confidence": 1.0, "unresolved": [], "reason_summary": "Read the forecast."}
+    model = _StreamingModel([json.dumps(raw)])
+    frames = [f async for f in PlannerResolver(model, _Catalog([weather])).stream_advance(request)]
+    if location == "北京":
+        assert isinstance(frames[-1], FastPlannerStreamFailure)
+        return
+    assert isinstance(frames[-1], FastPlannerStreamTerminal), frames[-1]
+    cited = frames[-1].advance.activities[0].argument_sources["location"]
+    assert (cited.source_start_token_ref, cited.source_end_token_ref) == ("r1.t2", "r1.t3")
+    assert frames[-1].advance.metadata["citation_reanchoring"][0]["normalization"] == "outcome_citation_reanchored_in_outcome"
+
+
 def test_one_activity_for_every_work_responsibility_serves_them_all():
     """Live 2026-10-15 (info_umbrella_zh, runs 14-16): both Responsibilities were decided work
     and one weather read was written for them, citing the first only; Host rejected the turn."""

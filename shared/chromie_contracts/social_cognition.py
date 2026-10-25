@@ -500,6 +500,8 @@ class SocialCognitionResolution(SocialCognitionOutput):
                     raise ValueError("communication omitted its required Responsibility binding")
                 if need.kind in {"input", "confirmation"} and act.function != "ask":
                     raise ValueError("an input or confirmation need requires a question")
+                if need.kind in {"answer", "result"} and act.function in {"acknowledge", "nonverbal"}:
+                    raise ValueError("an acknowledgement does not say an answer or result")
                 if need.delivery_phase is not None and act.delivery_phase != need.delivery_phase:
                     raise ValueError("communication changed an upstream delivery-order requirement")
 

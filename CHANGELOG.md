@@ -5,6 +5,13 @@ remains available in Git history.
 
 ## Unreleased
 
+### Citations land on their value; an acknowledgement never answers (iteration 2, 2026-10-25)
+
+- An outcome citation whose tokens miss the value moves to the value's single verbatim run in that outcome; the
+  Planner had cited "上海" one token off ("答上") and the turn failed closed.
+- An acknowledgement or wordless act can no longer cover an answer or result need: "家里还有水吗？" was answered
+  only with the ingress "嗯，我看看。".
+
 ### A link to a finished Goal no longer re-plans; celebrate is in the common repertoire (iteration 1, 2026-10-25)
 
 - When Goal Association only relates a new Goal to Goals that are already finished, the running Planner result

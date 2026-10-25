@@ -17,7 +17,7 @@ Run the everyday live-text cohort (`scenarios/everyday/`, 70 cases) against
 Soridormi MuJoCo, judge every case, and repair each failure at its earliest
 responsible owner. One invocation and one debug bundle per run; a hard failure in
 the 15-case `must_pass` smoke stage stops `core` and `challenge` (owner rule).
-Evidence and per-run judgments: `.chromie/acceptance/iter1-20261025/`, `acc3-20261024/` (stopped at 57/70), `acc2-focused-20261024/`,
+Evidence and per-run judgments: `.chromie/acceptance/iter2-20261025/`, `iter1-20261025/`, `acc3-20261024/` (stopped at 57/70), `acc2-focused-20261024/`,
 `acc1-20261024/`, `perf2-20261024/` and `perf-4f64f5120-20261024/` (performance mode), `review-fixes-20261023/` (stopped),
 `merge-reads-20261023/`, `span-owned-20261023/`, `main-20cce0dfa-20261023/` (complete cohorts),
 `planner-fit-20261023/` and `ingress-awaiting-20261023/` (focused),
@@ -32,13 +32,15 @@ Evidence and per-run judgments: `.chromie/acceptance/iter1-20261025/`, `acc3-202
 
 - Owner 2026-10-25: up to 8 iterations of complete cohort → earliest-boundary root cause → fix → gate → commit and
   push; when a cohort passes every case, add everyday scenarios to `scenarios/everyday/`.
-- Iteration 1 ran on 2fd36c9ea and hard-stopped at 32/70 (smoke 15/15, core 13/17): a GA-requested re-plan of
-  "Yes, please." returned an invalid Planner DTO (contained, water delivered, but a model-contract failure stops
-  the cohort). This delivery: GA requests whose new Goal only links to finished Goals join the running Plan
-  (`continuity_unchanged` in the goal contract), and `celebrate` joins the common prompt tier.
+- Iteration 1 (2fd36c9ea) hard-stopped at 32/70 on an invalid GA re-plan DTO (fixed in a3b8e2b82: a link to a
+  finished Goal keeps the running Plan; celebrate is common). Iteration 2 (a3b8e2b82) hard-stopped at 34/70 (smoke
+  15/15, core 17/19 automatic, 16/19 judged): the Planner cited "上海" with outcome tokens one off. This delivery:
+  an outcome citation that misses its value moves to the value's single verbatim run in that outcome, and an
+  acknowledgement or wordless act can no longer cover an answer or result need (the ingress "嗯，我看看。" had
+  covered "家里还有水吗？").
 - The workstation runs in performance mode; Agent and Host use profile default timeouts. After a reboot start the
   Soridormi scene detached (Handoff).
-- Next: iteration 2 — rebuild and deploy this revision, run the complete cohort, judge, fix.
+- Next: iteration 3 — rebuild and deploy this revision, run the complete cohort, judge, fix.
 
 Verification: clean-worktree gate on this delivery's source: pytest 4,039 passed + 5 skipped (`xgrammar` not
 installed), benchmarks 172, legacy Agent tests 20, all checks. Strict replay not rerun (last 6,000/6,000 on freeze
@@ -157,6 +159,10 @@ installed), benchmarks 172, legacy Agent tests 20, all checks. Strict replay not
 - A GA result whose new Goal only links to finished Goals (no association, supersession or referent change, no link
   to a still-open Goal) leaves the running UMI Plan in force instead of re-planning from scratch (live: such re-plans
   erased a correct weather read and failed the Planner contract; acc1 had 7 of 8 GA re-plans of this shape).
+- An outcome citation whose tokens miss its value moves to that value's single verbatim run in the same outcome
+  (extends the 2026-10-23 re-anchoring decision; a value the outcome does not hold still fails closed).
+- An acknowledgement or wordless act cannot cover an answer or result need: the Social Cognition decoder does not
+  offer it and the Agent and Host validators reject it (live: the ingress "嗯，我看看。" covered the answer need).
 
 ## Owner decisions in force
 
