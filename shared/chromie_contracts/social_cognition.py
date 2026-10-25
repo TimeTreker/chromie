@@ -266,6 +266,27 @@ def earlier_act_need_bindings(context: Any) -> dict[str, set[str]]:
     return bindings
 
 
+def earlier_acknowledgement_ids(context: Any) -> set[str]:
+    """Identities of pending or delivered acts spoken as an acknowledgement or wordless expression.
+
+    Said before an answer existed, such an act cannot later become that answer (live 2026-10-25:
+    the ingress "嗯，我看看。" was reused to cover "家里还有水吗？").
+    """
+
+    interaction = context.get("interaction_context") if isinstance(context, dict) else None
+    found: set[str] = set()
+    for key in ("events", "already_spoken", "pending_speech", "prior_delivered_speech"):
+        for row in (interaction or {}).get(key, []) if isinstance(interaction, dict) else []:
+            if not isinstance(row, dict):
+                continue
+            metadata = row.get("metadata")
+            metadata = metadata if isinstance(metadata, dict) else {}
+            if (row.get("speech_act") or metadata.get("speech_act")) in {"acknowledge", "nonverbal"}:
+                ids = metadata.get("communicative_activity_ids") or row.get("communicative_activity_ids") or []
+                found.update(str(identity).strip() for identity in ids if isinstance(ids, list))
+    return found
+
+
 def completed_work_need_ids(request: "SocialCognitionRequest") -> set[str]:
     """Needs that report Work Evidence; only words written with that Evidence can cover them.
 
@@ -445,7 +466,9 @@ class SocialCognitionResolution(SocialCognitionOutput):
         )):
             raise ValueError("a stated preference is kept only at ingress from the person's own Responsibility")
         evidence_need_ids = completed_work_need_ids(request)
-        earlier_bindings = earlier_act_need_bindings(request.context) if evidence_need_ids else {}
+        earlier_bindings_all = earlier_act_need_bindings(request.context)
+        earlier_bindings = earlier_bindings_all if evidence_need_ids else {}
+        acknowledgements = earlier_acknowledgement_ids(request.context)
         situation = request.situation
         if (self.memory_candidates or self.self_memory_candidates) and (
             request.trigger != "situation" or situation is None
@@ -500,8 +523,9 @@ class SocialCognitionResolution(SocialCognitionOutput):
                     raise ValueError("communication omitted its required Responsibility binding")
                 if need.kind in {"input", "confirmation"} and act.function != "ask":
                     raise ValueError("an input or confirmation need requires a question")
-                if need.kind in {"answer", "result"} and act.function in {"acknowledge", "nonverbal"}:
-                    raise ValueError("an acknowledgement does not say an answer or result")
+                if (need.kind in {"answer", "result"} and act.activity_id in acknowledgements
+                        and need_id not in earlier_bindings_all.get(act.activity_id, set())):
+                    raise ValueError("an earlier acknowledgement cannot be reused as an answer or result")
                 if need.delivery_phase is not None and act.delivery_phase != need.delivery_phase:
                     raise ValueError("communication changed an upstream delivery-order requirement")
 

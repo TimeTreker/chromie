@@ -2841,11 +2841,13 @@ def test_words_said_before_work_evidence_cannot_cover_its_answer(earlier_binding
             host.validate_request(current)
 
 
-@pytest.mark.parametrize("function", ["acknowledge", "respond"])
-def test_an_acknowledgement_does_not_say_an_answer(function):
+@pytest.mark.parametrize("act", ["reused_acknowledgement", "fresh_acknowledgement", "answer"])
+def test_an_earlier_acknowledgement_does_not_become_the_answer(act):
     """Live 2026-10-25 (multi_that_water_zh T1): "家里还有水吗？" was answered from perception, but
     Social Cognition reused its ingress "嗯，我看看。" to cover the answer need, and the person never
-    heard whether there was water. An acknowledgement or wordless act says no answer or result."""
+    heard whether there was water. A fresh act may still report a result in its own words (live
+    iteration 4: "Here you are!" labelled acknowledge after the handover was rejected and the
+    person heard a failure instead)."""
     from agent.app.social_cognition import social_cognition_response_schema, validate_social_cognition_output
     from shared.chromie_contracts.core_interpretation import CognitiveResponsibilityProposal
     from shared.chromie_contracts.plan import SocialCommunicationNeed
@@ -2864,23 +2866,26 @@ def test_an_acknowledgement_does_not_say_an_answer(function):
                                          "prior_delivered_speech": []}},
     )
     acts = social_cognition_response_schema(current, [])["$defs"]["SocialCommunicativeAct"]["oneOf"]
-    reused = [act["properties"]["addressed_need_ids"] for act in acts
-              if act["properties"]["activity_id"].get("const") == "ack"]
+    reused = [item["properties"]["addressed_need_ids"] for item in acts
+              if item["properties"]["activity_id"].get("const") == "ack"]
     assert reused and not any("need:water" in (item.get("items") or {}).get("enum", []) for item in reused)
+    activity_id, text, function = {
+        "reused_acknowledgement": ("ack", "嗯，我看看。", "acknowledge"),
+        "fresh_acknowledgement": ("answer", "有的，给你看看！", "acknowledge"),
+        "answer": ("answer", "有的，我身后有一瓶水。", "respond"),
+    }[act]
     output = SocialCognitionOutput.model_validate({
         "disposition": "communicate", "reason_summary": "Answer.", "need_outcomes": {"need:water": "covered"},
-        "activities": [{"activity_id": "ack" if function == "acknowledge" else "answer",
-                        "text": "嗯，我看看。" if function == "acknowledge" else "有的，我身后有一瓶水。",
-                        "function": function, "truth_stage": "context_grounded",
-                        "source_responsibility_refs": ["r1"], "source_goal_ids": ["goal:water"],
-                        "addressed_need_ids": ["need:water"]}],
+        "activities": [{"activity_id": activity_id, "text": text, "function": function,
+                        "truth_stage": "context_grounded", "source_responsibility_refs": ["r1"],
+                        "source_goal_ids": ["goal:water"], "addressed_need_ids": ["need:water"]}],
     })
     host = SocialCognitionResolution(**output.model_dump(), request_id=current.request_id,
                                      snapshot_digest=current.snapshot_digest(), model_call_count=1)
-    if function == "acknowledge":
-        with pytest.raises(ValueError, match="acknowledgement does not say an answer"):
+    if act == "reused_acknowledgement":
+        with pytest.raises(ValueError, match="earlier acknowledgement cannot be reused"):
             validate_social_cognition_output(output, current, [])
-        with pytest.raises(ValueError, match="acknowledgement does not say an answer"):
+        with pytest.raises(ValueError, match="earlier acknowledgement cannot be reused"):
             host.validate_request(current)
     else:
         validate_social_cognition_output(output, current, [])

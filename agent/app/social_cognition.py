@@ -25,7 +25,7 @@ from shared.chromie_contracts.plan import FastProgressKind, validate_communicati
 from shared.chromie_contracts.social_cognition import (
     SocialCognitionOutput, SocialCognitionRequest, SocialCognitionResolution,
     SocialStartupGreetingOutput, SocialStartupGreetingRequest, SocialStartupGreetingResolution,
-    asks_about_uncertain_meaning, completed_work_need_ids, must_say_now_need_ids,
+    asks_about_uncertain_meaning, completed_work_need_ids, earlier_acknowledgement_ids, must_say_now_need_ids,
     need_asks_uncertain_meaning, pre_evidence_act_violation, uncertain_task_responsibility_refs,
     value_review_responsibility_refs, value_withheld_need_ids,
 )
@@ -264,7 +264,7 @@ def _constrain_social_activity_identity(
     """
     known: dict[str, set[str]] = {}
     known_need_bindings: dict[str, set[str]] = {}
-    acknowledged_ids: set[str] = set()
+    acknowledgements = earlier_acknowledgement_ids(request.context)
     prior_ids: set[str] = set()
     terminal_failure_need_ids = _result_needs_said_now(request)
     context = request.context.get("interaction_context", {})
@@ -284,8 +284,6 @@ def _constrain_social_activity_identity(
                         )
                     if key == "prior_delivered_speech":
                         prior_ids.add(identity)
-                    if (row.get("speech_act") or row.get("metadata", {}).get("speech_act")) in {"acknowledge", "nonverbal"}:
-                        acknowledged_ids.add(identity)
 
     def fresh_identity_suffix(excluded: list[str], remaining: int) -> str | None:
         # The serving decoder ignores `not: {enum: ...}` and does not support
@@ -354,11 +352,11 @@ def _constrain_social_activity_identity(
             reuse["properties"]["activity_id"]["const"] = identity
             reuse["properties"]["text"]["const"] = text
             # Words written before Work Evidence reached Social Cognition cannot report it, and
-            # a delivered acknowledgement says no answer or result (live 2026-10-25: the ingress
-            # "嗯，我看看。" was reused to cover "家里还有水吗？"). Fresh acts are held to the
-            # same rule by validation; splitting every branch by function overflowed the prompt.
+            # an acknowledgement delivered before an answer existed cannot become that answer
+            # (live 2026-10-25: the ingress "嗯，我看看。" was reused to cover "家里还有水吗？").
+            # A fresh act may still report a result ("Here you are!" after a handover).
             unbound = completed_work_need_ids(request) - known_need_bindings.get(identity, set())
-            if identity in acknowledged_ids:
+            if identity in acknowledgements:
                 unbound |= {need.need_id for need in request.communication_needs if need.kind in {"answer", "result"}}
             addressed = reuse["properties"].get("addressed_need_ids") or {}
             if unbound and "enum" in (addressed.get("items") or {}):
@@ -987,6 +985,7 @@ def validate_social_cognition_output(
     # Acts that already exist (pending or delivered) and the needs they addressed then, and
     # which of them the ledger records as a question about meaning UMI left uncertain.
     previous_need_bindings: dict[str, set[str]] = {}
+    acknowledgements = earlier_acknowledgement_ids(request.context)
     meaning_questions: set[str] = set()
     uncertain_refs = uncertain_task_responsibility_refs(request)
     for key in ("events", "already_spoken", "pending_speech"):
@@ -1114,8 +1113,9 @@ def validate_social_cognition_output(
             if (act.activity_id in previous_need_bindings and need_id in completed_work_need_ids(request)
                     and need_id not in previous_need_bindings[act.activity_id]):
                 raise ValueError("words said before Work Evidence cannot report it")
-            if need.kind in {"answer", "result"} and act.function in {"acknowledge", "nonverbal"}:
-                raise ValueError("an acknowledgement does not say an answer or result")
+            if (need.kind in {"answer", "result"} and act.activity_id in acknowledgements
+                    and need_id not in previous_need_bindings.get(act.activity_id, set())):
+                raise ValueError("an earlier acknowledgement cannot be reused as an answer or result")
 
 
 def _social_plan_facts(value: Any) -> Any:

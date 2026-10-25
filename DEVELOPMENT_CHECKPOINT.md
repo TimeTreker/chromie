@@ -13,11 +13,12 @@ proof, then default target-evidence closure.
 
 ## Active Issue — everyday live-cohort root-cause repairs
 
-Run the everyday live-text cohort (`scenarios/everyday/`, 70 cases) against
+Run the everyday live-text cohort (`scenarios/everyday/`, 69 cases; `scenarios/model_limited/` holds cases the
+owner skips as local-model limits) against
 Soridormi MuJoCo, judge every case, and repair each failure at its earliest
 responsible owner. One invocation and one debug bundle per run; a hard failure in
 the 15-case `must_pass` smoke stage stops `core` and `challenge` (owner rule).
-Evidence and per-run judgments: `.chromie/acceptance/iter3-20261025/`, `iter2-20261025/`, `iter1-20261025/`, `acc3-20261024/` (stopped at 57/70), `acc2-focused-20261024/`,
+Evidence and per-run judgments: `.chromie/acceptance/iter4-20261025/`, `iter3-20261025/`, `iter2-20261025/`, `iter1-20261025/`, `acc3-20261024/` (stopped at 57/70), `acc2-focused-20261024/`,
 `acc1-20261024/`, `perf2-20261024/` and `perf-4f64f5120-20261024/` (performance mode), `review-fixes-20261023/` (stopped),
 `merge-reads-20261023/`, `span-owned-20261023/`, `main-20cce0dfa-20261023/` (complete cohorts),
 `planner-fit-20261023/` and `ingress-awaiting-20261023/` (focused),
@@ -39,10 +40,14 @@ Evidence and per-run judgments: `.chromie/acceptance/iter3-20261025/`, `iter2-20
   Iteration 3 (12bfb0e95) hard-stopped at 16/70: iteration 2 had enforced "an acknowledgement says no answer or
   result" by splitting every Social Cognition act branch by function, growing the output schema 1.5-1.66x, and a
   large call overflowed the context. This delivery moves that rule into the reuse variants of delivered
-  acknowledgements (fresh acts stay held to it by validation); the schema is now smaller than before iteration 2.
+  acknowledgements; the schema is now smaller than before iteration 2 (3cdf06008). Iteration 4 (3cdf06008)
+  hard-stopped at 32/70 (smoke 15/15, core 15/17): the validators still judged the function label, rejecting a
+  fresh "Here you are!" result labelled acknowledge. This delivery rejects only the reuse of an earlier
+  acknowledgement for an answer or result, and moves `multi_that_water_zh` to `scenarios/model_limited/` (owner
+  2026-10-25: local-model limit, skip until fine-tuning).
 - The workstation runs in performance mode; Agent and Host use profile default timeouts. After a reboot start the
   Soridormi scene detached (Handoff).
-- Next: iteration 4 — rebuild and deploy this revision, run the complete cohort, judge, fix. Measure the schema size
+- Next: iteration 5 — rebuild and deploy this revision, run the complete cohort, judge, fix. Measure the schema size
   of any Social Cognition schema change before deploying it.
 
 Verification: clean-worktree gate on this delivery's source: pytest 4,039 passed + 5 skipped (`xgrammar` not
@@ -164,11 +169,15 @@ installed), benchmarks 172, legacy Agent tests 20, all checks. Strict replay not
   erased a correct weather read and failed the Planner contract; acc1 had 7 of 8 GA re-plans of this shape).
 - An outcome citation whose tokens miss its value moves to that value's single verbatim run in the same outcome
   (extends the 2026-10-23 re-anchoring decision; a value the outcome does not hold still fails closed).
-- An acknowledgement or wordless act cannot cover an answer or result need: the reuse variant of a delivered
-  acknowledgement does not offer it and the Agent and Host validators reject it (live: the ingress "嗯，我看看。"
-  covered the answer need; a per-function split of every act branch overflowed the prompt and was replaced).
+- An acknowledgement or wordless act said before an answer existed cannot be reused to cover that answer or a
+  result: its reuse variant does not offer the need and the Agent and Host validators reject it (live: the ingress
+  "嗯，我看看。" covered the answer need). A fresh act may report a result in its own words ("Here you are!").
 
 ## Owner decisions in force
+
+- 2026-10-25: a cohort case that fails only because of the local model's own judgment (shown by replays or
+  margins after structural fixes) moves to `scenarios/model_limited/` until the model is fine-tuned; first
+  `multi_that_water_zh`.
 
 - Chromie never calls herself a robot, AI or device, answers as herself and asserts
   nothing false about her nature (Charter and interaction contract).

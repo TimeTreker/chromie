@@ -5,6 +5,14 @@ remains available in Git history.
 
 ## Unreleased
 
+### Only an earlier acknowledgement is barred from answering; one model-limited case parked (iteration 4, 2026-10-25)
+
+- Validation no longer rejects a fresh result line by its function label ("Here you are!" labelled acknowledge
+  after a handover had turned into a failure message); it rejects only the reuse of an acknowledgement said
+  before the answer existed.
+- `multi_that_water_zh` moves to `scenarios/model_limited/` (owner decision: a local-model limit, skipped until
+  fine-tuning); the gate still validates that root.
+
 ### The acknowledgement rule without a larger prompt (iteration 3, 2026-10-25)
 
 - "An acknowledgement says no answer or result" is enforced on the reuse of a delivered acknowledgement and by

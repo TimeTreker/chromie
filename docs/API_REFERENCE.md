@@ -41,7 +41,7 @@ An act already pending or delivered in the turn may be reused unchanged to cover
 if it was written with that need in hand: a need that reports completed Work Evidence
 (`completed_work_dependencies`) cannot be covered by words said before that Evidence reached
 Social Cognition. An input or confirmation need is covered only by a question, and an answer or result need
-never by an acknowledgement or a wordless act.
+never by reusing an acknowledgement or wordless act said before it.
 The Host client rechecks identity/provenance; the runtime entrypoint requires the
 state owner's freshness predicate before and after inference. Expression execution
 uses the existing catalog/target/resource/duplicate-dispatch validators. Empty

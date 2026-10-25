@@ -11,6 +11,12 @@ python -m benchmarks.scenarios check
 python -m benchmarks.scenarios run --suite cognitive_core_dialogue --no-write
 ```
 
+`scenarios/model_limited/` keeps everyday live cases that fail only because of the local
+model's own judgment (owner decision 2026-10-25: skip them until the model is fine-tuned;
+first `multi_that_water_zh`, a conversation-settled "那个"). The everyday cohort does not
+discover them; run them with `--scenario-root scenarios/model_limited`, and move a case back
+to `scenarios/everyday/` once it passes.
+
 Run behavior-quality gates through the discovered general-ability scenario library:
 
 ```bash
