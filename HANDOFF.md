@@ -14,17 +14,19 @@ ordered open work are in [STATUS](docs/STATUS.md).
   revision pinned by `capabilities/soridormi.json` and `release/compatibility.json`. The
   MCP container mounts its `src`, so a `docker restart soridormi-runtime-mcp` loads it and
   resets the scene (user at -90 degrees, 1.5 m).
-- Live Agent: `chromie-agent:latest` = `acc2-20261024` (`1c7d4fecab20`), built from this delivery's source and
-  recreated with the profile's default timeouts (performance mode, no quiet-mode override); `--verify-agent-source`
-  matched (`.chromie/acceptance/acc2-focused-20261024/agent-source-verify.json`). This file is the single owner of the
-  deployed identity. Rollback image: `perf2-20261024` (`b27810d373c0`, built from 399894a5a).
+- Live Agent: `chromie-agent:latest` = `iter5-20261025` (`bd4b7107ff30`), built from e36ada5b9 (this delivery's
+  source; this commit changes documentation only) and recreated with the profile's default timeouts (performance
+  mode); `--verify-agent-source` matched (`.chromie/acceptance/iter5-20261025/agent-source-verify.json`). This file is
+  the single owner of the deployed identity. Rollback image: `perf2-20261024` (`b27810d373c0`, built from 399894a5a).
   LLM: `chromie-sglang:latest` = `gemma4-fp8`
   (`f59a042e6973`); compose resolves `chromie-sglang:${CHROMIE_IMAGE_TAG}`, so the
   `latest` tag must exist for `start_chromie.sh`.
 - Workflow corpus: freeze 47 (`bdb8db08…`; scripts in `.chromie/acceptance/thirsty-offer-20261021/freeze47/`). Restore it with
   `python -m benchmarks.regression restore-fixtures`; do not untar `frozen.tar.xz` over
   `workflow_scenarios/` (its inner `manifest.json` lacks the storage identity).
-- Evidence (README in each): `.chromie/acceptance/iter4-20261025/` (iteration 4 on 3cdf06008: hard stop at 32/70),
+- Evidence (README in each): `.chromie/acceptance/iter5-20261025/` (iteration 5 on e36ada5b9: 69-case cohort, hard stop
+  at 33/69 on a weather-provider timeout; the owner's stop point), `iter4-20261025/` (iteration 4 on 3cdf06008: hard
+  stop at 32/70),
   `iter3-20261025/` (iteration 3 on 12bfb0e95: hard stop at 16/70, SC prompt over budget), `iter2-20261025/` (iteration 2 on a3b8e2b82: hard stop at 34/70),
   `iter1-20261025/` (iteration 1 on 2fd36c9ea: hard stop at 32/70, root causes and probes; its
   `soridormi-run.log` is the running scene's log), `acc3-20261024/` (stopped at 57/70 by the machine shutdown),

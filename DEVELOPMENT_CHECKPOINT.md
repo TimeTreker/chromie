@@ -18,7 +18,7 @@ owner skips as local-model limits) against
 Soridormi MuJoCo, judge every case, and repair each failure at its earliest
 responsible owner. One invocation and one debug bundle per run; a hard failure in
 the 15-case `must_pass` smoke stage stops `core` and `challenge` (owner rule).
-Evidence and per-run judgments: `.chromie/acceptance/iter4-20261025/`, `iter3-20261025/`, `iter2-20261025/`, `iter1-20261025/`, `acc3-20261024/` (stopped at 57/70), `acc2-focused-20261024/`,
+Evidence and per-run judgments: `.chromie/acceptance/iter5-20261025/`, `iter4-20261025/`, `iter3-20261025/`, `iter2-20261025/`, `iter1-20261025/`, `acc3-20261024/` (stopped at 57/70), `acc2-focused-20261024/`,
 `acc1-20261024/`, `perf2-20261024/` and `perf-4f64f5120-20261024/` (performance mode), `review-fixes-20261023/` (stopped),
 `merge-reads-20261023/`, `span-owned-20261023/`, `main-20cce0dfa-20261023/` (complete cohorts),
 `planner-fit-20261023/` and `ingress-awaiting-20261023/` (focused),
@@ -44,10 +44,16 @@ Evidence and per-run judgments: `.chromie/acceptance/iter4-20261025/`, `iter3-20
   hard-stopped at 32/70 (smoke 15/15, core 15/17): the validators still judged the function label, rejecting a
   fresh "Here you are!" result labelled acknowledge. This delivery rejects only the reuse of an earlier
   acknowledgement for an answer or result, and moves `multi_that_water_zh` to `scenarios/model_limited/` (owner
-  2026-10-25: local-model limit, skip until fine-tuning).
+  2026-10-25: local-model limit, skip until fine-tuning) (e36ada5b9). Iteration 5 (e36ada5b9, 69 cases) is the
+  owner's stop point: no automatic cognition failure before a hard stop at 33/69 caused by a transient
+  weather-provider geocoding timeout (Chromie planned Shanghai tomorrow and said truthfully that the lookup timed
+  out); smoke 15/15 automatic (14/15 judged: a joke came out as "Why did you do that?"), core 17/18 automatic
+  (16/18 judged). Every earlier hard-stop point passed.
 - The workstation runs in performance mode; Agent and Host use profile default timeouts. After a reboot start the
   Soridormi scene detached (Handoff).
-- Next: iteration 5 — rebuild and deploy this revision, run the complete cohort, judge, fix. Measure the schema size
+- Next (5 of 8 iterations used; the owner paused the loop after iteration 5): iteration 6 reruns the complete cohort
+  of e36ada5b9 (deployed as `iter5-20261025`, no source change since); open: wave_friend greeting, SC echo of the
+  person's words, joke wording variance, external provider timeouts stopping the cohort. Measure the schema size
   of any Social Cognition schema change before deploying it.
 
 Verification: clean-worktree gate on this delivery's source: pytest 4,039 passed + 5 skipped (`xgrammar` not
