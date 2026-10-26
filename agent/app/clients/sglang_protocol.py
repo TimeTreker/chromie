@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import copy
+import itertools
 import json
 from typing import Any
 
@@ -168,6 +169,28 @@ def _bound_ga_ownership_rows(schema: dict[str, Any]) -> None:
             rows["maxItems"] = min(rows.get("maxItems", len(association_refs)), len(association_refs))
 
 
+def _bound_ga_requirement_indices(schema: dict[str, Any]) -> None:
+    """Expose GA's unique requirement indices to the native decoder, which ignores uniqueItems.
+
+    Live 2026-10-26 (memory_plan_en): ``replace_requirement_indices`` came out as
+    ``[0, 0, 0, ...]`` until the output was truncated. Up to four requirements are offered as
+    their exact ordered subsets; a longer Goal is bounded by its requirement count. The DTO
+    still rejects repeats.
+    """
+    change = schema.get("$defs", {}).get("GoalAssociationModelRequirementChange", {})
+    for branch in change.get("oneOf") or []:
+        indices = (branch.get("properties") or {}).get("replace_requirement_indices")
+        values = ((indices or {}).get("items") or {}).get("enum") if isinstance(indices, dict) else None
+        if not isinstance(values, list):
+            continue
+        if len(values) <= 4:
+            branch["properties"]["replace_requirement_indices"] = {"type": "array", "enum": [
+                list(subset) for size in range(len(values) + 1)
+                for subset in itertools.combinations(values, size)]}
+        else:
+            indices["maxItems"] = len(values)
+
+
 def _openai_response_format(response_format: Any) -> dict[str, Any] | None:
     if response_format == "text":
         return None
@@ -177,6 +200,7 @@ def _openai_response_format(response_format: Any) -> dict[str, Any] | None:
         schema, _ = candidate_compatible_schema(response_format)
         if schema.get("title") == "GoalAssociationModelOutput":
             _bound_ga_ownership_rows(schema)
+            _bound_ga_requirement_indices(schema)
         if schema.get("title") == "FastPlannerWorkAdvanceOutput":
             _stream_decoder_constraints(schema)
         if schema.get("title") in {

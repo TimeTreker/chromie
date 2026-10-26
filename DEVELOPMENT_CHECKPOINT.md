@@ -18,7 +18,7 @@ owner skips as local-model limits) against
 Soridormi MuJoCo, judge every case, and repair each failure at its earliest
 responsible owner. One invocation and one debug bundle per run; a hard failure in
 the 15-case `must_pass` smoke stage stops `core` and `challenge` (owner rule).
-Evidence and per-run judgments: `.chromie/acceptance/iter6-20261026/`, `iter5-20261025/`, `iter4-20261025/`, `iter3-20261025/`, `iter2-20261025/`, `iter1-20261025/`, `acc3-20261024/` (stopped at 57/70), `acc2-focused-20261024/`,
+Evidence and per-run judgments: `.chromie/acceptance/iter7-20261026/`, `iter6-20261026/`, `iter5-20261025/`, `iter4-20261025/`, `iter3-20261025/`, `iter2-20261025/`, `iter1-20261025/`, `acc3-20261024/` (stopped at 57/70), `acc2-focused-20261024/`,
 `acc1-20261024/`, `perf2-20261024/` and `perf-4f64f5120-20261024/` (performance mode), `review-fixes-20261023/` (stopped),
 `merge-reads-20261023/`, `span-owned-20261023/`, `main-20cce0dfa-20261023/` (complete cohorts),
 `planner-fit-20261023/` and `ingress-awaiting-20261023/` (focused),
@@ -52,13 +52,18 @@ Evidence and per-run judgments: `.chromie/acceptance/iter6-20261026/`, `iter5-20
   with the performance-mode default timeouts and hard-stopped at 28/69 on a Planner timeout (smoke 15/15, core
   12/13 automatic). This delivery (owner 2026-10-26): configurable character styles — one choice sets personality
   and social expression together (`config/mind/character_styles.json`), and the factory Chromie is `lively_cute`
-  with the new `lively` expression preset (Mind 0.10.0).
+  with the new `lively` expression preset (Mind 0.10.0) (7e091a536). Iteration 7 (7e091a536, quiet mode with its
+  overrides) got furthest: 47/69, smoke 15/15, core 31/32 automatic (30/32 judged; "那上海呢？" answered Shanghai
+  tomorrow, the language preference held, the quiet nod passed), then Goal Association looped
+  `replace_requirement_indices: [0, 0, ...]` until truncation. This delivery offers those indices to the decoder as
+  exact unique subsets (or a bounded list). The lively style did not raise expression use (2/116 SC calls with an
+  expression vs 3/80 under courteous): open.
 - The workstation came up in quiet mode on 2026-10-26: deploy with the quiet-mode timeout overrides (Handoff).
   After a reboot start the Soridormi scene detached (Handoff).
-- Next: iteration 7 (6 of 8 used) — deploy this revision with the quiet-mode overrides, run the complete cohort,
-  judge (watch that livelier expression never competes with a requested action, e.g. "别说话，点两下头"), fix.
-  Open: wave_friend greeting, SC echo of the person's words, joke wording variance, external provider timeouts.
-  Measure the schema size of any Social Cognition schema change before deploying it.
+- Next: iteration 8 (7 of 8 used; the last of the owner's loop) — deploy this revision with the quiet-mode overrides
+  while the machine is in quiet mode, run the complete cohort, judge. Open: wave_friend greeting, SC echo of the
+  person's words, expression use under the lively style, external provider timeouts. Measure the schema size of
+  any Social Cognition schema change before deploying it.
 
 Verification: clean-worktree gate on this delivery's source: pytest 4,039 passed + 5 skipped (`xgrammar` not
 installed), benchmarks 172, legacy Agent tests 20, all checks. Strict replay not rerun (last 6,000/6,000 on freeze
@@ -174,6 +179,9 @@ installed), benchmarks 172, legacy Agent tests 20, all checks. Strict replay not
   is a contract failure (`validate_unmet_response_accounting`), so a failed GA revision keeps the first Plan (live:
   the GA-requested Plan for "那上海呢？" planned no read and replaced the first Plan's valid read).
 - The live-text harness keeps Capability contracts on the reflex path too, so acceptance reads declared defaults.
+- The SGLang transport decodes Goal Association's requirement replacement indices as exact unique subsets (up to
+  four requirements) or a bounded list; the native decoder ignores `uniqueItems` (live: `[0, 0, ...]` until the
+  output truncated). The DTO schema and the recorded replay requests are unchanged.
 - A GA result whose new Goal only links to finished Goals (no association, supersession or referent change, no link
   to a still-open Goal) leaves the running UMI Plan in force instead of re-planning from scratch (live: such re-plans
   erased a correct weather read and failed the Planner contract; acc1 had 7 of 8 GA re-plans of this shape).

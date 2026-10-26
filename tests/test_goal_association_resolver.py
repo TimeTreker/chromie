@@ -1224,6 +1224,33 @@ class GoalAssociationRepairPreservationTests(unittest.TestCase):
         self.assertEqual(malformed, before)
         self.assertEqual(len(model.prompts), 2)
 
+    def test_requirement_replacement_indices_cannot_repeat_in_the_decoder(self):
+        """Live 2026-10-26 (memory_plan_en T3): GA wrote replace_requirement_indices [0, 0, 0, ...]
+        until the output was truncated; the native decoder ignores uniqueItems and the list had no
+        bound. The SGLang transport exposes the unique sets (or a bound); the DTO schema and the
+        recorded Ollama requests stay unchanged."""
+        from jsonschema import Draft202012Validator
+        from agent.app.clients.sglang_protocol import _openai_response_format
+        from agent.app.goal_association_contract import GoalAssociationModelOutput
+        from agent.app.goal_association_schema import goal_association_response_schema
+
+        for criteria in (["Acknowledge the piano lesson at five."], ["A", "B"], ["A", "B", "C", "D", "E", "F"]):
+            with self.subTest(requirements=len(criteria)):
+                schema = goal_association_response_schema(
+                    GoalAssociationModelOutput,
+                    [{"goal_id": "goal-a", "goal": {"description": "x", "success_criteria": criteria}}], [])
+                wire = _openai_response_format(schema)["json_schema"]["schema"]
+                contract = wire["$defs"]["GoalAssociationModelRequirementChange"]["oneOf"][0]
+                # The decoder's view: it does not enforce uniqueItems.
+                decoded = {key: value for key, value in contract["properties"]["replace_requirement_indices"].items()
+                           if key != "uniqueItems"}
+                indices = Draft202012Validator(decoded)
+                self.assertFalse(indices.is_valid([0] * (len(criteria) + 1)))
+                self.assertTrue(indices.is_valid([]))
+                self.assertTrue(indices.is_valid([0]))
+                if len(criteria) <= 4:
+                    self.assertFalse(indices.is_valid([0, 0]))
+
     def test_shape_repair_cannot_change_requirement_replacement_scope(self):
         req, valid, _ = self.candidate_case()
         req.context["active_goal_snapshots"][0]["goal"]["success_criteria"] = ["Requirement A", "Requirement B"]

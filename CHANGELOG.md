@@ -5,6 +5,13 @@ remains available in Git history.
 
 ## Unreleased
 
+### Goal Association cannot loop on requirement indices (iteration 8, 2026-10-26)
+
+- The SGLang transport offers requirement replacement indices to the native decoder as the exact unique subsets
+  of the Goal's requirements (or a bounded list), beside its existing GA ownership bound; the DTO schema is
+  unchanged. The decoder ignored `uniqueItems`, and "What do I have at five again?" produced
+  `[0, 0, 0, ...]` until the output was truncated.
+
 ### Configurable character styles; Chromie is lively and cute (iteration 7, 2026-10-26)
 
 - One reviewed character style sets personality (traits, self-concept, spoken style) together with the matching

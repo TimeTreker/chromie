@@ -14,18 +14,20 @@ ordered open work are in [STATUS](docs/STATUS.md).
   revision pinned by `capabilities/soridormi.json` and `release/compatibility.json`. The
   MCP container mounts its `src`, so a `docker restart soridormi-runtime-mcp` loads it and
   resets the scene (user at -90 degrees, 1.5 m).
-- Live Agent: `chromie-agent:latest` = `iter5-20261025` (`bd4b7107ff30`), built from e36ada5b9 (this delivery's
-  source; this commit changes documentation only) and recreated with the profile's default timeouts (performance
-  mode); `--verify-agent-source` matched (`.chromie/acceptance/iter5-20261025/agent-source-verify.json`). This file is
-  the single owner of the deployed identity. Rollback image: `perf2-20261024` (`b27810d373c0`, built from 399894a5a).
+- Live Agent: `chromie-agent:latest` = `iter7-20261026` (`2d0f1d981838`), built from 7e091a536 (one Goal Association
+  decoder change before this delivery) and recreated with the quiet-mode timeout overrides; `--verify-agent-source`
+  matched at deploy (`.chromie/acceptance/iter7-20261026/agent-source-verify.json`). Rebuild before attributing live
+  results to this delivery. This file is the single owner of the deployed identity. Rollback image: `perf2-20261024`
+  (`b27810d373c0`, built from 399894a5a).
   LLM: `chromie-sglang:latest` = `gemma4-fp8`
   (`f59a042e6973`); compose resolves `chromie-sglang:${CHROMIE_IMAGE_TAG}`, so the
   `latest` tag must exist for `start_chromie.sh`.
 - Workflow corpus: freeze 47 (`bdb8db08…`; scripts in `.chromie/acceptance/thirsty-offer-20261021/freeze47/`). Restore it with
   `python -m benchmarks.regression restore-fixtures`; do not untar `frozen.tar.xz` over
   `workflow_scenarios/` (its inner `manifest.json` lacks the storage identity).
-- Evidence (README in each): `.chromie/acceptance/iter6-20261026/` (iteration 6 on e36ada5b9: quiet mode with default
-  timeouts, hard stop at 28/69 on a Planner timeout; its `soridormi-run.log` is the running scene's log),
+- Evidence (README in each): `.chromie/acceptance/iter7-20261026/` (iteration 7 on 7e091a536, quiet mode with its
+  overrides: hard stop at 47/69 on a truncated GA output), `iter6-20261026/` (iteration 6 on e36ada5b9: quiet mode
+  with default timeouts, hard stop at 28/69 on a Planner timeout; its `soridormi-run.log` is the running scene's log),
   `iter5-20261025/` (iteration 5 on e36ada5b9: hard stop at 33/69 on a weather-provider timeout), `iter4-20261025/` (iteration 4 on 3cdf06008: hard
   stop at 32/70),
   `iter3-20261025/` (iteration 3 on 12bfb0e95: hard stop at 16/70, SC prompt over budget), `iter2-20261025/` (iteration 2 on a3b8e2b82: hard stop at 34/70),
@@ -41,7 +43,7 @@ ordered open work are in [STATUS](docs/STATUS.md).
   `playback-race-20261020/`, `answer-source-20261020/`, `gaze-turn-20261020/`, `said-now-20261020/`,
   `decided-activity-20261020/`, `main-03974435e-20261020/`.
   Bundles `~/Downloads/chromie_debug_bundle_2026102*.tar.gz`. Earlier runs: `.chromie/acceptance/everyday-20261016/`.
-- Last gate (this delivery's source, clean worktree, GPU host, 2026-10-24): pytest 4,046 passed + 5 skipped (`xgrammar` not installed), benchmarks 172, legacy Agent tests 20; policies, docs, test ownership, ruff, mypy and runtime-structure ratchets pass (`agent/app/planner_validation.py` is at its line ratchet). Strict replay was not rerun for this delivery; its last pass is 6,000/6,000 on freeze 47 (2026-10-23). The gate needs `anthropic==1.15.0` from `requirements-test.txt` (`INSTALL_TEST_DEPS=1`).
+- Last gate (this delivery's source, clean worktree, GPU host, 2026-10-24): pytest 4,047 passed + 5 skipped (`xgrammar` not installed), benchmarks 172, legacy Agent tests 20; policies, docs, test ownership, ruff, mypy and runtime-structure ratchets pass (`agent/app/planner_validation.py` is at its line ratchet). Strict replay was not rerun for this delivery; its last pass is 6,000/6,000 on freeze 47 (2026-10-23). The gate needs `anthropic==1.15.0` from `requirements-test.txt` (`INSTALL_TEST_DEPS=1`).
 - `start_chromie.sh --build` reuses the layer cache, takes package downloads from BuildKit
   cache mounts, and recreates only the services whose image changed. The first build
   after this change reruns the cache-mount layers once.
