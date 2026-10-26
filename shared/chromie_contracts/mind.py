@@ -12,7 +12,7 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator, model_valida
 from .text import compact_text
 
 Priority = Literal["low", "normal", "high", "critical"]
-SocialInteractionPreset = Literal["courteous", "neutral", "reserved", "custom"]
+SocialInteractionPreset = Literal["lively", "courteous", "neutral", "reserved", "custom"]
 ProposalStatus = Literal["proposed", "approved", "rejected", "superseded"]
 
 
@@ -218,6 +218,25 @@ class SocialInteractionStyle(BaseModel):
                 "named skill and semantic-argument pattern without a scene-specific reason."
             ),
         }
+        if preset == "lively":
+            return {
+                **common,
+                "bounded_courtesy": (
+                    "Be warm, playful, and concise. Greet, thank, cheer, and say goodbye "
+                    "naturally, but do not pad a complete interaction with extra explanation "
+                    "or service-style offers."
+                ),
+                "expressiveness": (
+                    "Express readily and visibly at social moments such as greetings, good "
+                    "news, thanks, play, and goodbyes, with one fitting gesture alongside "
+                    "your words; keep stillness for focus, sadness, or a request for quiet."
+                ),
+                "initiative": (
+                    "Add one coherent auxiliary social expression to a socially meaningful "
+                    "act when it fits the scene and remains parallel, bounded, and optional; "
+                    "it never stands in for the words or the requested Work."
+                ),
+            }
         if preset == "courteous":
             return {
                 **common,
@@ -410,7 +429,9 @@ class CustomerMindPersonalization(BaseModel):
     display_name: str | None = Field(default=None, min_length=1, max_length=80)
     pronouns: list[str] | None = Field(default=None, min_length=1, max_length=6)
     family_role: str | None = Field(default=None, min_length=1, max_length=160)
-    social_style_preset: Literal["courteous", "neutral", "reserved"] | None = None
+    # One choice sets personality and social expression together (owner 2026-10-26);
+    # the reviewed styles live in config/mind/character_styles.json.
+    character_style: str | None = Field(default=None, min_length=1, max_length=60, pattern=r"^[a-z][a-z_]*$")
     worldview_perspectives: list[str] = Field(default_factory=list, max_length=8)
     household_values: list[str] = Field(default_factory=list, max_length=8)
 
@@ -710,9 +731,53 @@ def active_customer_mind_profile_path(
     return (Path(project_root) / ACTIVE_CUSTOMER_MIND_PROFILE_RELATIVE_PATH).resolve()
 
 
+CHARACTER_STYLES_RELATIVE_PATH = Path("config/mind/character_styles.json")
+
+
+class CharacterStyle(BaseModel):
+    """One owner-reviewed character: personality wording plus its social-expression preset.
+
+    Identity truth, answer and tool style, maturity and safety boundaries stay factory-owned.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    title: str = Field(min_length=1, max_length=120)
+    social_style_preset: Literal["lively", "courteous", "neutral", "reserved"]
+    core_traits: list[str] = Field(min_length=1, max_length=16)
+    self_concept: str = Field(min_length=1)
+    spoken_style: str = Field(min_length=1)
+
+
+class CharacterStyleCatalog(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    schema_version: Literal[1] = 1
+    description: str = ""
+    default_style: str
+    styles: dict[str, CharacterStyle] = Field(min_length=1)
+
+    @model_validator(mode="after")
+    def default_is_listed(self) -> "CharacterStyleCatalog":
+        if self.default_style not in self.styles:
+            raise ValueError("the default character style must be one of the listed styles")
+        return self
+
+
+def load_character_styles(path: str | Path | None = None) -> CharacterStyleCatalog:
+    """The reviewed styles next to the factory MindProfile (``config/mind``)."""
+
+    if path is None:
+        module_path = Path(__file__).resolve()
+        candidates = [module_path.parents[index] / CHARACTER_STYLES_RELATIVE_PATH for index in (2, 1)]
+        path = next((item for item in candidates if item.is_file()), candidates[0])
+    return CharacterStyleCatalog.model_validate(json.loads(Path(path).read_text(encoding="utf-8")))
+
+
 def apply_customer_mind_personalization(
     factory_profile: MindProfile,
     personalization: CustomerMindPersonalization,
+    character_styles: CharacterStyleCatalog | None = None,
 ) -> MindProfile:
     """Derive an active profile without exposing locked foundation fields."""
 
@@ -771,10 +836,26 @@ def apply_customer_mind_personalization(
     household_values["statements"] = list(personalization.household_values)
     payload["household_values"] = household_values
 
-    if personalization.social_style_preset:
+    if personalization.character_style:
+        catalog = character_styles or load_character_styles()
+        style = catalog.styles.get(personalization.character_style)
+        if style is None:
+            raise ValueError(
+                "unknown character style: " + personalization.character_style
+                + " (reviewed styles: " + ", ".join(sorted(catalog.styles)) + ")"
+            )
+        personality = dict(payload["personality_expression"])
+        personality["core_traits"] = list(style.core_traits)
+        personality["self_concept"] = style.self_concept.replace("{name}", new_name)
+        personality["spoken_style"] = style.spoken_style.replace("{name}", new_name)
+        payload["personality_expression"] = personality
         payload["social_interaction_style"] = SocialInteractionStyle(
-            preset=personalization.social_style_preset
+            preset=style.social_style_preset
         ).model_dump(mode="json")
+        identity = dict(payload["identity"])
+        identity["short_self_description"] = str(identity["short_self_description"]).replace(
+            "I'm curious, warm, lively,", "I'm " + ", ".join(style.core_traits[:3]) + ",")
+        payload["identity"] = identity
 
     payload["profile_id"] = f"{factory_profile.profile_id}.customer"
     payload["version"] = (

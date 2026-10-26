@@ -5,7 +5,7 @@ exact commands. Replace it on each delivery; do not append history. The resume
 boundary is in the [checkpoint](DEVELOPMENT_CHECKPOINT.md); current status and the
 ordered open work are in [STATUS](docs/STATUS.md).
 
-## Current snapshot — 2026-10-25
+## Current snapshot — 2026-10-26
 
 - Checkout `/home/chromie/github/chromie`, branch `main`; the expected resume revision is
   the latest `origin/main` commit containing this file (the 2026-10-20 repair and build
@@ -24,8 +24,9 @@ ordered open work are in [STATUS](docs/STATUS.md).
 - Workflow corpus: freeze 47 (`bdb8db08…`; scripts in `.chromie/acceptance/thirsty-offer-20261021/freeze47/`). Restore it with
   `python -m benchmarks.regression restore-fixtures`; do not untar `frozen.tar.xz` over
   `workflow_scenarios/` (its inner `manifest.json` lacks the storage identity).
-- Evidence (README in each): `.chromie/acceptance/iter5-20261025/` (iteration 5 on e36ada5b9: 69-case cohort, hard stop
-  at 33/69 on a weather-provider timeout; the owner's stop point), `iter4-20261025/` (iteration 4 on 3cdf06008: hard
+- Evidence (README in each): `.chromie/acceptance/iter6-20261026/` (iteration 6 on e36ada5b9: quiet mode with default
+  timeouts, hard stop at 28/69 on a Planner timeout; its `soridormi-run.log` is the running scene's log),
+  `iter5-20261025/` (iteration 5 on e36ada5b9: hard stop at 33/69 on a weather-provider timeout), `iter4-20261025/` (iteration 4 on 3cdf06008: hard
   stop at 32/70),
   `iter3-20261025/` (iteration 3 on 12bfb0e95: hard stop at 16/70, SC prompt over budget), `iter2-20261025/` (iteration 2 on a3b8e2b82: hard stop at 34/70),
   `iter1-20261025/` (iteration 1 on 2fd36c9ea: hard stop at 32/70, root causes and probes; its
@@ -40,7 +41,7 @@ ordered open work are in [STATUS](docs/STATUS.md).
   `playback-race-20261020/`, `answer-source-20261020/`, `gaze-turn-20261020/`, `said-now-20261020/`,
   `decided-activity-20261020/`, `main-03974435e-20261020/`.
   Bundles `~/Downloads/chromie_debug_bundle_2026102*.tar.gz`. Earlier runs: `.chromie/acceptance/everyday-20261016/`.
-- Last gate (this delivery's source, clean worktree, GPU host, 2026-10-24): pytest 4,044 passed + 5 skipped (`xgrammar` not installed), benchmarks 172, legacy Agent tests 20; policies, docs, test ownership, ruff, mypy and runtime-structure ratchets pass (`agent/app/planner_validation.py` is at its line ratchet). Strict replay was not rerun for this delivery; its last pass is 6,000/6,000 on freeze 47 (2026-10-23). The gate needs `anthropic==1.15.0` from `requirements-test.txt` (`INSTALL_TEST_DEPS=1`).
+- Last gate (this delivery's source, clean worktree, GPU host, 2026-10-24): pytest 4,046 passed + 5 skipped (`xgrammar` not installed), benchmarks 172, legacy Agent tests 20; policies, docs, test ownership, ruff, mypy and runtime-structure ratchets pass (`agent/app/planner_validation.py` is at its line ratchet). Strict replay was not rerun for this delivery; its last pass is 6,000/6,000 on freeze 47 (2026-10-23). The gate needs `anthropic==1.15.0` from `requirements-test.txt` (`INSTALL_TEST_DEPS=1`).
 - `start_chromie.sh --build` reuses the layer cache, takes package downloads from BuildKit
   cache mounts, and recreates only the services whose image changed. The first build
   after this change reruns the cache-mount layers once.
@@ -53,6 +54,8 @@ ordered open work are in [STATUS](docs/STATUS.md).
   near-tie decision can also flip between lifetimes (about 3 nats observed for the same request).
   Compare prompt candidates by decision-token logprob margin (`logprobs: true`) on at least two
   lifetimes; replays within one lifetime are not stability evidence.
+- The machine came up in quiet mode on 2026-10-26; run quiet-mode deployments with the overrides below (iteration 6
+  hit a Planner timeout with the performance-mode defaults).
 - Quiet mode (owner request 2026-10-21): `sudo .chromie/quiet-mode/quiet-mode.sh on` turns CPU
   turbo off, sets the power-saver profile, locks GPU clocks to 210-1800 MHz and caps GPU power
   at its minimum; `off` restores, `status` shows, `enable-at-boot` reapplies it after reboots

@@ -23,6 +23,7 @@ from shared.chromie_contracts.mind import (
     active_customer_mind_profile_path,
     apply_customer_mind_personalization,
     default_mind_profile_path,
+    load_character_styles,
     load_mind_profile,
     validate_customer_mind_profile,
 )
@@ -31,7 +32,7 @@ from shared.chromie_contracts.mind import (
 def _parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         description=(
-            "Configure customer-owned identity presentation, social style, "
+            "Configure customer-owned identity presentation, character style, "
             "worldview perspectives, and household values without exposing "
             "Chromie's locked safety/authority foundation."
         )
@@ -57,9 +58,15 @@ def _parser() -> argparse.ArgumentParser:
     )
     parser.add_argument("--family-role", help="Customer-selected household role wording.")
     parser.add_argument(
-        "--social-style",
-        choices=("courteous", "neutral", "reserved"),
-        help="Reviewed social interaction style preset.",
+        "--character-style",
+        choices=sorted(load_character_styles().styles),
+        help="Reviewed character style: personality and social expression together "
+             "(see --list-character-styles).",
+    )
+    parser.add_argument(
+        "--list-character-styles",
+        action="store_true",
+        help="Print the reviewed character styles and exit.",
     )
     parser.add_argument(
         "--worldview-perspective",
@@ -141,10 +148,10 @@ def _personalization_from_args(
         family_role=(
             args.family_role if args.family_role is not None else prior.family_role
         ),
-        social_style_preset=(
-            args.social_style
-            if args.social_style is not None
-            else prior.social_style_preset
+        character_style=(
+            args.character_style
+            if args.character_style is not None
+            else prior.character_style
         ),
         worldview_perspectives=worldview_perspectives,
         household_values=household_values,
@@ -170,6 +177,8 @@ def _preview(profile: MindProfile, *, output: Path) -> dict[str, object]:
             "family_role": identity.family_role,
             "embodiment_boundary": "robotic body; no biological-human claim",
         },
+        "character_style": personalization.character_style,
+        "personality_traits": list(profile.personality_expression.core_traits),
         "social_style": profile.social_interaction_style.preset,
         "worldview_perspectives": list(profile.worldview.household_perspectives),
         "household_values": list(profile.household_values.statements),
@@ -235,6 +244,15 @@ def _reset(path: Path) -> dict[str, object]:
 
 def main(argv: Sequence[str] | None = None) -> int:
     args = _parser().parse_args(argv)
+    if args.list_character_styles:
+        catalog = load_character_styles()
+        print(json.dumps({
+            "default_style": catalog.default_style,
+            "styles": {name: {"title": style.title, "core_traits": style.core_traits,
+                              "social_style": style.social_style_preset}
+                       for name, style in catalog.styles.items()},
+        }, ensure_ascii=False, indent=2))
+        return 0
     output = args.output.expanduser()
     if not output.is_absolute():
         output = ROOT / output

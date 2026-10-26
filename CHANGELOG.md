@@ -5,6 +5,16 @@ remains available in Git history.
 
 ## Unreleased
 
+### Configurable character styles; Chromie is lively and cute (iteration 7, 2026-10-26)
+
+- One reviewed character style sets personality (traits, self-concept, spoken style) together with the matching
+  social-expression preset, so the two cannot contradict each other: `lively_cute` (factory), `gentle_warm`,
+  `calm_steady`, `cool_independent` in `config/mind/character_styles.json`;
+  `scripts/configure_chromie_mind.py --character-style` replaces `--social-style`.
+- A new `lively` expression preset: expression at greetings, good news, thanks, play and goodbyes, still never
+  competing with a requested action, an emergency or the main task. The factory Mind (0.10.0) uses it; its
+  personality already said lively and playful, but the courteous preset kept expression rare.
+
 ### Only an earlier acknowledgement is barred from answering; one model-limited case parked (iteration 4, 2026-10-25)
 
 - Validation no longer rejects a fresh result line by its function label ("Here you are!" labelled acknowledge

@@ -60,8 +60,8 @@ def test_customer_setup_applies_and_runtime_selects_active_profile(
                 "her",
                 "--family-role",
                 "our household helper",
-                "--social-style",
-                "reserved",
+                "--character-style",
+                "calm_steady",
                 "--worldview-perspective",
                 "Treat learning as something the household does together.",
                 "--household-value",
@@ -123,8 +123,8 @@ def test_shipped_env_layers_keep_customer_profile_and_its_social_style(
             str(output),
             "--name",
             "Nova",
-            "--social-style",
-            "reserved",
+            "--character-style",
+            "calm_steady",
             "--apply",
         ]
     )

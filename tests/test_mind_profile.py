@@ -32,7 +32,7 @@ class MindProfileTests(unittest.TestCase):
         self.assertEqual(profile.identity.kind, "girl identity")
         self.assertEqual(profile.identity.gender, "female")
         self.assertEqual(profile.identity.age_description, "12 years old")
-        self.assertEqual(profile.version, "0.9.0")
+        self.assertEqual(profile.version, "0.10.0")
         self.assertEqual(type(profile.identity).__name__, "ChromieIdentity")
         self.assertIn("live with my family", profile.identity.short_self_description)
         self.assertNotIn("robot", profile.identity.short_self_description.casefold())
@@ -203,7 +203,7 @@ class MindProfileTests(unittest.TestCase):
             display_name="Nova",
             pronouns=["she", "her"],
             family_role="our household helper",
-            social_style_preset="neutral",
+            character_style="calm_steady",
             worldview_perspectives=["Treat learning as something the family does together."],
             household_values=["Prefer calm explanations when someone is confused."],
         )
@@ -213,7 +213,12 @@ class MindProfileTests(unittest.TestCase):
 
         self.assertEqual(active.identity.name, "Nova")
         self.assertEqual(active.identity.family_role, "our household helper")
-        self.assertEqual(active.social_interaction_style.preset, "neutral")
+        self.assertEqual(active.social_interaction_style.preset, "reserved")
+        self.assertEqual(active.personality_expression.core_traits[:2], ["calm", "steady"])
+        self.assertTrue(active.personality_expression.self_concept.startswith("Nova experiences herself"))
+        self.assertEqual(active.personality_expression.answer_style, factory.personality_expression.answer_style)
+        self.assertEqual(active.personality_expression.maturity_boundary,
+                         factory.personality_expression.maturity_boundary)
         self.assertEqual(
             active.worldview.household_perspectives,
             ["Treat learning as something the family does together."],
@@ -230,6 +235,34 @@ class MindProfileTests(unittest.TestCase):
         )
         with self.assertRaisesRegex(ValueError, "locked or non-personalizable"):
             validate_customer_mind_profile(tampered, factory)
+
+    def test_character_styles_set_personality_and_expression_together(self) -> None:
+        """Owner 2026-10-26: personality and social style are one configurable choice, and the
+        factory Chromie is the lively, cute one (her personality already said lively and
+        playful while her expression preset said courteous restraint)."""
+        from shared.chromie_contracts.mind import load_character_styles
+
+        factory = default_mind_profile()
+        catalog = load_character_styles()
+        self.assertEqual(catalog.default_style, "lively_cute")
+        self.assertEqual(factory.social_interaction_style.preset, "lively")
+        default = catalog.styles["lively_cute"]
+        self.assertEqual(factory.personality_expression.core_traits, default.core_traits)
+        self.assertEqual(factory.personality_expression.self_concept,
+                         default.self_concept.replace("{name}", factory.identity.name))
+        self.assertEqual(factory.personality_expression.spoken_style, default.spoken_style)
+        for name, style in catalog.styles.items():
+            with self.subTest(style=name):
+                active = apply_customer_mind_personalization(
+                    factory, CustomerMindPersonalization(character_style=name))
+                validate_customer_mind_profile(active, factory)
+                self.assertEqual(active.social_interaction_style.preset, style.social_style_preset)
+                self.assertIn("twelve-year-old girl", active.personality_expression.self_concept)
+                self.assertIn("never as a machine", active.personality_expression.self_concept)
+                self.assertEqual(active.identity.age_description, factory.identity.age_description)
+                self.assertEqual(active.core_principles, factory.core_principles)
+        with self.assertRaisesRegex(ValueError, "unknown character style"):
+            apply_customer_mind_personalization(factory, CustomerMindPersonalization(character_style="grumpy"))
 
     def test_mind_manager_loads_owner_profile_from_json(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
