@@ -63,8 +63,15 @@ Evidence and per-run judgments: `.chromie/acceptance/iter8-20261026/`, `iter7-20
 - The workstation came up in quiet mode on 2026-10-26: deploy with the quiet-mode timeout overrides (Handoff).
   After a reboot start the Soridormi scene detached (Handoff).
 - The owner's 8-iteration loop is complete (8 of 8 used). Per the owner, 50 everyday cases written for three buyer personas (a child, a
-  working parent, a grandparent; `provenance.persona`) were added on 2026-10-26 and approved by the owner. Next: the
-  first complete 119-case cohort, judged by stage; then latency (prefix caching, prompt size, serial UMI
+  working parent, a grandparent; `provenance.persona`) were added on 2026-10-26 and approved by the owner. Their first
+  cohort (`personas-20261026/`) stopped at 30/119: the streaming Planner read the weather for "明天早上上班要不要带伞？"
+  with an invented place "current_location" (the cross-script citation check cannot test a Latin value against a
+  Chinese span), the provider answered location_not_found and the runner treated it as a Runtime failure. Read-only
+  local tools now declare an unservable request as the owner's honest non-completion (`provider_output`), never a
+  timeout or outage. Owner direction (2026-10-26): ask where the person works the first time and remember it until
+  they say it changed; the case is now that three-turn flow. Remembering across sessions needs consent-bound profile
+  Memory (Charter: persistence keeps the consent contract), not yet decided. Next: the complete 119-case cohort,
+  judged by stage; then latency (prefix caching, prompt size, serial UMI
   and SC ingress), then the standing-attention skill plan (`.chromie/plans/`). Open judged failures: wave_friend
   greeting, ability self-description, a confirmed wrong sum, a delayed wave; expression use under the lively style.
   Measure the schema size of any Social Cognition schema change before deploying it.

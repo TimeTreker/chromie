@@ -489,7 +489,10 @@ the conversation's reply language and even for a Latin retrieval key. This
 changes no canonical binding, alias, or qualifier. Missing localization or an
 unconfirmed cross-language name fails closed; it does not authorize substitution.
 If none match, the tool returns typed
-`location_not_found`.
+`location_not_found`. That failure, and a missing requested forecast period, also
+declare `provider_output: {"completed": false, "no_motion": true}`: the provider
+answered and the request cannot be served. A provider timeout or outage declares
+nothing, so it stays a service failure.
 | `AGENT_DAG_ENGINE_MAX_CONCURRENCY` | Process-local WorkDAG bound; default `4`, range 1–64. |
 | `AGENT_DAG_ENGINE_EXECUTION_TOKEN` | Secret bearer token for WorkDAG cancellation. |
 | `AGENT_DAG_ENGINE_DIAGNOSTICS_TOKEN` | Bearer token for DAGEngine status diagnostics. A blank value falls back to `AGENT_DAG_ENGINE_EXECUTION_TOKEN`; when both are blank, those endpoints return 503. |

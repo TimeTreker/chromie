@@ -101,6 +101,10 @@ class WeatherReport:
 class WeatherLookupError(RuntimeError):
     """Raised when a weather lookup cannot produce a user-safe report."""
 
+    # The provider answered, but no such place or forecast period exists for this request.
+    # Every other reason is a service or provider-data failure.
+    REQUEST_UNSERVED_REASONS = frozenset({"location_not_found", "forecast_period_unavailable"})
+
     def __init__(
         self,
         message: str,
@@ -111,6 +115,10 @@ class WeatherLookupError(RuntimeError):
         super().__init__(message)
         self.reason_code = " ".join(str(reason_code or "weather_lookup_failed").split())
         self.attempted_queries = attempted_queries
+
+    @property
+    def request_unserved(self) -> bool:
+        return self.reason_code in self.REQUEST_UNSERVED_REASONS
 
 
 _CHINESE_ADMIN_PREFIX_SUFFIXES = (

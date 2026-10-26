@@ -5,6 +5,14 @@ remains available in Git history.
 
 ## Unreleased
 
+### An unservable read is honest non-completion (2026-10-26)
+
+- Weather and external-information reads that ran and found the request cannot be served (no such place or
+  forecast period, no question, an empty result) declare `provider_output: {"completed": false, "no_motion": true}`,
+  so the acceptance runner judges the case instead of stopping the cohort; timeouts and outages declare nothing.
+  Live: "明天早上上班要不要带伞？" read the weather for an invented place and stopped the first 119-case cohort.
+- `adult_umbrella_no_city_zh` follows the owner's direction: ask where the person works, then keep that place.
+
 ### Everyday cases for three buyer personas (2026-10-26)
 
 - 50 live-text cases in `scenarios/everyday/` written from what a child, a working parent and a grandparent

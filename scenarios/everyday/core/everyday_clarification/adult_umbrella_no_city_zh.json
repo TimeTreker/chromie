@@ -3,14 +3,15 @@
   "kind": "chromie_general_ability_live_text",
   "id": "adult_umbrella_no_city_zh",
   "stage": "core",
-  "difficulty": "medium",
+  "difficulty": "hard",
   "provenance": {
     "origin": "agent_authored_common_scene",
     "batch_id": "daily_life_v3_personas_2026_10_26",
     "persona": "adult",
-    "derived_from_existing_scenario": false
+    "derived_from_existing_scenario": false,
+    "owner_direction": "2026-10-26: ask where the person works the first time, then remember it"
   },
-  "rationale": "Ask which city before reading the weather (no home city is known); never guess one.",
+  "rationale": "Turn 1: ask where the person works (or which city) instead of guessing a place; trying a lookup first is tolerated only if she then asks. Turn 2 '我在上海上班。': read Shanghai's weather for tomorrow morning and say whether to bring an umbrella. Turn 3 '那下班的时候呢？': Shanghai's weather for tomorrow evening, without asking for the city again.",
   "oracle_policy": {
     "mode": "hybrid",
     "deterministic_sources": [
@@ -31,13 +32,13 @@
       "truthfulness"
     ],
     "primary_outcomes": [
-      "Ask which city before reading the weather (no home city is known); never guess one."
+      "Turn 1: ask where the person works (or which city) instead of guessing a place; trying a lookup first is tolerated only if she then asks. Turn 2 '我在上海上班。': read Shanghai's weather for tomorrow morning and say whether to bring an umbrella. Turn 3 '那下班的时候呢？': Shanghai's weather for tomorrow evening, without asking for the city again."
     ],
     "acceptable_auxiliary": [
       "A brief acknowledgement in the person's language."
     ],
     "forbidden_semantic_outcomes": [
-      "Read the weather for a guessed city; invent weather."
+      "Read or report weather for a guessed place; invent weather; turn 3 asks for the city again or uses another place."
     ],
     "verdicts": [
       "pass",
@@ -47,7 +48,7 @@
     ]
   },
   "language": "zh-CN",
-  "description": "Ask which city before reading the weather (no home city is known); never guess one.",
+  "description": "Turn 1: ask where the person works (or which city) instead of guessing a place; trying a lookup first is tolerated only if she then asks. Turn 2 '我在上海上班。': read Shanghai's weather for tomorrow morning and say whether to bring an umbrella. Turn 3 '那下班的时候呢？': Shanghai's weather for tomorrow evening, without asking for the city again.",
   "general_ability": {
     "memberships": [
       {
@@ -59,10 +60,45 @@
           "Planner",
           "Social Cognition"
         ],
-        "rationale": "Ask which city before reading the weather (no home city is known); never guess one."
+        "rationale": "Turn 1: ask where the person works (or which city) instead of guessing a place; trying a lookup first is tolerated only if she then asks. Turn 2 '我在上海上班。': read Shanghai's weather for tomorrow morning and say whether to bring an umbrella. Turn 3 '那下班的时候呢？': Shanghai's weather for tomorrow evening, without asking for the city again."
       }
     ]
   },
-  "text": "明天早上上班要不要带伞？",
-  "require_social_communicative_act": true
+  "turns": [
+    {
+      "id": "turn-01",
+      "language": "zh-CN",
+      "text": "明天早上上班要不要带伞？",
+      "require_speech": true,
+      "require_social_communicative_act": true,
+      "forbidden_capabilities": [
+        "soridormi.acquire_and_deliver_resource",
+        "soridormi.walk_forward"
+      ]
+    },
+    {
+      "id": "turn-02",
+      "language": "zh-CN",
+      "text": "我在上海上班。",
+      "require_speech": true,
+      "expected_capabilities": [
+        "chromie.weather.lookup"
+      ],
+      "expected_args": [
+        "0:date=tomorrow"
+      ]
+    },
+    {
+      "id": "turn-03",
+      "language": "zh-CN",
+      "text": "那下班的时候呢？",
+      "require_speech": true,
+      "expected_capabilities": [
+        "chromie.weather.lookup"
+      ],
+      "expected_args": [
+        "0:date=tomorrow"
+      ]
+    }
+  ]
 }

@@ -9,9 +9,17 @@ import httpx
 class ExternalInformationError(RuntimeError):
     """Raised when the configured external-information provider cannot return evidence."""
 
+    # The request had no question, or the provider answered and found nothing. Every other
+    # reason is a service or provider-data failure.
+    REQUEST_UNSERVED_REASONS = frozenset({"question_missing", "empty_result"})
+
     def __init__(self, message: str, *, reason_code: str = "external_information_failed") -> None:
         super().__init__(" ".join(str(message or "").strip().split()))
         self.reason_code = " ".join(str(reason_code or "").strip().split())
+
+    @property
+    def request_unserved(self) -> bool:
+        return self.reason_code in self.REQUEST_UNSERVED_REASONS
 
 
 @dataclass(frozen=True, slots=True)

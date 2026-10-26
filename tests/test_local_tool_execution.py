@@ -173,6 +173,32 @@ class LocalToolExecutionTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(result.reason_code, "location_not_found")
         self.assertIn("河南省内乡县", result.message)
         self.assertEqual(result.output, {})
+        # Live 2026-10-26 (adult_umbrella_no_city_zh): the provider answered and no such place
+        # exists, an honest non-completion rather than a service failure.
+        self.assertEqual(result.metadata, {"provider_output": {"completed": False, "no_motion": True}})
+
+    async def test_executor_declares_no_non_completion_for_a_provider_timeout(self) -> None:
+        class _TimedOutWeatherClient:
+            async def lookup(self, query):
+                raise WeatherLookupError("weather provider did not answer", reason_code="provider_timeout")
+
+        executor = LocalToolExecutor(
+            CapabilityRegistry.from_bundles([chromie_capability_bundle()]),
+            weather_client=_TimedOutWeatherClient(),
+        )
+
+        result = await executor.execute(
+            ToolExecutionRequest(
+                request_id="weather-timeout",
+                tool_id="chromie.weather.lookup",
+                args={"location": "上海", "date": "today"},
+                language="zh-CN",
+            )
+        )
+
+        self.assertEqual(result.status, "failed")
+        self.assertEqual(result.reason_code, "provider_timeout")
+        self.assertEqual(result.metadata, {})
 
     async def test_executor_fails_closed_on_schema_invalid_arguments(self) -> None:
         executor = LocalToolExecutor(

@@ -806,7 +806,9 @@ at the case boundary, including within `must_pass`; unrun cases remain explicit
 and cannot support a passing claim. A provider that declared it did not complete and did
 not move, with a safe-idle final state, reported honest Evidence rather than an integrity
 failure: its case is judged by its own expectations and collection continues (owner
-decision 2026-10-21). Collect the one correlated bundle after
+decision 2026-10-21). Read-only local tools declare it only when the request cannot be
+served (no such place or forecast period, no question, an empty result), never for a
+timeout or a provider outage. Collect the one correlated bundle after
 normal runner exit, without an external polling watcher terminating it before
 the aggregate and reviewer artifacts are written. See
 [Scenario-Driven Development](SCENARIO_DRIVEN_DEVELOPMENT.md#72-aggregate-first-live-iteration).

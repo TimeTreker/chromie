@@ -106,6 +106,7 @@ class LocalToolExecutor:
                 "failed",
                 exc.reason_code or "local_tool_failed",
                 str(exc),
+                request_unserved=exc.request_unserved,
             )
         except Exception as exc:  # pragma: no cover - final provider boundary
             logger.exception(
@@ -257,13 +258,23 @@ class LocalToolExecutor:
         status: str,
         reason_code: str,
         message: str,
+        *,
+        request_unserved: bool = False,
     ) -> ToolExecutionResponse:
+        # A read that ran and found its request cannot be served declares that it did not
+        # complete and did not move, the same honest non-completion a body provider declares
+        # (owner decision 2026-10-21); service failures carry no such declaration.
         return ToolExecutionResponse(
             request_id=request.request_id,
             tool_id=request.tool_id,
             status=status,
             reason_code=" ".join(str(reason_code or "").split())[:160],
             message=" ".join(str(message or "").split())[:600],
+            metadata=(
+                {"provider_output": {"completed": False, "no_motion": True}}
+                if request_unserved
+                else {}
+            ),
         )
 
 
