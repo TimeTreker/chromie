@@ -15,7 +15,7 @@ ordered open work are in [STATUS](docs/STATUS.md).
   MCP container mounts its `src`, so a `docker restart soridormi-runtime-mcp` loads it and
   resets the scene (user at -90 degrees, 1.5 m).
 - Live Agent: `chromie-agent:latest` = `iter8-20261026` (`67023144e8e1`), built from 9358ba34c (this delivery's source;
-  this commit changes documentation only) and recreated with the quiet-mode timeout overrides; `--verify-agent-source`
+  the later commits add scenarios and documentation only) and recreated with the quiet-mode timeout overrides; `--verify-agent-source`
   matched (`.chromie/acceptance/iter8-20261026/agent-source-verify.json`). This file is the single owner of the
   deployed identity. Rollback image: `perf2-20261024` (`b27810d373c0`, built from 399894a5a).
   LLM: `chromie-sglang:latest` = `gemma4-fp8`
@@ -78,8 +78,8 @@ ordered open work are in [STATUS](docs/STATUS.md).
 ## Deploy and run
 
 ```bash
-# resume the owner's iteration loop (up to 8): rebuild and deploy this revision, fresh LLM and scene, complete
-# cohort, one bundle, judge every case, fix at the earliest boundary, gate, commit and push
+# run the complete 119-case cohort on this revision: deploy (skip the build when the Agent already matches),
+# fresh LLM and scene, one invocation, one bundle, judge every case by stage
 # owner: rebuild the Agent from a clean main checkout and deploy it (performance mode; in quiet mode prefix
 # CHROMIE_SERVICE_RUNTIME_OVERRIDE_FILE=.chromie/quiet-mode/agent-timeouts.env)
 # (rollback: docker tag chromie-agent:perf2-20261024 chromie-agent:latest)

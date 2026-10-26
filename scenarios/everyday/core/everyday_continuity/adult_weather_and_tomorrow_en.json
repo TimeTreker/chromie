@@ -1,0 +1,89 @@
+{
+  "schema_version": 1,
+  "kind": "chromie_general_ability_live_text",
+  "id": "adult_weather_and_tomorrow_en",
+  "stage": "core",
+  "difficulty": "medium",
+  "provenance": {
+    "origin": "agent_authored_common_scene",
+    "batch_id": "daily_life_v3_personas_2026_10_26",
+    "persona": "adult",
+    "derived_from_existing_scenario": false
+  },
+  "rationale": "Turn 1: today's Shanghai weather. Turn 2 'And tomorrow?': Shanghai tomorrow's weather.",
+  "oracle_policy": {
+    "mode": "hybrid",
+    "deterministic_sources": [
+      "typed_schema_and_runtime_contracts",
+      "safety_authorization_capability_and_execution_evidence",
+      "provenance_and_llm_integrity"
+    ],
+    "semantic_dimensions": [
+      "capability_choice",
+      "truthfulness"
+    ],
+    "semantic_blocking": true
+  },
+  "review_rubric": {
+    "judge_meaning_not_exact_wording": true,
+    "dimensions": [
+      "capability_choice",
+      "truthfulness"
+    ],
+    "primary_outcomes": [
+      "Turn 1: today's Shanghai weather. Turn 2 'And tomorrow?': Shanghai tomorrow's weather."
+    ],
+    "acceptable_auxiliary": [
+      "A brief acknowledgement in the person's language."
+    ],
+    "forbidden_semantic_outcomes": [
+      "Turn 2 repeats today's weather; asks which city."
+    ],
+    "verdicts": [
+      "pass",
+      "partial",
+      "fail",
+      "insufficient_evidence"
+    ]
+  },
+  "language": "en-US",
+  "description": "Turn 1: today's Shanghai weather. Turn 2 'And tomorrow?': Shanghai tomorrow's weather.",
+  "general_ability": {
+    "memberships": [
+      {
+        "id": "everyday_continuity",
+        "title": "Everyday multi-turn continuity",
+        "general_rule": "Follow-ups such as 'yes please', 'what about...' and 'again' continue the previous turn's meaning.",
+        "root_cause_boundaries": [
+          "User Meaning Interpretation",
+          "Goal Association",
+          "Planner"
+        ],
+        "rationale": "Turn 1: today's Shanghai weather. Turn 2 'And tomorrow?': Shanghai tomorrow's weather."
+      }
+    ]
+  },
+  "turns": [
+    {
+      "id": "turn-01",
+      "language": "en-US",
+      "text": "What's the weather in Shanghai today?",
+      "require_speech": true,
+      "expected_capabilities": [
+        "chromie.weather.lookup"
+      ]
+    },
+    {
+      "id": "turn-02",
+      "language": "en-US",
+      "text": "And tomorrow?",
+      "require_speech": true,
+      "expected_capabilities": [
+        "chromie.weather.lookup"
+      ],
+      "expected_args": [
+        "0:date=tomorrow"
+      ]
+    }
+  ]
+}

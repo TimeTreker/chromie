@@ -1,0 +1,74 @@
+{
+  "schema_version": 1,
+  "kind": "chromie_general_ability_live_text",
+  "id": "adult_make_room_zh",
+  "stage": "core",
+  "difficulty": "easy",
+  "provenance": {
+    "origin": "agent_authored_common_scene",
+    "batch_id": "daily_life_v3_personas_2026_10_26",
+    "persona": "adult",
+    "derived_from_existing_scenario": false
+  },
+  "rationale": "Step sideways to the right to make room.",
+  "oracle_policy": {
+    "mode": "hybrid",
+    "deterministic_sources": [
+      "typed_schema_and_runtime_contracts",
+      "safety_authorization_capability_and_execution_evidence",
+      "provenance_and_llm_integrity"
+    ],
+    "semantic_dimensions": [
+      "capability_choice",
+      "truthfulness"
+    ],
+    "semantic_blocking": true
+  },
+  "review_rubric": {
+    "judge_meaning_not_exact_wording": true,
+    "dimensions": [
+      "capability_choice",
+      "truthfulness"
+    ],
+    "primary_outcomes": [
+      "Step sideways to the right to make room."
+    ],
+    "acceptable_auxiliary": [
+      "A brief acknowledgement in the person's language."
+    ],
+    "forbidden_semantic_outcomes": [
+      "Step left; walk forward."
+    ],
+    "verdicts": [
+      "pass",
+      "partial",
+      "fail",
+      "insufficient_evidence"
+    ]
+  },
+  "language": "zh-CN",
+  "description": "Step sideways to the right to make room.",
+  "general_ability": {
+    "memberships": [
+      {
+        "id": "everyday_movement",
+        "title": "Everyday movement and attention",
+        "general_rule": "Walking, turning, stepping and looking use the matching body ability with the requested amount, from the person's words or the observed scene, never a guessed value.",
+        "root_cause_boundaries": [
+          "User Meaning Interpretation",
+          "Planner",
+          "Soridormi"
+        ],
+        "rationale": "Step sideways to the right to make room."
+      }
+    ]
+  },
+  "text": "让一让，往右边挪一下。",
+  "expected_capabilities": [
+    "soridormi.sidestep"
+  ],
+  "expected_args": [
+    "0:direction=right"
+  ],
+  "require_speech": false
+}

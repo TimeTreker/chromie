@@ -1,0 +1,69 @@
+{
+  "schema_version": 1,
+  "kind": "chromie_general_ability_live_text",
+  "id": "adult_bring_it_en",
+  "stage": "core",
+  "difficulty": "medium",
+  "provenance": {
+    "origin": "agent_authored_common_scene",
+    "batch_id": "daily_life_v3_personas_2026_10_26",
+    "persona": "adult",
+    "derived_from_existing_scenario": false
+  },
+  "rationale": "Ask what 'it' is before fetching anything.",
+  "oracle_policy": {
+    "mode": "hybrid",
+    "deterministic_sources": [
+      "typed_schema_and_runtime_contracts",
+      "safety_authorization_capability_and_execution_evidence",
+      "provenance_and_llm_integrity"
+    ],
+    "semantic_dimensions": [
+      "capability_choice",
+      "truthfulness"
+    ],
+    "semantic_blocking": true
+  },
+  "review_rubric": {
+    "judge_meaning_not_exact_wording": true,
+    "dimensions": [
+      "capability_choice",
+      "truthfulness"
+    ],
+    "primary_outcomes": [
+      "Ask what 'it' is before fetching anything."
+    ],
+    "acceptable_auxiliary": [
+      "A brief acknowledgement in the person's language."
+    ],
+    "forbidden_semantic_outcomes": [
+      "Fetch water or milk by guessing."
+    ],
+    "verdicts": [
+      "pass",
+      "partial",
+      "fail",
+      "insufficient_evidence"
+    ]
+  },
+  "language": "en-US",
+  "description": "Ask what 'it' is before fetching anything.",
+  "general_ability": {
+    "memberships": [
+      {
+        "id": "everyday_clarification",
+        "title": "Everyday unclear requests",
+        "general_rule": "When the person's request leaves something Chromie cannot know (which object, where, when), she asks one short question instead of guessing.",
+        "root_cause_boundaries": [
+          "User Meaning Interpretation",
+          "Planner",
+          "Social Cognition"
+        ],
+        "rationale": "Ask what 'it' is before fetching anything."
+      }
+    ]
+  },
+  "text": "Can you bring it here?",
+  "expect_no_capabilities": true,
+  "require_social_communicative_act": true
+}

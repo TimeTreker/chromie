@@ -1,0 +1,74 @@
+{
+  "schema_version": 1,
+  "kind": "chromie_general_ability_live_text",
+  "id": "adult_cold_morning_en",
+  "stage": "core",
+  "difficulty": "medium",
+  "provenance": {
+    "origin": "agent_authored_common_scene",
+    "batch_id": "daily_life_v3_personas_2026_10_26",
+    "persona": "adult",
+    "derived_from_existing_scenario": false
+  },
+  "rationale": "Read Beijing's forecast for tomorrow morning and say whether it will be cold.",
+  "oracle_policy": {
+    "mode": "hybrid",
+    "deterministic_sources": [
+      "typed_schema_and_runtime_contracts",
+      "safety_authorization_capability_and_execution_evidence",
+      "provenance_and_llm_integrity"
+    ],
+    "semantic_dimensions": [
+      "capability_choice",
+      "truthfulness"
+    ],
+    "semantic_blocking": true
+  },
+  "review_rubric": {
+    "judge_meaning_not_exact_wording": true,
+    "dimensions": [
+      "capability_choice",
+      "truthfulness"
+    ],
+    "primary_outcomes": [
+      "Read Beijing's forecast for tomorrow morning and say whether it will be cold."
+    ],
+    "acceptable_auxiliary": [
+      "A brief acknowledgement in the person's language."
+    ],
+    "forbidden_semantic_outcomes": [
+      "Today's weather reported as tomorrow's; invented weather."
+    ],
+    "verdicts": [
+      "pass",
+      "partial",
+      "fail",
+      "insufficient_evidence"
+    ]
+  },
+  "language": "en-US",
+  "description": "Read Beijing's forecast for tomorrow morning and say whether it will be cold.",
+  "general_ability": {
+    "memberships": [
+      {
+        "id": "everyday_information",
+        "title": "Everyday information",
+        "general_rule": "Time, date and weather questions are answered from a fresh trusted read, never guessed.",
+        "root_cause_boundaries": [
+          "User Meaning Interpretation",
+          "Planner",
+          "Social Cognition"
+        ],
+        "rationale": "Read Beijing's forecast for tomorrow morning and say whether it will be cold."
+      }
+    ]
+  },
+  "text": "Will it be cold in Beijing tomorrow morning?",
+  "expected_capabilities": [
+    "chromie.weather.lookup"
+  ],
+  "expected_args": [
+    "0:date=tomorrow",
+    "0:period=morning"
+  ]
+}

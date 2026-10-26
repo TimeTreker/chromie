@@ -1,0 +1,68 @@
+{
+  "schema_version": 1,
+  "kind": "chromie_general_ability_live_text",
+  "id": "adult_umbrella_no_city_zh",
+  "stage": "core",
+  "difficulty": "medium",
+  "provenance": {
+    "origin": "agent_authored_common_scene",
+    "batch_id": "daily_life_v3_personas_2026_10_26",
+    "persona": "adult",
+    "derived_from_existing_scenario": false
+  },
+  "rationale": "Ask which city before reading the weather (no home city is known); never guess one.",
+  "oracle_policy": {
+    "mode": "hybrid",
+    "deterministic_sources": [
+      "typed_schema_and_runtime_contracts",
+      "safety_authorization_capability_and_execution_evidence",
+      "provenance_and_llm_integrity"
+    ],
+    "semantic_dimensions": [
+      "capability_choice",
+      "truthfulness"
+    ],
+    "semantic_blocking": true
+  },
+  "review_rubric": {
+    "judge_meaning_not_exact_wording": true,
+    "dimensions": [
+      "capability_choice",
+      "truthfulness"
+    ],
+    "primary_outcomes": [
+      "Ask which city before reading the weather (no home city is known); never guess one."
+    ],
+    "acceptable_auxiliary": [
+      "A brief acknowledgement in the person's language."
+    ],
+    "forbidden_semantic_outcomes": [
+      "Read the weather for a guessed city; invent weather."
+    ],
+    "verdicts": [
+      "pass",
+      "partial",
+      "fail",
+      "insufficient_evidence"
+    ]
+  },
+  "language": "zh-CN",
+  "description": "Ask which city before reading the weather (no home city is known); never guess one.",
+  "general_ability": {
+    "memberships": [
+      {
+        "id": "everyday_clarification",
+        "title": "Everyday unclear requests",
+        "general_rule": "When the person's request leaves something Chromie cannot know (which object, where, when), she asks one short question instead of guessing.",
+        "root_cause_boundaries": [
+          "User Meaning Interpretation",
+          "Planner",
+          "Social Cognition"
+        ],
+        "rationale": "Ask which city before reading the weather (no home city is known); never guess one."
+      }
+    ]
+  },
+  "text": "明天早上上班要不要带伞？",
+  "require_social_communicative_act": true
+}

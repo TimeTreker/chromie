@@ -13,7 +13,7 @@ proof, then default target-evidence closure.
 
 ## Active Issue — everyday live-cohort root-cause repairs
 
-Run the everyday live-text cohort (`scenarios/everyday/`, 69 cases; `scenarios/model_limited/` holds cases the
+Run the everyday live-text cohort (`scenarios/everyday/`, 119 cases since the 50 persona cases of 2026-10-26; `scenarios/model_limited/` holds cases the
 owner skips as local-model limits) against
 Soridormi MuJoCo, judge every case, and repair each failure at its earliest
 responsible owner. One invocation and one debug bundle per run; a hard failure in
@@ -62,8 +62,9 @@ Evidence and per-run judgments: `.chromie/acceptance/iter8-20261026/`, `iter7-20
   (65/69 = 94.2 %, previous best complete judged cohort acc1 62/70). Quiet-mode latency: first audio p50 28.2 s.
 - The workstation came up in quiet mode on 2026-10-26: deploy with the quiet-mode timeout overrides (Handoff).
   After a reboot start the Soridormi scene detached (Handoff).
-- The owner's 8-iteration loop is complete (8 of 8 used). Every case passes automatically, so per the owner the next
-  step is more everyday scenarios in `scenarios/everyday/`; then latency (prefix caching, prompt size, serial UMI
+- The owner's 8-iteration loop is complete (8 of 8 used). Per the owner, 50 everyday cases written for three buyer personas (a child, a
+  working parent, a grandparent; `provenance.persona`) were added on 2026-10-26 and approved by the owner. Next: the
+  first complete 119-case cohort, judged by stage; then latency (prefix caching, prompt size, serial UMI
   and SC ingress), then the standing-attention skill plan (`.chromie/plans/`). Open judged failures: wave_friend
   greeting, ability self-description, a confirmed wrong sum, a delayed wave; expression use under the lively style.
   Measure the schema size of any Social Cognition schema change before deploying it.

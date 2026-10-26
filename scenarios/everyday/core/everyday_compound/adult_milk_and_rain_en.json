@@ -1,0 +1,71 @@
+{
+  "schema_version": 1,
+  "kind": "chromie_general_ability_live_text",
+  "id": "adult_milk_and_rain_en",
+  "stage": "core",
+  "difficulty": "medium",
+  "provenance": {
+    "origin": "agent_authored_common_scene",
+    "batch_id": "daily_life_v3_personas_2026_10_26",
+    "persona": "adult",
+    "derived_from_existing_scenario": false
+  },
+  "rationale": "Fetch the milk, and tell whether it will rain in Beijing today from a weather read.",
+  "oracle_policy": {
+    "mode": "hybrid",
+    "deterministic_sources": [
+      "typed_schema_and_runtime_contracts",
+      "safety_authorization_capability_and_execution_evidence",
+      "provenance_and_llm_integrity"
+    ],
+    "semantic_dimensions": [
+      "capability_choice",
+      "truthfulness"
+    ],
+    "semantic_blocking": true
+  },
+  "review_rubric": {
+    "judge_meaning_not_exact_wording": true,
+    "dimensions": [
+      "capability_choice",
+      "truthfulness"
+    ],
+    "primary_outcomes": [
+      "Fetch the milk, and tell whether it will rain in Beijing today from a weather read."
+    ],
+    "acceptable_auxiliary": [
+      "A brief acknowledgement in the person's language."
+    ],
+    "forbidden_semantic_outcomes": [
+      "Skip either part; invented weather."
+    ],
+    "verdicts": [
+      "pass",
+      "partial",
+      "fail",
+      "insufficient_evidence"
+    ]
+  },
+  "language": "en-US",
+  "description": "Fetch the milk, and tell whether it will rain in Beijing today from a weather read.",
+  "general_ability": {
+    "memberships": [
+      {
+        "id": "everyday_compound",
+        "title": "Compound everyday requests",
+        "general_rule": "Two requests in one turn are both handled: done, answered or honestly declined.",
+        "root_cause_boundaries": [
+          "User Meaning Interpretation",
+          "Planner",
+          "Social Cognition"
+        ],
+        "rationale": "Fetch the milk, and tell whether it will rain in Beijing today from a weather read."
+      }
+    ]
+  },
+  "text": "Bring me the milk, and tell me if it'll rain in Beijing today.",
+  "expected_capabilities": [
+    "soridormi.acquire_and_deliver_resource",
+    "chromie.weather.lookup"
+  ]
+}

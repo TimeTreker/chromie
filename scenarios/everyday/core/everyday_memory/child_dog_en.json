@@ -1,0 +1,85 @@
+{
+  "schema_version": 1,
+  "kind": "chromie_general_ability_live_text",
+  "id": "child_dog_en",
+  "stage": "core",
+  "difficulty": "medium",
+  "provenance": {
+    "origin": "agent_authored_common_scene",
+    "batch_id": "daily_life_v3_personas_2026_10_26",
+    "persona": "child",
+    "derived_from_existing_scenario": false
+  },
+  "rationale": "Turn 2: says the dog is called Max.",
+  "oracle_policy": {
+    "mode": "hybrid",
+    "deterministic_sources": [
+      "typed_schema_and_runtime_contracts",
+      "safety_authorization_capability_and_execution_evidence",
+      "provenance_and_llm_integrity"
+    ],
+    "semantic_dimensions": [
+      "capability_choice",
+      "truthfulness"
+    ],
+    "semantic_blocking": true
+  },
+  "review_rubric": {
+    "judge_meaning_not_exact_wording": true,
+    "dimensions": [
+      "capability_choice",
+      "truthfulness"
+    ],
+    "primary_outcomes": [
+      "Turn 2: says the dog is called Max."
+    ],
+    "acceptable_auxiliary": [
+      "A brief acknowledgement in the person's language."
+    ],
+    "forbidden_semantic_outcomes": [
+      "Turn 2 forgets or names another dog."
+    ],
+    "verdicts": [
+      "pass",
+      "partial",
+      "fail",
+      "insufficient_evidence"
+    ]
+  },
+  "language": "en-US",
+  "description": "Turn 2: says the dog is called Max.",
+  "general_ability": {
+    "memberships": [
+      {
+        "id": "everyday_memory",
+        "title": "Everyday remembering within a conversation",
+        "general_rule": "What the person told Chromie earlier in the conversation (a name, a liking, a plan, a preference) is remembered and used later.",
+        "root_cause_boundaries": [
+          "Goal Association",
+          "Memory",
+          "Social Cognition"
+        ],
+        "rationale": "Turn 2: says the dog is called Max."
+      }
+    ]
+  },
+  "turns": [
+    {
+      "id": "turn-01",
+      "language": "en-US",
+      "text": "My dog is called Max.",
+      "require_speech": true,
+      "expect_no_capabilities": true
+    },
+    {
+      "id": "turn-02",
+      "language": "en-US",
+      "text": "What's my dog's name?",
+      "require_speech": true,
+      "expect_no_capabilities": true,
+      "expected_speech_any": [
+        "Max"
+      ]
+    }
+  ]
+}

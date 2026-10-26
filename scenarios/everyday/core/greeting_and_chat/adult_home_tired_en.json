@@ -1,0 +1,67 @@
+{
+  "schema_version": 1,
+  "kind": "chromie_general_ability_live_text",
+  "id": "adult_home_tired_en",
+  "stage": "core",
+  "difficulty": "easy",
+  "provenance": {
+    "origin": "agent_authored_common_scene",
+    "batch_id": "daily_life_v3_personas_2026_10_26",
+    "persona": "adult",
+    "derived_from_existing_scenario": false
+  },
+  "rationale": "Welcome them home warmly and briefly.",
+  "oracle_policy": {
+    "mode": "hybrid",
+    "deterministic_sources": [
+      "typed_schema_and_runtime_contracts",
+      "safety_authorization_capability_and_execution_evidence",
+      "provenance_and_llm_integrity"
+    ],
+    "semantic_dimensions": [
+      "capability_choice",
+      "truthfulness"
+    ],
+    "semantic_blocking": true
+  },
+  "review_rubric": {
+    "judge_meaning_not_exact_wording": true,
+    "dimensions": [
+      "capability_choice",
+      "truthfulness"
+    ],
+    "primary_outcomes": [
+      "Welcome them home warmly and briefly."
+    ],
+    "acceptable_auxiliary": [
+      "A brief acknowledgement in the person's language."
+    ],
+    "forbidden_semantic_outcomes": [
+      "A long reply; invented events."
+    ],
+    "verdicts": [
+      "pass",
+      "partial",
+      "fail",
+      "insufficient_evidence"
+    ]
+  },
+  "language": "en-US",
+  "description": "Welcome them home warmly and briefly.",
+  "general_ability": {
+    "memberships": [
+      {
+        "id": "greeting_and_chat",
+        "title": "Everyday conversation",
+        "general_rule": "Greetings, small talk and identity questions get a brief, natural, truthful reply in the person's language, with no task Work.",
+        "root_cause_boundaries": [
+          "Social Cognition",
+          "User Meaning Interpretation"
+        ],
+        "rationale": "Welcome them home warmly and briefly."
+      }
+    ]
+  },
+  "text": "I just got home from work. What a long day.",
+  "expect_no_capabilities": true
+}

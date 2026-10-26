@@ -188,7 +188,8 @@ There is no central general-ability index. Live scenarios are discovered under
 `general_ability/<must_pass|core|challenge>/<ability-class>/`; every file owns
 its stage, difficulty, ability membership, hybrid oracle, and review metadata.
 Optional scenario-local `provenance` records authoring origin, batch id, and
-whether the case was derived from an existing scenario. When present, the runner
+whether the case was derived from an existing scenario; everyday cases written for a buyer persona also
+record `persona` (`child`, `adult` or `elder`). When present, the runner
 validates those fields and retains them in live summaries and semantic-review
 bundles; it never changes the verdict or creates a central registry.
 Maintained Level-A scenarios in the deterministic suites declare their own

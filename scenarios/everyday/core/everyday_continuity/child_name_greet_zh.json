@@ -1,0 +1,84 @@
+{
+  "schema_version": 1,
+  "kind": "chromie_general_ability_live_text",
+  "id": "child_name_greet_zh",
+  "stage": "core",
+  "difficulty": "easy",
+  "provenance": {
+    "origin": "agent_authored_common_scene",
+    "batch_id": "daily_life_v3_personas_2026_10_26",
+    "persona": "child",
+    "derived_from_existing_scenario": false
+  },
+  "rationale": "Turn 2: greets the child by the name 小明 (a wave is optional).",
+  "oracle_policy": {
+    "mode": "hybrid",
+    "deterministic_sources": [
+      "typed_schema_and_runtime_contracts",
+      "safety_authorization_capability_and_execution_evidence",
+      "provenance_and_llm_integrity"
+    ],
+    "semantic_dimensions": [
+      "capability_choice",
+      "truthfulness"
+    ],
+    "semantic_blocking": true
+  },
+  "review_rubric": {
+    "judge_meaning_not_exact_wording": true,
+    "dimensions": [
+      "capability_choice",
+      "truthfulness"
+    ],
+    "primary_outcomes": [
+      "Turn 2: greets the child by the name 小明 (a wave is optional)."
+    ],
+    "acceptable_auxiliary": [
+      "A brief acknowledgement in the person's language."
+    ],
+    "forbidden_semantic_outcomes": [
+      "Turn 2 forgets the name or invents another."
+    ],
+    "verdicts": [
+      "pass",
+      "partial",
+      "fail",
+      "insufficient_evidence"
+    ]
+  },
+  "language": "zh-CN",
+  "description": "Turn 2: greets the child by the name 小明 (a wave is optional).",
+  "general_ability": {
+    "memberships": [
+      {
+        "id": "everyday_continuity",
+        "title": "Everyday multi-turn continuity",
+        "general_rule": "Follow-ups such as 'yes please', 'what about...' and 'again' continue the previous turn's meaning.",
+        "root_cause_boundaries": [
+          "User Meaning Interpretation",
+          "Goal Association",
+          "Planner"
+        ],
+        "rationale": "Turn 2: greets the child by the name 小明 (a wave is optional)."
+      }
+    ]
+  },
+  "turns": [
+    {
+      "id": "turn-01",
+      "language": "zh-CN",
+      "text": "我叫小明。",
+      "require_speech": true,
+      "expect_no_capabilities": true
+    },
+    {
+      "id": "turn-02",
+      "language": "zh-CN",
+      "text": "跟我打个招呼吧！",
+      "require_speech": true,
+      "expected_speech_any": [
+        "小明"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,90 @@
+{
+  "schema_version": 1,
+  "kind": "chromie_general_ability_live_text",
+  "id": "child_bedtime_zh",
+  "stage": "challenge",
+  "difficulty": "hard",
+  "provenance": {
+    "origin": "agent_authored_common_scene",
+    "batch_id": "daily_life_v3_personas_2026_10_26",
+    "persona": "child",
+    "derived_from_existing_scenario": false
+  },
+  "rationale": "Turn 1: acknowledge bedtime. Turn 2: a very short bedtime story. Turn 3: say good night.",
+  "oracle_policy": {
+    "mode": "hybrid",
+    "deterministic_sources": [
+      "typed_schema_and_runtime_contracts",
+      "safety_authorization_capability_and_execution_evidence",
+      "provenance_and_llm_integrity"
+    ],
+    "semantic_dimensions": [
+      "capability_choice",
+      "truthfulness"
+    ],
+    "semantic_blocking": true
+  },
+  "review_rubric": {
+    "judge_meaning_not_exact_wording": true,
+    "dimensions": [
+      "capability_choice",
+      "truthfulness"
+    ],
+    "primary_outcomes": [
+      "Turn 1: acknowledge bedtime. Turn 2: a very short bedtime story. Turn 3: say good night."
+    ],
+    "acceptable_auxiliary": [
+      "A brief acknowledgement in the person's language."
+    ],
+    "forbidden_semantic_outcomes": [
+      "A long story; forgets it is bedtime."
+    ],
+    "verdicts": [
+      "pass",
+      "partial",
+      "fail",
+      "insufficient_evidence"
+    ]
+  },
+  "language": "zh-CN",
+  "description": "Turn 1: acknowledge bedtime. Turn 2: a very short bedtime story. Turn 3: say good night.",
+  "general_ability": {
+    "memberships": [
+      {
+        "id": "everyday_long_conversation",
+        "title": "Everyday longer conversations",
+        "general_rule": "Over several turns Chromie keeps the topic, the person's earlier words and her own earlier answers coherent, and changes course when the person corrects her.",
+        "root_cause_boundaries": [
+          "User Meaning Interpretation",
+          "Goal Association",
+          "Planner",
+          "Social Cognition"
+        ],
+        "rationale": "Turn 1: acknowledge bedtime. Turn 2: a very short bedtime story. Turn 3: say good night."
+      }
+    ]
+  },
+  "turns": [
+    {
+      "id": "turn-01",
+      "language": "zh-CN",
+      "text": "我要睡觉了。",
+      "require_speech": true,
+      "expect_no_capabilities": true
+    },
+    {
+      "id": "turn-02",
+      "language": "zh-CN",
+      "text": "给我讲个很短的睡前故事吧。",
+      "require_speech": true,
+      "expect_no_capabilities": true
+    },
+    {
+      "id": "turn-03",
+      "language": "zh-CN",
+      "text": "晚安！",
+      "require_speech": true,
+      "expect_no_capabilities": true
+    }
+  ]
+}

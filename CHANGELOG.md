@@ -5,6 +5,12 @@ remains available in Git history.
 
 ## Unreleased
 
+### Everyday cases for three buyer personas (2026-10-26)
+
+- 50 live-text cases in `scenarios/everyday/` written from what a child, a working parent and a grandparent
+  would ask a home robot: play, learning, feelings, gestures, remembering what they said, weather and errands,
+  medicine, safety, and honest limits. Each records `provenance.persona`; the library has 119 cases.
+
 ### Goal Association cannot loop on requirement indices (iteration 8, 2026-10-26)
 
 - The SGLang transport offers requirement replacement indices to the native decoder as the exact unique subsets
