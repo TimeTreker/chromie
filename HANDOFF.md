@@ -14,19 +14,19 @@ ordered open work are in [STATUS](docs/STATUS.md).
   revision pinned by `capabilities/soridormi.json` and `release/compatibility.json`. The
   MCP container mounts its `src`, so a `docker restart soridormi-runtime-mcp` loads it and
   resets the scene (user at -90 degrees, 1.5 m).
-- Live Agent: `chromie-agent:latest` = `iter7-20261026` (`2d0f1d981838`), built from 7e091a536 (one Goal Association
-  decoder change before this delivery) and recreated with the quiet-mode timeout overrides; `--verify-agent-source`
-  matched at deploy (`.chromie/acceptance/iter7-20261026/agent-source-verify.json`). Rebuild before attributing live
-  results to this delivery. This file is the single owner of the deployed identity. Rollback image: `perf2-20261024`
-  (`b27810d373c0`, built from 399894a5a).
+- Live Agent: `chromie-agent:latest` = `iter8-20261026` (`67023144e8e1`), built from 9358ba34c (this delivery's source;
+  this commit changes documentation only) and recreated with the quiet-mode timeout overrides; `--verify-agent-source`
+  matched (`.chromie/acceptance/iter8-20261026/agent-source-verify.json`). This file is the single owner of the
+  deployed identity. Rollback image: `perf2-20261024` (`b27810d373c0`, built from 399894a5a).
   LLM: `chromie-sglang:latest` = `gemma4-fp8`
   (`f59a042e6973`); compose resolves `chromie-sglang:${CHROMIE_IMAGE_TAG}`, so the
   `latest` tag must exist for `start_chromie.sh`.
 - Workflow corpus: freeze 47 (`bdb8db08…`; scripts in `.chromie/acceptance/thirsty-offer-20261021/freeze47/`). Restore it with
   `python -m benchmarks.regression restore-fixtures`; do not untar `frozen.tar.xz` over
   `workflow_scenarios/` (its inner `manifest.json` lacks the storage identity).
-- Evidence (README in each): `.chromie/acceptance/iter7-20261026/` (iteration 7 on 7e091a536, quiet mode with its
-  overrides: hard stop at 47/69 on a truncated GA output), `iter6-20261026/` (iteration 6 on e36ada5b9: quiet mode
+- Evidence (README in each): `.chromie/acceptance/iter8-20261026/` (iteration 8 on 9358ba34c, quiet mode with its
+  overrides: the first complete cohort, 69/69 automatic, 65/69 judged), `iter7-20261026/` (iteration 7 on 7e091a536:
+  hard stop at 47/69 on a truncated GA output), `iter6-20261026/` (iteration 6 on e36ada5b9: quiet mode
   with default timeouts, hard stop at 28/69 on a Planner timeout; its `soridormi-run.log` is the running scene's log),
   `iter5-20261025/` (iteration 5 on e36ada5b9: hard stop at 33/69 on a weather-provider timeout), `iter4-20261025/` (iteration 4 on 3cdf06008: hard
   stop at 32/70),

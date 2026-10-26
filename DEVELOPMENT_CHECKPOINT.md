@@ -18,7 +18,7 @@ owner skips as local-model limits) against
 Soridormi MuJoCo, judge every case, and repair each failure at its earliest
 responsible owner. One invocation and one debug bundle per run; a hard failure in
 the 15-case `must_pass` smoke stage stops `core` and `challenge` (owner rule).
-Evidence and per-run judgments: `.chromie/acceptance/iter7-20261026/`, `iter6-20261026/`, `iter5-20261025/`, `iter4-20261025/`, `iter3-20261025/`, `iter2-20261025/`, `iter1-20261025/`, `acc3-20261024/` (stopped at 57/70), `acc2-focused-20261024/`,
+Evidence and per-run judgments: `.chromie/acceptance/iter8-20261026/`, `iter7-20261026/`, `iter6-20261026/`, `iter5-20261025/`, `iter4-20261025/`, `iter3-20261025/`, `iter2-20261025/`, `iter1-20261025/`, `acc3-20261024/` (stopped at 57/70), `acc2-focused-20261024/`,
 `acc1-20261024/`, `perf2-20261024/` and `perf-4f64f5120-20261024/` (performance mode), `review-fixes-20261023/` (stopped),
 `merge-reads-20261023/`, `span-owned-20261023/`, `main-20cce0dfa-20261023/` (complete cohorts),
 `planner-fit-20261023/` and `ingress-awaiting-20261023/` (focused),
@@ -57,13 +57,16 @@ Evidence and per-run judgments: `.chromie/acceptance/iter7-20261026/`, `iter6-20
   tomorrow, the language preference held, the quiet nod passed), then Goal Association looped
   `replace_requirement_indices: [0, 0, ...]` until truncation. This delivery offers those indices to the decoder as
   exact unique subsets (or a bounded list). The lively style did not raise expression use (2/116 SC calls with an
-  expression vs 3/80 under courteous): open.
+  expression vs 3/80 under courteous): open. Iteration 8 (9358ba34c, the SGLang transport carries that bound) is
+  the loop's first complete cohort: 69/69 automatic, no hard stop; judged smoke 15/15, core 47/49, challenge 3/5
+  (65/69 = 94.2 %, previous best complete judged cohort acc1 62/70). Quiet-mode latency: first audio p50 28.2 s.
 - The workstation came up in quiet mode on 2026-10-26: deploy with the quiet-mode timeout overrides (Handoff).
   After a reboot start the Soridormi scene detached (Handoff).
-- Next: iteration 8 (7 of 8 used; the last of the owner's loop) — deploy this revision with the quiet-mode overrides
-  while the machine is in quiet mode, run the complete cohort, judge. Open: wave_friend greeting, SC echo of the
-  person's words, expression use under the lively style, external provider timeouts. Measure the schema size of
-  any Social Cognition schema change before deploying it.
+- The owner's 8-iteration loop is complete (8 of 8 used). Every case passes automatically, so per the owner the next
+  step is more everyday scenarios in `scenarios/everyday/`; then latency (prefix caching, prompt size, serial UMI
+  and SC ingress), then the standing-attention skill plan (`.chromie/plans/`). Open judged failures: wave_friend
+  greeting, ability self-description, a confirmed wrong sum, a delayed wave; expression use under the lively style.
+  Measure the schema size of any Social Cognition schema change before deploying it.
 
 Verification: clean-worktree gate on this delivery's source: pytest 4,039 passed + 5 skipped (`xgrammar` not
 installed), benchmarks 172, legacy Agent tests 20, all checks. Strict replay not rerun (last 6,000/6,000 on freeze
