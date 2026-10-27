@@ -91,18 +91,28 @@ Evidence and per-run judgments: `.chromie/acceptance/iter8-20261026/`, `iter7-20
   contract no longer carries the worked example "current-local-night realizes as date=today", which pulled a
   period-scoped "明天早上" to today (replayed live calls: 2.6 → 10.7 nats, and a wrong T4 corrected). A GA continuation or
   reference that answers a Goal's open input gap now closes it (only modify/clarify did). The silence
-  reflex also takes a hush and a duration ("嘘，安静一会儿，我在打电话。" had been planned as a body action). The
-  iteration-2 cohort (`it2-ground-20261027/cohort/`, c29f3b7c1): smoke 15/15, core 52/55 automatic and 47/55
-  judged; open: "那上海呢？" keeps today (flaky), "给我倒杯水。" says it was poured when the bottle was brought, SC
-  brushes off loneliness and boredom. Next: the
-  complete 119-case cohort, judged by stage; then latency (prefix caching, prompt size, serial UMI
-  and SC ingress), then the standing-attention skill plan (`.chromie/plans/`). Open judged failures: wave_friend
-  greeting, ability self-description, a confirmed wrong sum, a delayed wave; expression use under the lively style.
+  reflex also takes a hush and a duration ("嘘，安静一会儿，我在打电话。" had been planned as a body action).
+  Iteration 4: SenseVoice's own emotion and notable sound (`voice_cues`, owner decision 2026-10-27) reach Social
+  Cognition with that utterance and shape only its tone, never the person's words. The streaming Planner decoder's mixed
+  state now needs two different dispositions: "I have a headache. Can I take some of grandpa's pills?" decided answer
+  and answer_from_perception (both respond) under mixed and stopped the iteration-3 cohort. The acceptance oracle
+  listed the retired sidestep field `vy_mps`, so a sidestep that did go right failed; the library check now rejects an
+  expected argument the oracle never observes, and `child_spin_en` accepts the truthful limitation (turn_in_place
+  covers at most about 4 rad per request). The iteration-3 cohort (`it3-person-20261027/cohort/`, fabf2c910) stopped
+  at 89/119 on that decoder state: smoke 15/15, core 71/74 automatic and 61/74 judged (63/74 with the two oracle
+  defects corrected); challenge not reached. Open judged failures: "给我倒杯水。" says it was poured when the bottle
+  was brought; a drawing or shirt Chromie cannot see is praised (two general SC wordings replayed at temperature 0
+  changed nothing; model-limited candidate or a perception-scope fact from the provider); "你都会做些什么呀？" names
+  abilities she lacks; boredom and loneliness get no offer of company; wave_friend has no greeting; the celebrate
+  reply echoes the user. Compound fetch-and-read turns take 344-490 s. Next: the iteration-4 cohort, then iteration
+  5 (a remember-this ability for "帮我记一下"), then latency (prefix caching, prompt size, serial UMI and SC ingress),
+  then the standing-attention skill plan (`.chromie/plans/`).
   Measure the schema size of any Social Cognition schema change before deploying it.
 
-Verification: clean-worktree gate on this delivery's source: pytest 4,068 passed + 5 skipped (`xgrammar` not
-installed), benchmarks 172, legacy Agent tests 20, all checks. Strict replay not rerun (last 6,000/6,000 on freeze
-47, 2026-10-23).
+Verification: clean-worktree gate on this delivery's source (2026-10-27): pytest 4,072 passed + 5 skipped
+(`xgrammar` not installed), benchmarks 172, legacy Agent tests 20, all checks; the orchestrator line ratchet is
+lowered to 1993 because the file shrank. Workflow replay tests 94/94; strict replay not rerun (last 6,000/6,000 on
+freeze 47, 2026-10-23).
 
 ## Repairs in force from this Issue
 

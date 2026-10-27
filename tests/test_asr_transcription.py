@@ -108,6 +108,20 @@ class ASRBackendTests(unittest.TestCase):
         self.assertEqual(calls[0]["kwargs"]["use_itn"], True)
         self.assertEqual(calls[1], {"sample_rate": 16000, "audio": [0.0]})
 
+    def test_sensevoice_voice_cues_keep_only_a_recognized_emotion_and_a_notable_sound(self) -> None:
+        """Owner decision 2026-10-27: SenseVoice's own emotion and sound reach Social Cognition."""
+        from asr.backends import extract_sherpa_voice_cues
+
+        class Result:
+            def __init__(self, emotion: str, event: str) -> None:
+                self.emotion, self.event, self.text = emotion, event, "我好难过。"
+
+        self.assertEqual(extract_sherpa_voice_cues(Result("<|SAD|>", "<|Cry|>")), {"emotion": "sad", "sound": "crying"})
+        self.assertEqual(extract_sherpa_voice_cues(Result("<|HAPPY|>", "<|Laughter|>")),
+                         {"emotion": "happy", "sound": "laughing"})
+        self.assertEqual(extract_sherpa_voice_cues(Result("<|EMO_UNKNOWN|>", "<|Speech|>")), {})
+        self.assertEqual(extract_sherpa_voice_cues(Result("<|NEUTRAL|>", "<|Speech|>")), {})
+
     def test_sensevoice_backend_fails_closed_when_model_files_are_missing(self) -> None:
         with self.assertRaisesRegex(ValueError, "requires local model files"):
             create_final_asr_backend(self._config())

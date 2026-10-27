@@ -846,7 +846,11 @@ The ASR service accepts WebSocket connections and two message forms:
   `{"type":"pong","service":"asr",...}` with backend, mode, model revision,
   and bounded-concurrency metadata.
 - Binary PCM16 mono audio at `ASR_SAMPLE_RATE` -> one JSON final result:
-  `{"type":"final","sequence":<n>,"text":"...","duration":<seconds>}`.
+  `{"type":"final","sequence":<n>,"text":"...","duration":<seconds>}`, plus
+  `"voice_cues":{"emotion":...,"sound":...}` when SenseVoice recognized the voice's emotion or a
+  notable sound (owner decision 2026-10-27). The Orchestrator keeps them per utterance and adds
+  them to that turn's cognition context as `voice_cues`; Social Cognition lets them shape its tone
+  and never treats them as the person's words.
 
 Failures return `{"type":"error","sequence":<n>,"message":"..."}`. `sequence`
 numbers the utterances sent on one connection from 1; clients reject a reply

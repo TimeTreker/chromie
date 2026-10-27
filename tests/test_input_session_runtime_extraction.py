@@ -9,6 +9,7 @@ from orchestrator.orchestrator import VoiceAssistant
 from orchestrator.runtime.input_session_runtime import (
     InputSessionRuntime,
     input_session_runtime_for,
+    voice_cues_context,
 )
 from orchestrator.runtime.input_turn_lifecycle import InputTurnLifecycle
 from tests.voice_assistant_test_support import bare_voice_assistant
@@ -24,6 +25,19 @@ class InputSessionRuntimeExtractionTests(unittest.TestCase):
         self.assertIsInstance(first, InputSessionRuntime)
         self.assertIs(first, second)
         self.assertIs(host.input_turn_lifecycle.runtime, first)
+
+    def test_an_utterances_voice_cues_reach_its_turn_context_only(self) -> None:
+        """Owner decision 2026-10-27: SenseVoice's emotion and sound for an utterance reach cognition."""
+        host = SimpleNamespace(input_turn_lifecycle=InputTurnLifecycle())
+        runtime = input_session_runtime_for(host)
+        runtime.record_voice_cues("sid-1", {"emotion": "sad", "sound": "crying"})
+        runtime.record_voice_cues("sid-2", {})
+        self.assertEqual(voice_cues_context(host, "sid-1"), {"voice_cues": {"emotion": "sad", "sound": "crying"}})
+        self.assertEqual(voice_cues_context(host, "sid-2"), {})
+        self.assertEqual(voice_cues_context(SimpleNamespace(), "sid-1"), {})
+        for index in range(10):
+            runtime.record_voice_cues(f"later-{index}", {"emotion": "happy"})
+        self.assertEqual(voice_cues_context(host, "sid-1"), {})  # bounded to recent utterances
 
     def test_microphone_and_asr_transport_left_composition_root(self) -> None:
         root_source = (ROOT / "orchestrator" / "orchestrator.py").read_text(encoding="utf-8")

@@ -59,7 +59,7 @@
     "soridormi.sidestep": {
       "type": "locomotion.sidestep",
       "domain": "locomotion",
-      "arg_fields": ["vy_mps", "duration_s"]
+      "arg_fields": ["direction", "lateral_speed_mps", "duration_s"]
     },
     "soridormi.stand_idle": {
       "type": "posture.stand_idle",

@@ -2821,6 +2821,7 @@ def _serving_every_responsibility(items: Any, refs: list[str]) -> Any:
 
 _STATE_DECISION = {"execute": {"work"}, "respond": {"answer", "answer_from_perception"},
                    "clarify": {"clarify"}, "unavailable": {"unavailable"}}
+_DECISION_STATE = {decision: state for state, decisions in _STATE_DECISION.items() for decision in decisions}
 
 
 def _restrict_state_decisions(
@@ -2881,8 +2882,11 @@ def _mixed_limitation_states(state: dict[str, Any], responsibility_refs: list[st
     offered only for the Responsibility whose decision it realizes; with three, one
     state per set of ``unavailable`` Responsibilities keeps Activities off them. Live
     2026-10-12 (wave + coffee): coffee was decided unavailable, then given a
-    clarification, and Host rejected the whole turn. Larger turns keep one mixed state
-    and Host keeps the same checks.
+    clarification, and Host rejected the whole turn. Two decisions are mixed only when
+    their dispositions differ (live 2026-10-27: "I have a headache. Can I take some of
+    grandpa's pills?" decided answer and answer_from_perception, both respond, under
+    mixed; Host rejected the turn). Larger turns keep one mixed state and Host keeps
+    the same checks.
     """
     per_ref = state["properties"].get("responsibility_decisions", {}).get("properties", {})
     if len(responsibility_refs) > MIXED_LIMITATION_STATE_MAX_REFS or not per_ref:
@@ -2902,7 +2906,7 @@ def _mixed_limitation_states(state: dict[str, Any], responsibility_refs: list[st
     if len(responsibility_refs) <= MIXED_DECISION_STATE_MAX_REFS:
         assignments = [dict(zip(responsibility_refs, picked))
                        for picked in product(*(list(choices[ref]) for ref in responsibility_refs))
-                       if len(set(picked)) > 1]
+                       if len({_DECISION_STATE[decision] for decision in picked}) > 1]
     else:
         assignments = [{ref: ("unavailable" if ref in limited else None) for ref in responsibility_refs}
                        for size in range(len(responsibility_refs))

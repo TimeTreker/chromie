@@ -5,6 +5,18 @@ remains available in Git history.
 
 ## Unreleased
 
+### Hear how the person sounds; two answers are never "mixed" (owner loop 2, iteration 4, 2026-10-27)
+
+- SenseVoice's own emotion and notable sound (`voice_cues`: happy, sad, crying, laughing, …) travel with that
+  utterance to Social Cognition, which lets them shape its tone and never treats them as the person's words (owner
+  decision). Plain speech and an unknown or neutral emotion add nothing.
+- The streaming Planner decoder offers its mixed state only for decisions with different dispositions: answer beside
+  answer_from_perception (both respond) had been decoded as mixed, and Host stopped the iteration-3 cohort at 89/119
+  on "I have a headache. Can I take some of grandpa's pills?".
+- Acceptance: the observation oracle reads the sidestep's public `direction` (it listed the retired `vy_mps`, so a
+  sidestep that went right failed), and the library check rejects an expected argument the oracle never observes;
+  `child_spin_en` accepts the truthful limitation, since one turn_in_place request covers at most about 4 rad.
+
 ### Remember what a person tells you like a friend does (owner loop 2, iteration 3, 2026-10-27)
 
 - No "要我记住吗？" question (owner decision): a lasting fact the person tells about themselves is kept as theirs —

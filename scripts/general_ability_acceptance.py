@@ -1476,6 +1476,7 @@ def validate_library(
     validate_level_a_sources: bool = True,
 ) -> list[str]:
     errors: list[str] = []
+    behavior_map = load_behavior_map()
     stage_ids = {stage.stage_id for stage in library.stages}
     stage_orders: set[int] = set()
     for stage in library.stages:
@@ -1516,6 +1517,16 @@ def validate_library(
             for turn in ref.case.turns or (ref.case,):
                 if turn.expect_cancelled and not turn.interrupt_text:
                     errors.append(f"{ability.ability_id}/{turn.case_id}: expect_cancelled requires interrupt_text")
+                # An expected arg the observation oracle never projects can never pass
+                # (live 2026-10-27: sidestep direction=right executed, but the map
+                # still listed the retired provider field vy_mps).
+                for index, key, _ in () if turn.expected_observations else turn.expected_args:
+                    capability_id = (turn.expected_capabilities[index]
+                                     if index < len(turn.expected_capabilities) else "")
+                    fields = behavior_map.get(capability_id, {}).get("arg_fields")
+                    if not capability_id or (isinstance(fields, list) and key not in fields):
+                        errors.append(f"{ability.ability_id}/{turn.case_id}: expected arg {index}:{key} "
+                                      f"is not an observed field of {capability_id or 'any expected capability'}")
             try:
                 policy = OraclePolicy.from_mapping(ref.oracle_policy)
             except ValueError as exc:

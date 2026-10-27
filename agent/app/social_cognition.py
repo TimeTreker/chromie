@@ -1445,6 +1445,17 @@ def _social_memory_guard(request: SocialCognitionRequest) -> str:
             "about them in one short sentence.\n")
 
 
+def _social_voice_guard(request: SocialCognitionRequest) -> str:
+    """How the person sounded in this turn (SenseVoice emotion and sound; owner decision 2026-10-27)."""
+
+    cues = request.context.get("voice_cues")
+    if not isinstance(cues, dict) or not cues:
+        return ""
+    return ("\nvoice_cues says how the person's voice sounded in this turn (an emotion such as sad or happy, a sound "
+            "such as laughing or crying). Let it shape your tone and whether comfort or shared joy fits; it is not "
+            "their words, so never quote it or claim more than it shows.\n")
+
+
 LIMITATION_RESULT_NOTICE = (
     "\nCurrent limitation result need: part of this request will not be done (a Planner "
     "result whose facts.disposition is unavailable or refused, or Chromie's own value_declined "
@@ -1682,7 +1693,7 @@ class SocialCognitionResolver:
                 schema, max_chars=self.num_ctx * 3, label="Social Cognition output contract",
             ) + "\n" + SOCIAL_COGNITION_WORK_STATE_PROMPT
             + _social_current_turn_output_guard(request) + _social_value_judgment_guard(request)
-            + _social_language_guard(request) + _social_memory_guard(request),
+            + _social_language_guard(request) + _social_memory_guard(request) + _social_voice_guard(request),
             system=SOCIAL_COGNITION_AUTHORITY_PROMPT + (
                 "This is the sole deeper pass; decide communicate or silence now." if deep else ""
             ),

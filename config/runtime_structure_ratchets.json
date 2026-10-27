@@ -56,7 +56,7 @@
   "file_line_baselines": {
     "agent/app/planner_schema.py": 3124,
     "agent/app/planner_validation.py": 3559,
-    "orchestrator/orchestrator.py": 1994,
+    "orchestrator/orchestrator.py": 1993,
     "orchestrator/runtime/capability_runtime.py": 2676,
     "orchestrator/runtime/cognitive_runtime.py": 3694,
     "orchestrator/runtime/conversation_state.py": 2418

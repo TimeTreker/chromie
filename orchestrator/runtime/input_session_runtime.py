@@ -57,6 +57,14 @@ class InputSessionRuntime:
         # rejected and the connection is reset.
         self._asr_socket: Any = None
         self._asr_sequence = 0
+        # How the voice sounded per recent utterance (SenseVoice emotion and sound, owner 2026-10-27).
+        self.voice_cues: dict[str, dict[str, str]] = {}
+
+    def record_voice_cues(self, session_id: str, cues: Any) -> None:
+        if isinstance(cues, dict) and cues:
+            self.voice_cues[session_id] = {str(key): str(value) for key, value in cues.items()}
+            while len(self.voice_cues) > 8:
+                self.voice_cues.pop(next(iter(self.voice_cues)))
 
     async def _revoke_presentation_compute_lease(self, *, reason: str) -> None:
         lease = getattr(self.host, "presentation_compute_lease", None)
@@ -468,6 +476,7 @@ class InputSessionRuntime:
                                         errors=[],
                                     )
                                 session_id = new_session_id
+                            self.record_voice_cues(session_id, result.get("voice_cues"))
                             self._launch_routed_turn(user_text, session_id)
                         else:
                             host.session_log(session_id, "asr_empty_text")
@@ -986,6 +995,13 @@ class InputSessionRuntime:
             host.sessions.checkpoint_active_traces()
             host.sessions.finalize_idle_sessions(idle_timeout_ms=idle_timeout_ms)
 
+
+
+def voice_cues_context(host: Any, session_id: str | None) -> dict[str, Any]:
+    """The current utterance's voice cues for cognition, when its audio carried any."""
+    runtime = getattr(getattr(host, "input_turn_lifecycle", None), "runtime", None)
+    cues = getattr(runtime, "voice_cues", {}).get(session_id or "") if isinstance(runtime, InputSessionRuntime) else None
+    return {"voice_cues": dict(cues)} if cues else {}
 
 
 def input_session_runtime_for(host: Any) -> InputSessionRuntime:

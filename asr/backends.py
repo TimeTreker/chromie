@@ -123,6 +123,32 @@ def _extract_sherpa_result_text(result: Any) -> str:
     return _clean_sherpa_text(raw)
 
 
+# SenseVoice states the voice's emotion and any non-speech sound with each utterance. Only a
+# recognized emotion and a notable sound reach cognition; plain speech and an unknown emotion do not.
+_SENSEVOICE_EMOTIONS = {"HAPPY": "happy", "SAD": "sad", "ANGRY": "angry", "FEARFUL": "fearful",
+                        "DISGUSTED": "disgusted", "SURPRISED": "surprised"}
+_SENSEVOICE_EVENTS = {"Laughter": "laughing", "Cry": "crying", "Cough": "coughing", "Sneeze": "sneezing",
+                      "Applause": "applause", "BGM": "background music", "Breath": "heavy breathing"}
+
+
+def extract_sherpa_voice_cues(result: Any) -> dict[str, str]:
+    """How the voice sounded, from SenseVoice's own result fields, without reinterpreting the words."""
+    raw = _stringify_sherpa_result(result).strip()
+    try:
+        payload = json.loads(raw) if raw else {}
+    except json.JSONDecodeError:
+        payload = {}
+    if not isinstance(payload, dict):
+        payload = {}
+
+    def tag(name: str) -> str:
+        value = getattr(result, name, None) or payload.get(name) or ""
+        return str(value).strip().removeprefix("<|").removesuffix("|>")
+
+    cues = {"emotion": _SENSEVOICE_EMOTIONS.get(tag("emotion")), "sound": _SENSEVOICE_EVENTS.get(tag("event"))}
+    return {key: value for key, value in cues.items() if value}
+
+
 class SenseVoiceFinalBackend:
     name = "sherpa_onnx"
     mode = "final"
@@ -182,6 +208,7 @@ class SenseVoiceFinalBackend:
             "model_type": self.model_type,
             "provider": self.provider,
             "raw_result": _stringify_sherpa_result(stream.result),
+            "voice_cues": extract_sherpa_voice_cues(stream.result),
         }
 
 

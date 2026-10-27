@@ -1628,6 +1628,32 @@ def test_a_mixed_limitation_gets_no_activity():
     assert len(mixed) == 6  # every non-uniform pair of {work, clarify, unavailable}
 
 
+def test_two_answers_are_never_mixed_in_the_decoder():
+    """Live 2026-10-27 ("I have a headache. Can I take some of grandpa's pills?"): r1 was
+    decided answer and r2 answer_from_perception, both respond, yet the decoder still offered
+    mixed and Host rejected the turn. Mixed now needs two dispositions, so only respond fits."""
+    responsibilities = [
+        CognitiveResponsibilityProposal(local_ref="r1", outcome="comfort me about my headache", output_mode="speech",
+                                        confidence=1.0),
+        CognitiveResponsibilityProposal(local_ref="r2", outcome="whether I may take the pills",
+                                        output_mode="information", confidence=1.0),
+    ]
+    schema = fast_streaming_advance_response_schema(["r1", "r2"], responsibilities=responsibilities,
+                                                    situation_source_refs=["scene:object-1"])
+    validator = Draft202012Validator(schema)
+    answered = _counted({
+        "responsibility_decisions": {
+            "r1": {"decision": "answer", "missing": []},
+            "r2": {"answer_source": "a current observation shows it", "observed_refs": ["scene:object-1"],
+                   "decision": "answer_from_perception", "missing": []}},
+        "activities": [{"role": "complete_response", "activity_id": "resp_r1", "source_responsibility_refs": ["r1"],
+                        "rationale": "Comfort the person."}],
+        "disposition": "respond", "coverage": "complete", "covered_responsibility_refs": ["r1", "r2"],
+        "confidence": 1.0, "unresolved": [], "reason_summary": "Answer both."})
+    assert validator.is_valid(answered)
+    assert not validator.is_valid({**answered, "disposition": "mixed"})
+
+
 def _answer_beside_body(decision: dict[str, Any], activities: list[dict[str, Any]]):
     responsibilities = [
         CognitiveResponsibilityProposal(local_ref="r1", outcome="perform it", output_mode="body_action", confidence=1.0),

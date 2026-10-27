@@ -41,6 +41,11 @@ Successful response:
 {"type": "final", "sequence": 1, "text": "hello", "duration": 1.24}
 ```
 
+When SenseVoice recognizes the voice's emotion or a notable sound, the final result also carries
+`"voice_cues": {"emotion": "sad", "sound": "crying"}` (emotion: happy, sad, angry, fearful,
+disgusted, surprised; sound: laughing, crying, coughing, sneezing, applause, background music,
+heavy breathing). Plain speech and an unknown or neutral emotion add nothing.
+
 Failure response:
 
 ```json

@@ -74,7 +74,7 @@ from orchestrator.runtime.goal_list_console import (
     goal_list_item_text,
 )
 from orchestrator.runtime.input_turn_lifecycle import InputTurnLifecycle
-from orchestrator.runtime.input_session_runtime import input_session_runtime_for
+from orchestrator.runtime.input_session_runtime import input_session_runtime_for, voice_cues_context
 from orchestrator.runtime.playback_delivery import PlaybackDeliveryLifecycle
 from orchestrator.runtime.playback_transport import transport_for as playback_transport_for
 from orchestrator.runtime.observability_recording import (
@@ -936,9 +936,8 @@ class VoiceAssistant:
             # Model-facing Memory must come from the Memory owner's disclosure-safe
             # prompt projection, never the raw retained snapshot. The raw aggregate
             # remains internal conversation state for retention/debug ownership only.
-            "extracted_memory": (conversation.get("session_memory") or {}).get(
-                "extracted_memory", []
-            ),
+            "extracted_memory": (conversation.get("session_memory") or {}).get("extracted_memory", []),
+            **voice_cues_context(self, session_id),
             "mind": mind_context,
             "core_principles": mind_context.get("core_principles", []),
             "long_term_goals": mind_context.get("long_term_goals", []),

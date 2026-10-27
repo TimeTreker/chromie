@@ -3003,6 +3003,15 @@ def test_a_told_lasting_fact_is_decided_first_and_kept_without_asking():
                                   snapshot_digest=later.snapshot_digest(), model_call_count=1).validate_request(later)
 
 
+def test_how_the_voice_sounded_shapes_tone_only_when_the_audio_said_so():
+    """Owner decision 2026-10-27: SenseVoice's emotion and sound reach SC as voice cues."""
+    from agent.app.social_cognition import _social_voice_guard
+
+    sad = request(context={**request().context, "voice_cues": {"emotion": "sad", "sound": "crying"}})
+    assert "never quote it" in _social_voice_guard(sad)
+    assert _social_voice_guard(request()) == ""
+
+
 @pytest.mark.parametrize("kept", [False, True])
 def test_the_reply_language_defers_to_a_kept_language_preference(kept):
     """Live 2026-10-24 (memory_language_pref_zh): "以后先用中文回答我" was kept in Active Memory, but

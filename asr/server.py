@@ -127,6 +127,8 @@ async def handle_client(ws):
                         "sequence": sequence,
                         "text": text,
                         "duration": duration,
+                        **({"voice_cues": info["voice_cues"]}
+                           if isinstance(info, dict) and info.get("voice_cues") else {}),
                     }
                 )
             )
