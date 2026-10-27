@@ -1191,3 +1191,41 @@ async def test_agent_session_releases_idle_connections_before_the_agent_closes_t
         assert session.connector._keepalive_timeout < Config("app.main:app").timeout_keep_alive
     finally:
         await session.close()
+
+
+@pytest.mark.parametrize("output_mode,result_kind", [
+    ("stateful_effect", "unseen_effect"), ("information", "requested_information"), ("body_action", None)])
+def test_terminal_evidence_of_an_unseen_effect_reaches_social_cognition(output_mode, result_kind):
+    """Live 2026-10-27 (adult_shopping_list_zh): "帮我记一下，要买鸡蛋和面包。" was kept, nobody planned
+    a word about it, and the Host retained the Evidence without speech. A result the person asked to
+    be told, or an effect they cannot see happen, reaches Social Cognition; a body action they see
+    does not."""
+    from orchestrator.runtime.planner_reentry_host import requested_result_evidence_social_response
+
+    resolve = AsyncMock(return_value=(None, "told"))
+    host = SimpleNamespace(
+        cognitive_runtime=SimpleNamespace(resolve_social_interaction=resolve, interaction_ledger=None),
+        playback_delivery=SimpleNamespace(playback_generation=0), get_http_session=AsyncMock(return_value=object()),
+        session_log=Mock(), _outcome_response_is_stale=lambda **_kwargs: False)
+    source = InteractionResponse(interaction_id="keep", metadata={
+        "user_meaning_interpretation": {"responsibilities": [{"local_ref": "r1",
+            "outcome": "帮我记一下，要买鸡蛋和面包。", "output_mode": output_mode, "confidence": 1.0}]},
+        "goal_association": {"associations": [], "new_goals": [{"goal_id": "goal-keep",
+            "source_responsibility_refs": ["r1"], "source_text": "帮我记一下，要买鸡蛋和面包。"}]},
+    })
+    plan = CanonicalPlan(plan_id="keep", planner_tier="fast", disposition="execute", coverage="complete",
+                         confidence=1.0, goal_ids=["goal-keep"], steps=[CanonicalPlanStep(
+                             step_id="mem", capability_id="chromie.memory.keep", args={}, source_goal_ids=["goal-keep"])])
+    data = {"kept": True, "key": "shopping_list", "text": "要买鸡蛋和面包。", "kept_for": "for_now"}
+    response = asyncio.run(requested_result_evidence_social_response(
+        host, source_response=source, plan=plan, session_id="s", language="zh-CN",
+        user_request="帮我记一下，要买鸡蛋和面包。", goal_ids=["goal-keep"], extra_context={},
+        evidence=[ToolResultEvidence(evidence_id="kept", tool_id="chromie.memory.keep", status="completed",
+                                     data=data, output_sha256=canonical_value_sha256(data))]))
+    if result_kind is None:
+        assert response is None
+        resolve.assert_not_awaited()
+        return
+    assert response == "told"
+    [need] = resolve.await_args.kwargs["request"].communication_needs
+    assert need.kind == "result" and need.facts["result_kind"] == result_kind

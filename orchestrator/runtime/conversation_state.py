@@ -1305,7 +1305,7 @@ class ConversationStateManager:
         self._recent_tool_evidence.clear()
         self._discourse_referents.clear()
         self._discourse_focus.clear()
-        self._memory_store.clear()
+        self._memory_store.clear_conversation()
         self._persist_task_contexts_if_enabled()
         self.last_split_reason = reason
         return {

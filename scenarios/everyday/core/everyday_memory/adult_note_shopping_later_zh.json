@@ -1,0 +1,89 @@
+{
+  "schema_version": 1,
+  "kind": "chromie_general_ability_live_text",
+  "id": "adult_note_shopping_later_zh",
+  "stage": "core",
+  "difficulty": "medium",
+  "provenance": {
+    "origin": "agent_authored_common_scene",
+    "batch_id": "daily_life_v4_memory_2026_10_27",
+    "persona": "adult",
+    "derived_from_existing_scenario": false,
+    "owner_direction": "2026-10-27: remember what a person tells or asks Chromie to keep, bound to them, across conversations (knowledge base, owner loop 2 iteration 5)"
+  },
+  "rationale": "Turn 1: keeps the shopping list (eggs and bread) and says so. Turn 2, a later conversation: says it is eggs and bread.",
+  "oracle_policy": {
+    "mode": "hybrid",
+    "deterministic_sources": [
+      "typed_schema_and_runtime_contracts",
+      "safety_authorization_capability_and_execution_evidence",
+      "provenance_and_llm_integrity"
+    ],
+    "semantic_dimensions": [
+      "capability_choice",
+      "truthfulness"
+    ],
+    "semantic_blocking": true
+  },
+  "review_rubric": {
+    "judge_meaning_not_exact_wording": true,
+    "dimensions": [
+      "capability_choice",
+      "truthfulness"
+    ],
+    "primary_outcomes": [
+      "Turn 1: keeps the shopping list (eggs and bread) and says so. Turn 2, a later conversation: says it is eggs and bread."
+    ],
+    "acceptable_auxiliary": [
+      "A brief acknowledgement in the person's language."
+    ],
+    "forbidden_semantic_outcomes": [
+      "Turn 1 says she cannot remember or note it; turn 2 forgets an item, adds one or asks what it was."
+    ],
+    "verdicts": [
+      "pass",
+      "partial",
+      "fail",
+      "insufficient_evidence"
+    ]
+  },
+  "language": "zh-CN",
+  "description": "Turn 1: keeps the shopping list (eggs and bread) and says so. Turn 2, a later conversation: says it is eggs and bread.",
+  "general_ability": {
+    "memberships": [
+      {
+        "id": "everyday_memory",
+        "title": "Everyday remembering within a conversation",
+        "general_rule": "What the person told Chromie earlier in the conversation (a name, a liking, a plan, a preference) is remembered and used later.",
+        "root_cause_boundaries": [
+          "Goal Association",
+          "Memory",
+          "Social Cognition"
+        ],
+        "rationale": "Turn 1: keeps the shopping list (eggs and bread) and says so. Turn 2, a later conversation: says it is eggs and bread."
+      }
+    ]
+  },
+  "turns": [
+    {
+      "id": "turn-01",
+      "language": "zh-CN",
+      "text": "帮我记一下，明天要买鸡蛋和面包。",
+      "require_speech": true,
+      "expected_capabilities": [
+        "chromie.memory.keep"
+      ]
+    },
+    {
+      "id": "turn-02",
+      "language": "zh-CN",
+      "text": "我明天要买什么来着？",
+      "new_conversation": true,
+      "require_speech": true,
+      "expect_no_capabilities": true,
+      "expected_speech_any": [
+        "鸡蛋"
+      ]
+    }
+  ]
+}

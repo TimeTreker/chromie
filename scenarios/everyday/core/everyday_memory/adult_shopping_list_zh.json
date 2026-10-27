@@ -10,7 +10,7 @@
     "persona": "adult",
     "derived_from_existing_scenario": false
   },
-  "rationale": "Turn 2: says the list is eggs and bread.",
+  "rationale": "Turn 1: keeps the list and says so. Turn 2: says the list is eggs and bread.",
   "oracle_policy": {
     "mode": "hybrid",
     "deterministic_sources": [
@@ -31,13 +31,13 @@
       "truthfulness"
     ],
     "primary_outcomes": [
-      "Turn 2: says the list is eggs and bread."
+      "Turn 1: keeps the list and says so. Turn 2: says the list is eggs and bread."
     ],
     "acceptable_auxiliary": [
       "A brief acknowledgement in the person's language."
     ],
     "forbidden_semantic_outcomes": [
-      "Turn 2 forgets an item or adds one."
+      "Turn 1 says she cannot remember or note it; turn 2 forgets an item or adds one."
     ],
     "verdicts": [
       "pass",
@@ -47,7 +47,7 @@
     ]
   },
   "language": "zh-CN",
-  "description": "Turn 2: says the list is eggs and bread.",
+  "description": "Turn 1: keeps the list and says so. Turn 2: says the list is eggs and bread.",
   "general_ability": {
     "memberships": [
       {
@@ -59,7 +59,7 @@
           "Memory",
           "Social Cognition"
         ],
-        "rationale": "Turn 2: says the list is eggs and bread."
+        "rationale": "Turn 1: keeps the list and says so. Turn 2: says the list is eggs and bread."
       }
     ]
   },
@@ -69,7 +69,9 @@
       "language": "zh-CN",
       "text": "帮我记一下，要买鸡蛋和面包。",
       "require_speech": true,
-      "expect_no_capabilities": true
+      "expected_capabilities": [
+        "chromie.memory.keep"
+      ]
     },
     {
       "id": "turn-02",

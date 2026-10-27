@@ -1438,14 +1438,15 @@ async def requested_result_evidence_social_response(
     goal_ids: list[str],
     extra_context: dict[str, Any],
 ) -> InteractionResponse | None:
-    """Give SC terminal Evidence for a result the person asked to be told.
+    """Give SC terminal Evidence for a result the person asked to be told or cannot see.
 
     Every communication with the user goes through Social Cognition. When Activation or
     the Planner chose no next Work for terminal Evidence whose Goal carries an
-    ``information`` Responsibility, SC still receives that Evidence directly
-    with one Runtime result Need and decides how to communicate it (speech,
-    gesture, gaze). The Planner path already invokes SC itself, so this runs
-    only when that path produced nothing.
+    ``information`` Responsibility, or a ``stateful_effect`` one the person cannot see
+    happen (live 2026-10-27: "帮我记一下，要买鸡蛋和面包。" was kept in silence), SC still
+    receives that Evidence directly with one Runtime result Need and decides how to
+    communicate it (speech, gesture, gaze). The Planner path already invokes SC itself,
+    so this runs only when that path produced nothing.
     """
 
     if not evidence or not goal_ids:
@@ -1458,7 +1459,7 @@ async def requested_result_evidence_social_response(
             for item in planner_reentry_responsibilities(
                 source_response=source_response, goal_ids=[goal_id],
             )
-            if item.output_mode == "information"
+            if item.output_mode in {"information", "stateful_effect"}
         ]
         if goal_responsibilities:
             result_goal_ids.append(goal_id)
@@ -1505,6 +1506,8 @@ async def requested_result_evidence_social_response(
         }
     )
     status = aggregate_execution_status([item.status for item in evidence])
+    result_kind = ("requested_information" if any(
+        item.output_mode == "information" for item in responsibilities.values()) else "unseen_effect")
     need = SocialCommunicationNeed(
         need_id=communication_need_id(plan.plan_id, "requested_result_evidence"),
         owner="runtime",
@@ -1514,7 +1517,7 @@ async def requested_result_evidence_social_response(
         reference_id=plan.plan_id,
         facts={
             "status": status,
-            "result_kind": "requested_information",
+            "result_kind": result_kind,
             "required_result_update": True,
         },
         delivery_phase="immediate",
@@ -1547,7 +1550,7 @@ async def requested_result_evidence_social_response(
             },
             "work_result": {
                 "status": status,
-                "result_kind": "requested_information",
+                "result_kind": result_kind,
                 "evidence_refs": list(evidence_refs),
             },
         },

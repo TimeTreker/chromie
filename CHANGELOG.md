@@ -5,6 +5,21 @@ remains available in Git history.
 
 ## Unreleased
 
+### Remember what the person asks you to; a merged read keeps the place the person named (owner loop 2, iteration 5, 2026-10-27)
+
+- "帮我记一下，要买鸡蛋和面包。" is kept: the Host capability `chromie.memory.keep` (effect `memory_write`, no physical
+  effect) keeps the person's own words as their Memory, `lasting` (profile Memory, or this conversation while durable
+  Memory is off) or `for_now` (Working Memory for a day, also across conversations). `holds` is required and cited
+  (an omitted one had defaulted to for_now and kept a peanut allergy for a day), and so is its free text, which is kept
+  as said by the person (a kept "I'm allergic to peanuts." had been read as Chromie's own). Chromie had answered
+  "没法帮你记".
+- Terminal Evidence of a stateful effect the person cannot see (keeping a note) reaches Social Cognition as a result to
+  tell, as a requested information result does; the kept list had been retained in silence.
+- A read merged across Responsibilities cites a value the person said from the first served outcome that states it
+  once: "北京今天冷不冷？我出门要不要多穿点？" merged two weather reads, both outcomes said 北京, the Planner cited
+  "今天冷", the place was asked for, and Social Cognition's reuse of its acknowledgement as that question stopped the
+  iteration-4 cohort at 65/119.
+
 ### Hear how the person sounds; two answers are never "mixed" (owner loop 2, iteration 4, 2026-10-27)
 
 - SenseVoice's own emotion and notable sound (`voice_cues`: happy, sad, crying, laughing, …) travel with that

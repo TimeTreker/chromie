@@ -2094,6 +2094,63 @@ async def test_a_value_said_earlier_in_the_same_turn_is_cited_from_the_outcome(l
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("location", ["北京", "上海"])
+async def test_a_read_merged_across_responsibilities_cites_its_value_from_the_first_outcome(location):
+    """Live 2026-10-27 (elder_cold_dress_zh): "北京今天冷不冷？我出门要不要多穿点？" — two identical reads
+    (temperature, clothing advice) were merged into one serving r1 and r2, both outcomes said 北京, the
+    Planner cited "今天冷", and the place was asked for; Social Cognition then failed the turn. The
+    first served outcome holding the value once is cited; a place nobody said is still asked for."""
+    from shared.chromie_contracts.user_turn import user_turn_source_tokens
+
+    text = "北京今天冷不冷？我出门要不要多穿点？"
+    tokens = user_turn_source_tokens(text)
+
+    def span(surface):
+        start = text.index(surface)
+        found = [t for t in tokens if start <= t["start"] and t["end"] <= start + len(surface)]
+        return {"source_start_token_ref": found[0]["ref"], "source_end_token_ref": found[-1]["ref"]}
+
+    request = CognitiveWorkRequest(sid="cold", text=text, language="zh-CN", interpretation_confidence=1.0,
+        responsibilities=[
+            CognitiveResponsibilityProposal(local_ref="r1", outcome="回答北京今天的气温情况", output_mode="information",
+                                            confidence=1.0, source_evidence=span("北京今天冷不冷？")),
+            CognitiveResponsibilityProposal(local_ref="r2", outcome="根据北京的气温情况，建议用户出门时是否需要多穿点衣服",
+                                            output_mode="information", confidence=1.0,
+                                            source_evidence=span("我出门要不要多穿点？"))])
+    weather = CatalogCapability(
+        capability_id="chromie.weather.lookup", agent_id="chromie.weather", description="Retrieve a forecast.",
+        input_schema={"type": "object", "properties": {"location": {"type": "string"}}, "required": ["location"],
+                      "additionalProperties": False},
+        available=True, interaction_executable=True, prompt_tier="common", idempotent=True, side_effect_free=True,
+        safety_class="safe_read", hints={"side_effect_free": True, "resource_contract": {"provider_role": "acquire_information"},
+                                         "semantic_scope": {"responsibility_type": "acquire_and_deliver_resource",
+                                                            "resource_kinds": ["information"]}})
+    read = {"role": "capability", "capability_id": "chromie.weather.lookup", "args": {"location": location},
+            "argument_sources": {"location": span("今天冷")}}
+    raw = {"ability_needs": [{"need": "read the weather", "closest_loaded": "chromie.weather.lookup",
+                              "closest_loaded_does": "Retrieve a forecast.", "fits": True}],
+           "responsibility_decisions": {ref: {"needed_abilities_fit": True, "decision": "work", "missing": []}
+                                        for ref in ("r1", "r2")},
+           "activity_count": 2,
+           "activities": [{**read, "source_responsibility_refs": ["r1"], "activity_id": "act_weather", "depends_on": []},
+                          {**read, "source_responsibility_refs": ["r2"], "activity_id": "act_weather_advice",
+                           "depends_on": ["act_weather"]}],
+           "disposition": "execute", "coverage": "complete", "covered_responsibility_refs": ["r1", "r2"],
+           "confidence": 1.0, "unresolved": [], "reason_summary": "Read today's weather."}
+    model = _StreamingModel([json.dumps(raw)])
+    frames = [f async for f in PlannerResolver(model, _Catalog([weather])).stream_advance(request)]
+    if location == "上海":
+        assert [item.role for item in frames[-1].advance.activities] == ["clarification"]
+        return
+    assert isinstance(frames[-1], FastPlannerStreamTerminal), frames[-1]
+    [activity] = frames[-1].advance.activities
+    assert sorted(activity.source_responsibility_refs) == ["r1", "r2"]
+    cited = activity.argument_sources["location"]
+    assert cited.source_responsibility_ref == "r1"
+    assert (cited.source_start_token_ref, cited.source_end_token_ref) == ("r1.t2", "r1.t3")
+
+
+@pytest.mark.asyncio
 @pytest.mark.parametrize("location", ["上海", "北京"])
 async def test_an_outcome_citation_off_its_value_moves_to_the_value_in_that_outcome(location):
     """Live 2026-10-25 (multi_weather_followup_zh T2): for "那上海呢？" the Planner wrote location
@@ -2260,3 +2317,40 @@ def test_one_activity_for_every_work_responsibility_serves_them_all():
     validator = Draft202012Validator(schema)
     assert not validator.is_valid(output(["r1"]))
     assert validator.is_valid(output(["r1", "r2"]))
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("cited", [True, False])
+async def test_a_remember_request_is_kept_from_the_persons_words(cited):
+    """Owner decision 2026-10-27: "帮我记一下，要买鸡蛋和面包。" had no Capability, so the Planner decided
+    unavailable and Chromie said she could not remember it. Keeping it is a Memory Capability whose
+    text cites the person's own words."""
+    from agent.app.capabilities.catalog import CapabilityCatalog
+    from agent.app.capabilities.loader import build_configured_registry, parse_manifest_paths
+    from shared.chromie_contracts.user_turn import user_turn_source_tokens
+
+    keep = next(item for item in CapabilityCatalog(build_configured_registry(parse_manifest_paths("")).registry).entries()
+                if item.capability_id == "chromie.memory.keep")
+    text = "帮我记一下，要买鸡蛋和面包。"
+    tokens = user_turn_source_tokens(text)
+    start = text.index("要买")
+    span = [t["ref"] for t in tokens if start <= t["start"] and t["end"] <= text.index("。")]
+    request = CognitiveWorkRequest(sid="keep", text=text, language="zh-CN", interpretation_confidence=1.0,
+        responsibilities=[CognitiveResponsibilityProposal(
+            local_ref="r1", outcome=text, output_mode="stateful_effect", confidence=1.0,
+            source_evidence={"source_start_token_ref": tokens[0]["ref"], "source_end_token_ref": tokens[-1]["ref"]})])
+    activity = {"role": "capability", "source_responsibility_refs": ["r1"], "capability_id": "chromie.memory.keep",
+                "activity_id": "act_keep", "args": {"holds": "for_now", "key": "shopping_list",
+                                                     "text": "The person needs eggs and bread."},
+                "depends_on": []}
+    if cited:
+        cited_span = {"source_start_token_ref": span[0], "source_end_token_ref": span[-1]}
+        activity["argument_sources"] = {"holds": cited_span, "text": cited_span}
+    raw = {"ability_needs": [{"need": "remember a note", "closest_loaded": "chromie.memory.keep",
+                              "closest_loaded_does": "Keep one thing", "fits": True}],
+           "responsibility_decisions": {"r1": {"needed_abilities_fit": True, "decision": "work", "missing": []}},
+           "activity_count": 1, "activities": [activity], "disposition": "execute", "coverage": "complete",
+           "covered_responsibility_refs": ["r1"], "confidence": 1.0, "unresolved": [], "reason_summary": "Keep it."}
+    model = _StreamingModel([json.dumps(raw, ensure_ascii=False)])
+    frames = [f async for f in PlannerResolver(model, _Catalog([keep])).stream_advance(request)]
+    assert isinstance(frames[-1], FastPlannerStreamTerminal) is cited, frames[-1]

@@ -14,11 +14,10 @@ ordered open work are in [STATUS](docs/STATUS.md).
   revision pinned by `capabilities/soridormi.json` and `release/compatibility.json`. The
   MCP container mounts its `src`, so a `docker restart soridormi-runtime-mcp` loads it and
   resets the scene (user at -90 degrees, 1.5 m).
-- Live Agent: `chromie-agent:latest` = `it4-cues-20261027` (`43d59dc4a3df`), built from this delivery's source and
+- Live Agent: `chromie-agent:latest` = `it5-keep2-20261027` (`3f0b481fd695`), built from this delivery's source and
   recreated with the quiet-mode timeout overrides; `--verify-agent-source` matched
-  (`.chromie/acceptance/it4-cues-20261027/deploy/agent-source-verify.json`). Previous image: `it3-person-20261027` (`971e6024cf3f`).
-  The ASR image carries `voice_cues` only after `./scripts/compose.sh build chromie-asr` (proxy variables unset) and a
-  recreate of `chromie-asr`; the live-text cohort does not use ASR.
+  (`.chromie/acceptance/it5-keep-20261027/deploy2/agent-source-verify.json`). Previous image: `it4-cues-20261027` (`43d59dc4a3df`).
+  The ASR image carries `voice_cues` (rebuilt and recreated 2026-10-27); the live-text cohort does not use ASR.
 - The host rebooted at 19:35 on 2026-10-26: the Soridormi scene was restarted detached (log
   `.chromie/acceptance/it1-memory-20261026/soridormi-run.log`); CPU turbo came back on (`no_turbo=0`) while the platform
   stays quiet/power-saver, so the owner re-runs `sudo .chromie/quiet-mode/quiet-mode.sh on`; deployments keep the
@@ -30,7 +29,9 @@ ordered open work are in [STATUS](docs/STATUS.md).
 - Workflow corpus: freeze 47 (`bdb8db08…`; scripts in `.chromie/acceptance/thirsty-offer-20261021/freeze47/`). Restore it with
   `python -m benchmarks.regression restore-fixtures`; do not untar `frozen.tar.xz` over
   `workflow_scenarios/` (its inner `manifest.json` lacks the storage identity).
-- Evidence (README in each): `.chromie/acceptance/it4-cues-20261027/` (owner loop 2 iteration 4),
+- Evidence (README in each): `.chromie/acceptance/it5-keep-20261027/` (owner loop 2 iteration 5; `focus/` is a
+  diagnostic run on the uncommitted source), `it4-cues-20261027/` (iteration 4; `cohort/` stopped at 65/119 on a merged
+  read's lost place, judged by stage with the stop's module workflow),
   `it3-person-20261027/` (iteration 3; `cohort/` stopped at 89/119 on a streaming Planner decoder state, judged by stage),
   `it2-ground-20261027/` (iteration 2; `cohort/` stopped at 70/119, judged by stage in its README),
   `it1-memory-20261026/` (iteration 1: focused runs of the five-turn umbrella case; `cohort/` stopped at 30/119), `personas2-20261026/` (b78e89457: stopped at 10/119 on a
@@ -55,7 +56,7 @@ ordered open work are in [STATUS](docs/STATUS.md).
   `playback-race-20261020/`, `answer-source-20261020/`, `gaze-turn-20261020/`, `said-now-20261020/`,
   `decided-activity-20261020/`, `main-03974435e-20261020/`.
   Bundles `~/Downloads/chromie_debug_bundle_2026102*.tar.gz`. Earlier runs: `.chromie/acceptance/everyday-20261016/`.
-- Last gate (this delivery's source, clean worktree, GPU host, 2026-10-27): pytest 4,072 passed + 5 skipped (`xgrammar` not installed), benchmarks 172, legacy Agent tests 20; policies, docs, test ownership, ruff, mypy and runtime-structure ratchets pass (the `orchestrator/orchestrator.py` line ratchet is lowered to 1993). Strict replay was not rerun; its last pass is 6,000/6,000 on freeze 47 (2026-10-23). The gate needs `anthropic==1.15.0` from `requirements-test.txt` (`INSTALL_TEST_DEPS=1`).
+- Last gate (this delivery's source, GPU host, 2026-10-27): pytest 4,081 passed + 5 skipped (`xgrammar` not installed), benchmarks 172, legacy Agent tests 20; policies, docs, test ownership, ruff, mypy and runtime-structure ratchets pass. Strict replay was not rerun; its last pass is 6,000/6,000 on freeze 47 (2026-10-23). The gate needs `anthropic==1.15.0` from `requirements-test.txt` (`INSTALL_TEST_DEPS=1`).
 - `start_chromie.sh --build` reuses the layer cache, takes package downloads from BuildKit
   cache mounts, and recreates only the services whose image changed. The first build
   after this change reruns the cache-mount layers once.

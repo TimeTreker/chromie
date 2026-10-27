@@ -1632,10 +1632,13 @@ def reanchor_turn_citations_to_outcomes(
     "there" to Beijing in its outcome; the Planner wrote location "Beijing" but cited the turn's
     "there", and Host rejected the turn. The turn-versus-outcome choice was a 0.1-nat near-tie.
     Only an information read's free-text value whose cited turn words lack it, which occurs
-    verbatim exactly once in the outcomes of the Responsibilities that Activity serves, and which
+    verbatim exactly once in an outcome of a Responsibility that Activity serves, and which
     the talk already said (this turn outside the cited span included: live 2026-10-27, "我明天要去广州
     出差，那边热不热？" cited "那边" for 广州), moves to that outcome span; the value is unchanged and
-    validation follows. A value that only the outcome holds would let UMI override the person's own words
+    validation follows. A read merged across Responsibilities serves outcomes that each state the
+    value, so the first such outcome in the Activity's Responsibility order is cited (live 2026-10-27,
+    "北京今天冷不冷？我出门要不要多穿点？": the merged read found 北京 in both outcomes, stayed on "今天冷",
+    and asked where). A value that only the outcome holds would let UMI override the person's own words
     ("What is the weather in Paris?" with an outcome saying Chongqing still fails closed). An
     outcome citation whose tokens miss its value moves to that value's single verbatim run in the
     same outcome.
@@ -1677,9 +1680,8 @@ def reanchor_turn_citations_to_outcomes(
                     continue
                 if _cited_span_supports_string(value, quote) or not any(value in text for text in earlier_talk):
                     continue
-                found = [
-                    match for ref in activity.source_responsibility_refs if ref in outcomes
-                    for match in _verbatim_outcome_spans(ref, outcomes[ref], value)]
+                found = next((runs for ref in activity.source_responsibility_refs if ref in outcomes
+                              if len(runs := _verbatim_outcome_spans(ref, outcomes[ref], value)) == 1), [])
                 normalization = "turn_citation_reanchored_to_outcome"
             if len(found) == 1:
                 sources[parameter] = found[0]

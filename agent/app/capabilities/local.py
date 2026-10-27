@@ -419,9 +419,10 @@ def chromie_manifests(
 
     memory = AgentManifest(
         agent_id="chromie.memory",
-        display_name="Chromie Verified Tool Memory",
+        display_name="Chromie Memory",
         description=(
-            "Host-owned read-only retrieval of one previously verified tool result. "
+            "Host-owned Memory: exact retrieval of one previously verified tool result, and "
+            "keeping what a person asks Chromie to remember as that person's Memory. "
             "It never resolves pronouns or chooses a location; Goal Association must "
             "already provide exact semantic bindings."
         ),
@@ -543,7 +544,71 @@ def chromie_manifests(
                         "and is retrieving that result. Do not state the result before retrieval."
                     ),
                 },
-            )
+            ),
+            ToolCapability(
+                name="chromie.memory.keep",
+                agent_id="chromie.memory",
+                display_name="Keep something the person asked Chromie to remember",
+                description=(
+                    "Keep one thing the person asks Chromie to remember, or tells her to keep for "
+                    "them, as that person's Memory: a lasting fact (their dog's name, an allergy, a "
+                    "birthday) or something that holds for now (a shopping list, where they put "
+                    "their keys). A later thing under the same key replaces it. This is how Chromie "
+                    "remembers on request; it never stores what the person did not say."
+                ),
+                input_schema={
+                    "type": "object",
+                    "properties": {
+                        # Required, so the decoder states it (live 2026-10-27: an omitted holds
+                        # defaulted to for_now and a peanut allergy was kept for one day).
+                        "holds": {
+                            "type": "string", "enum": ["lasting", "for_now"],
+                            "description": (
+                                "lasting for something about the person that stays true (an allergy, "
+                                "a pet's name, a birthday); for_now for what holds only for now (a "
+                                "shopping list, where they put their keys); cite the words that show which."
+                            ),
+                        },
+                        "key": {
+                            "type": "string", "pattern": "^[a-z][a-z_]{1,40}$", "default": "note",
+                            "description": "Short snake_case name of what it is, such as shopping_list or dog_name.",
+                        },
+                        "text": {
+                            "type": "string", "minLength": 3, "maxLength": 160,
+                            "description": "What to remember, in the person's own words from this turn.",
+                        },
+                    },
+                    "required": ["holds", "text"],
+                    "additionalProperties": False,
+                },
+                output_schema={
+                    "type": "object",
+                    "properties": {
+                        "kept": {"type": "boolean"},
+                        "key": {"type": "string"},
+                        "text": {"type": "string"},
+                        "kept_for": {"type": "string", "enum": ["long_term", "this_conversation", "for_now"]},
+                    },
+                    "required": ["kept", "key", "text", "kept_for"],
+                    "additionalProperties": False,
+                },
+                effects=["memory_write"],
+                safety_class="low_risk_action",
+                execution=ExecutionPolicy(
+                    can_run_parallel=True, timeout_s=2.0, idempotent=True, side_effect_free=False,
+                ),
+                default_failure_policy=FailurePolicy(strategy="stop_and_report"),
+                llm_hints={
+                    "interaction_executable": True,
+                    "prompt_tier": "common",
+                    "prompt_tier_reason": "People ask a family member to remember things every day.",
+                    "when_to_use": (
+                        "Use when the person asks Chromie to remember, note or keep something for them."
+                    ),
+                    "semantic_type": "memory_keep",
+                    "semantic_scope": {"output_modes": ["stateful_effect"]},
+                },
+            ),
         ],
     )
 

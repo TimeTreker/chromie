@@ -156,6 +156,7 @@ A Capability is the executable atomic contract. Examples are:
 
 - `chromie.weather.lookup`;
 - `chromie.memory.retrieve_verified_tool_result`;
+- `chromie.memory.keep`;
 - `soridormi.look_direction`;
 - `soridormi.walk_velocity`.
 
