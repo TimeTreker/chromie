@@ -79,9 +79,17 @@ Evidence and per-run judgments: `.chromie/acceptance/iter8-20261026/`, `iter7-20
   whole shape in the SGLang transport (a requirement change had lost `source_responsibility_refs`). The live-text
   harness gives each case its own profile store and supports `new_conversation` turns. Live focused runs found and
   removed: an SC-time need changed the reserved Plan fingerprint; a confirmation need doubled the evidence-answer
-  contract past the prompt budget; a question appended to a reused acknowledgement broke its identity. Open: a
-  Latin placeholder location ("unknown") passes the cross-script exemption and was geocoded to Bangladesh (next
-  iteration); UMI sometimes reads "我在上海上班。" as a statement only and drops "明天" in a follow-up. Next: the
+  contract past the prompt budget; a question appended to a reused acknowledgement broke its identity. Its cohort
+  (`it1-memory-20261026/cohort/`) stopped at 30/119: smoke 15/15, core 13/15 judged; the umbrella case's
+  "那下班的时候呢？" failed closed because the working and long-term copies of the kept fact both held 上海.
+  Iteration 2: kept facts count once per key; a cross-script value stands only where a served outcome or a kept
+  fact states it (live outcomes state the value in its own language in 122 of 122 reads; "unknown" had been
+  geocoded to Bangladesh and reported); a required free-text input of an information read that no source states
+  becomes that input's clarification (`ungrounded_input_clarified`) instead of a read or a failure; the turn whose
+  words answered a Goal's open input gap (Goal Association `resolved_gap_ids`) owns the value it states. UMI read
+  "我在上海上班。" as a statement (speech -0.00 vs information -5.84 nats on the live request): the old question was
+  untyped speech after a failed read, so the open Goal had no pending clarification; the typed question is the
+  expected repair. Next: the
   complete 119-case cohort, judged by stage; then latency (prefix caching, prompt size, serial UMI
   and SC ingress), then the standing-attention skill plan (`.chromie/plans/`). Open judged failures: wave_friend
   greeting, ability self-description, a confirmed wrong sum, a delayed wave; expression use under the lively style.

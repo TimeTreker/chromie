@@ -1068,6 +1068,24 @@ class PlannerBindingRepresentationTests(unittest.TestCase):
                 authoritative_goals=[_weather_goal()],
             )
 
+    def test_the_turn_that_answered_a_goals_input_gap_owns_its_value(self):
+        """Live 2026-10-27 (adult_umbrella_no_city_zh T2): Chromie asked where, the person said
+        "我在上海上班。", Goal Association resolved the open gap, and the read failed closed because
+        the quote was not in the Goal's description."""
+        goal = _weather_goal()
+        raw = _weather_output().model_dump(mode="python")
+        raw["steps"][0]["args"]["location"] = "上海"
+        raw["parameter_resolutions"].append({
+            "step_id": "weather", "parameter": "location", "strategy": "user_supplied", "value": "上海",
+            "confidence": 1.0, "blocking": False, "rationale": "Answered the question where.",
+            "source_goal_ids": ["goal-weather"], "source_quote": "我在上海上班。"})
+        output = PlannerModelOutput.model_validate(raw)
+        with self.assertRaisesRegex(ValueError, "must cite an exact owned Goal requirement"):
+            validate_user_supplied_parameter_provenance(output, authoritative_goals=[goal],
+                                                        answer_text="我在上海上班。")
+        validate_user_supplied_parameter_provenance(output, authoritative_goals=[goal], answer_text="我在上海上班。",
+                                                    answered_goal_ids={"goal-weather"})
+
     def test_string_user_supplied_resolution_cannot_replace_typed_location(self):
         goal = _weather_goal()
         goal["object"]["bindings"]["location"] = {

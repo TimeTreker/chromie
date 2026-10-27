@@ -5,6 +5,17 @@ remains available in Git history.
 
 ## Unreleased
 
+### Ask for a place nobody named instead of reading an invented one (owner loop 2, iteration 2, 2026-10-27)
+
+- A cross-script value (a Latin location for a Chinese turn) stands only where a served outcome or a kept fact
+  states it; "unknown" had been geocoded to Unknown, Bangladesh, and that weather reported as the person's.
+- A required free-text input of an information read that no source states becomes that input's question to the
+  person (`ungrounded_input_clarified`) instead of a read or a failed turn.
+- A kept fact counts once per key across its working and long-term copies.
+- `adult_umbrella_no_city_zh` (five turns across two conversations) moves to the challenge stage.
+- The turn whose words answered a Goal's open input gap (resolved by Goal Association) owns the value it states;
+  "我在上海上班。" had answered where, and the Goal-bound read failed closed.
+
 ### Chromie remembers where you work, with your yes (owner loop 2, iteration 1, 2026-10-26)
 
 - Social Cognition notices a lasting fact the person tells about their life (`personal_fact`); Chromie keeps it for

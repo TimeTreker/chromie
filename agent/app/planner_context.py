@@ -204,6 +204,12 @@ def goal_association_prompt_projection(
     return projection
 
 
+def gap_answered_goal_ids(context: dict[str, Any] | None) -> set[str]:
+    """Goals whose open input gap Goal Association found answered by the current turn."""
+    return {str(goal_id) for item in goal_association_prompt_projection(context).get("associations") or []
+            if item.get("resolved_gap_ids") for goal_id in item.get("target_goal_ids") or []}
+
+
 def expected_goal_ids(context: dict[str, Any] | None) -> list[str]:
     """Return the ordered canonical goal IDs accepted by Goal Association."""
 

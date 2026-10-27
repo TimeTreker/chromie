@@ -64,9 +64,11 @@ repairs and owner decisions in force.
    on an open-meteo geocoding timeout (a service failure). Owner loop 2 (6 iterations, 2026-10-26), iteration 1:
    Chromie keeps a lasting fact the person told (where they work) for the conversation, asks once whether to
    remember it, and keeps it as consent-bound profile Memory on their yes; a later conversation used it for
-   "明天早上上班要不要带伞？" (focused run `it1-memory-20261026/focused/`). **Truthfulness defect, next:** a
-   Latin placeholder location in a Chinese turn passes the cross-script citation exemption, and the geocoder
-   matched "unknown" to Unknown, Bangladesh, whose weather was reported as the person's. The streaming Planner still decides
+   "明天早上上班要不要带伞？" (focused run `it1-memory-20261026/focused/`); its cohort stopped at 30/119 on the same
+   case (a kept fact counted twice across memory tiers). Iteration 2: a cross-script value stands only where a
+   served outcome or a kept fact states it (a Latin placeholder "unknown" had been geocoded to Bangladesh and its
+   weather reported as the person's), and a required read input that no source states is asked for instead of
+   read (the umbrella question now asks where first); a kept fact counts once per key. The streaming Planner still decides
    work with an assumed place for an unstated workplace (clarify trails by 12-15 nats; four prompt and decision-field
    probes moved nothing); the owner wants Chromie to ask where the person works and remember it. Open judged failures: "Say hi to my friend with a
    wave!" waves without a greeting; "你都会做些什么呀？" describes chatting and small tasks rather than real abilities;

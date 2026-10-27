@@ -204,21 +204,25 @@ def test_goal_and_planner_prompts_forbid_scope_narrowing() -> None:
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("text,outcome,location,cited,bindings,accepted", [
-    ("What is the weather today in Chongqing?", "what the weather is today in Chongqing", "Chongqing", "Chongqing", {}, True),
-    ("明天重庆天气怎么样？", "明天重庆天气怎么样", "重庆", "重庆", {}, True),
-    ("Can you help me check the weather today in chongqing?", "Provide the current weather conditions for Chongqing as of today.", "Chongqing", "chongqing", {}, True),
-    ("今天北京下雨了没有？", "告诉用户北京今天有没有下雨", "Beijing", "北京", {}, True),
-    ("What is the weather today in Chongqing?", "what the weather is today in Chongqing", "Chongqing", None, {}, False),
-    ("What is the weather in Paris?", "what the weather is in Chongqing", "Chongqing", "Paris", {}, False),
-    ("Check Chongqing weather and Beijing time.", "determine Beijing time", "Chongqing", "Chongqing", {}, False),
-    ("Check Chongqing weather.", "check Chongqing weather", "Chong", "Chongqing", {}, False),
-    ("Compare Beijing and Chongqing weather.", "compare Beijing and Chongqing weather", "Beijing", None, {"location": "Chongqing"}, False),
+@pytest.mark.parametrize("text,outcome,location,cited,bindings,expected", [
+    ("What is the weather today in Chongqing?", "what the weather is today in Chongqing", "Chongqing", "Chongqing", {}, "execute"),
+    ("明天重庆天气怎么样？", "明天重庆天气怎么样", "重庆", "重庆", {}, "execute"),
+    ("Can you help me check the weather today in chongqing?", "Provide the current weather conditions for Chongqing as of today.", "Chongqing", "chongqing", {}, "execute"),
+    ("今天北京下雨了没有？", "告诉用户Beijing今天有没有下雨", "Beijing", "北京", {}, "execute"),
+    ("今天北京下雨了没有？", "告诉用户北京今天有没有下雨", "Beijing", "北京", {}, "clarify"),
+    ("What is the weather today in Chongqing?", "what the weather is today in Chongqing", "Chongqing", None, {}, "unavailable"),
+    ("What is the weather in Paris?", "what the weather is in Chongqing", "Chongqing", "Paris", {}, "clarify"),
+    ("Check Chongqing weather and Beijing time.", "determine Beijing time", "Chongqing", "Chongqing", {}, "unavailable"),
+    ("Check Chongqing weather.", "check Chongqing weather", "Chong", "Chongqing", {}, "clarify"),
+    ("Compare Beijing and Chongqing weather.", "compare Beijing and Chongqing weather", "Beijing", None, {"location": "Chongqing"}, "unavailable"),
 ])
-async def test_fast_query_location_cites_span_of_own_intent_and_original_source(text, outcome, location, cited, bindings, accepted):
+async def test_fast_query_location_cites_span_of_own_intent_and_original_source(text, outcome, location, cited, bindings, expected):
     # A required free-text query input must cite its span: the decoder cannot
-    # enforce literal copies, and a translated city ("Beijing" for 北京) stays
-    # provable. Host still rejects same-script values the cited words lack.
+    # enforce literal copies. A translated city ("Beijing" for 北京) stands only where a
+    # same-script trusted text (the served outcome, a kept fact) states it; a value its
+    # sources do not state is asked for, never read (live 2026-10-26: "unknown" was read and
+    # geocoded to Bangladesh). Live outcomes state the value in its own language (122 of 122
+    # reads), so an outcome in the other language now costs one question.
     from tests.planner_test_support import WeatherCatalog, PlannerResolver as StreamingResolver
     from shared.chromie_contracts.user_turn import user_turn_source_tokens
 
@@ -260,11 +264,12 @@ async def test_fast_query_location_cites_span_of_own_intent_and_original_source(
         for item in catalog.items
     ]
     advance = await StreamingResolver(candidate, catalog).resolve_advance(request)
-    assert (advance.disposition == "execute") is accepted, advance.metadata
-    if accepted:
+    assert advance.disposition == expected, advance.metadata
+    if expected == "execute":
         assert advance.activities[0].args["location"] == location
+    elif expected == "clarify":
+        assert [item.role for item in advance.activities] == ["clarification"]
     else:
-        assert advance.disposition == "unavailable"
         assert not advance.activities
     assert len(candidate.prompts) == 1
 

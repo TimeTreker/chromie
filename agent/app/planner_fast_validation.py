@@ -27,6 +27,7 @@ from shared.chromie_contracts.user_turn import (
 )
 from shared.chromie_contracts.plan import (
     argument_source_span,
+    FastPlannerInputNeed,
     FastPlannerResponseNeed,
     FastPlannerUnavailableNeed,
     CanonicalPlan,
@@ -34,6 +35,7 @@ from shared.chromie_contracts.plan import (
     FastPlannerResponsibilityArgumentSource,
     FastPlannerSituationArgumentSource,
     FastPlannerProgressAct,
+    PlannerInformationGap,
     responsibility_outcome_source_tokens,
     validate_communicative_activity_identity,
 )
@@ -283,25 +285,33 @@ def _contains_exact_material_value(container: Any, expected: Any) -> bool:
     return False
 
 
-def _cited_span_supports_string(value: str, quote: str) -> bool:
+def _unsegmented(text: str) -> bool:
+    return any("㐀" <= ch <= "鿿" or "豈" <= ch <= "﫿" for ch in text)
+
+
+def _stands_in(value: str, text: str) -> bool:
+    """The value as an independent token run of a same-script text ("Chong" never borrows "Chongqing")."""
+    if _unsegmented(value):
+        return value in text
+    return re.search(
+        r"(?<![0-9a-z])" + re.escape(value.casefold()) + r"(?![0-9a-z])", text.casefold()
+    ) is not None
+
+
+def _cited_span_supports_string(value: str, quote: str, witnesses: list[str] | None = None) -> bool:
     """Check a cited free-text value representationally, never semantically.
 
     A same-script value must appear in its cited span as an independent token run
     (so "Chong" or a sibling city cannot borrow a span). A cross-script rendering,
-    such as a translated place name, cannot be checked mechanically; its span still
-    proves where the value came from.
+    such as a translated place name, cannot be checked against the span; with
+    ``witnesses`` it must stand verbatim in one of those same-script trusted texts
+    (the served outcomes, a kept fact). Live 2026-10-26: "unknown" cited from
+    "明天早上上班要不要带伞？" was geocoded to Unknown, Bangladesh, and reported.
     """
 
-    def unsegmented(text: str) -> bool:
-        return any("㐀" <= ch <= "鿿" or "豈" <= ch <= "﫿" for ch in text)
-
-    if unsegmented(value) != unsegmented(quote):
-        return True
-    if unsegmented(value):
-        return value in quote
-    return re.search(
-        r"(?<![0-9a-z])" + re.escape(value.casefold()) + r"(?![0-9a-z])", quote.casefold()
-    ) is not None
+    if _unsegmented(value) != _unsegmented(quote):
+        return witnesses is None or any(_stands_in(value, text) for text in witnesses)
+    return _stands_in(value, quote)
 
 
 def _source_numbers(value: Any) -> set[Decimal]:
@@ -1265,7 +1275,9 @@ def validate_fast_advance_output(
                         and parameter_schema.get("type") == "string"
                         and not parameter_schema.get("enum")
                         and isinstance(value, str)
-                        and not _cited_span_supports_string(value, cited_quotes[parameter])
+                        and not _cited_span_supports_string(value, cited_quotes[parameter], witnesses=[
+                            *(by_ref[ref].outcome for ref in activity.source_responsibility_refs),
+                            *person_told_memory_texts(request.context)])
                     ):
                         raise AuthoritativeGroundingValidationError(
                             "Planner cited span does not contain its string value: "
@@ -1684,8 +1696,11 @@ def person_told_memory_texts(context: dict[str, Any]) -> list[str]:
     memory = context.get("session_memory")
     active = memory.get("active_memory") if isinstance(memory, dict) else None
     entries = active.get("entries") if isinstance(active, dict) else None
-    return [str(entry.get("text") or "") for entry in project_active_memory_for_role(
-        entries if isinstance(entries, list) else [], role="planner") if entry.get("kind") == "fact" and entry.get("key")]
+    # One fact per key: its working and long-term copies are the same fact (live 2026-10-27: both held 上海,
+    # the rule asked for exactly one, and "那下班的时候呢？" failed closed).
+    facts = {str(entry["key"]): str(entry.get("text") or "") for entry in reversed(project_active_memory_for_role(
+        entries if isinstance(entries, list) else [], role="planner")) if entry.get("kind") == "fact" and entry.get("key")}
+    return list(facts.values())
 
 
 def reanchor_turn_citations_to_memory(
@@ -1731,6 +1746,88 @@ def reanchor_turn_citations_to_memory(
     if not repairs:
         return output, []
     return output.model_copy(update={"activities": activities}), repairs
+
+
+def clarify_ungrounded_information_inputs(
+    output: FastPlannerAdvanceModelOutput, *, request: CognitiveWorkRequest,
+    responsibilities: list[CognitiveResponsibilityProposal], capabilities: list[dict[str, Any]],
+) -> tuple[FastPlannerAdvanceModelOutput, list[dict[str, Any]]]:
+    """Ask for a required read input that no source states instead of reading an invented one.
+
+    Live 2026-10-26 (adult_umbrella_no_city_zh): for "明天早上上班要不要带伞？" the Planner read the
+    weather for "current_location" and, in a later conversation, for "unknown", which was geocoded
+    to Unknown, Bangladesh, and reported as the person's weather. A required free-text input of an
+    information read that neither its cited same-script words, the served outcomes nor a kept fact
+    state becomes that input's question to the person, and the read's Responsibilities are decided
+    clarify (a genuine user-resolvable clarification, never an invented value; the owner wants
+    Chromie to ask where the person works). The value is never guessed or replaced.
+    """
+
+    by_id = {str(item.get("capability_id") or ""): item for item in capabilities if isinstance(item, dict)}
+    by_ref = {item.local_ref: item for item in responsibilities}
+    kept = person_told_memory_texts(request.context)
+    depended = {key for activity in output.activities for key in getattr(activity, "depends_on", None) or []}
+    gaps: dict[str, list[str]] = {}
+    for activity in output.activities:
+        definition = by_id.get(getattr(activity, "capability_id", "")) or {}
+        refs = set(activity.source_responsibility_refs)
+        if (activity.role != "capability" or not fast_capability_acquires_information(definition)
+                or activity.activity_id in depended or not refs <= set(by_ref)
+                or any(other is not activity and refs & set(other.source_responsibility_refs)
+                       for other in output.activities)):
+            continue
+        input_schema = definition.get("input_schema") or {}
+        properties = input_schema.get("properties") or {}
+        bound = {name for ref in refs for name in by_ref[ref].bindings}
+        witnesses = [*(by_ref[ref].outcome for ref in refs), *kept]
+        for parameter in input_schema.get("required") or []:
+            value, schema = activity.args.get(parameter), properties.get(parameter) or {}
+            span = activity.argument_sources.get(parameter)
+            if (parameter in bound or not isinstance(value, str) or schema.get("type") != "string"
+                    or schema.get("enum") or "default" in schema or isinstance(span, FastPlannerSituationArgumentSource)):
+                continue
+            if span is None:
+                grounded = any(_stands_in(value, text) for text in [*witnesses, request.original_user_text])
+            else:
+                text = (by_ref[span.source_responsibility_ref].outcome
+                        if isinstance(span, FastPlannerResponsibilityArgumentSource) and span.source_responsibility_ref in by_ref
+                        else request.original_user_text)
+                try:
+                    quote = resolve_user_turn_source_span(text, argument_source_span(span))
+                except ValueError:
+                    continue  # a malformed citation stays a validation failure
+                grounded = _cited_span_supports_string(value, quote, witnesses=witnesses)
+            if not grounded:
+                gaps.setdefault(activity.activity_id, []).append(str(parameter))
+    if not gaps:
+        return output, []
+    activities: list[Any] = []
+    clarified_refs: set[str] = set()
+    for activity in output.activities:
+        if activity.activity_id not in gaps:
+            activities.append(activity)
+            continue
+        clarified_refs |= set(activity.source_responsibility_refs)
+        activities.append(FastPlannerInputNeed(
+            role="clarification", activity_id="clarify_" + activity.activity_id,
+            source_responsibility_refs=list(activity.source_responsibility_refs),
+            information_gaps=[PlannerInformationGap(
+                gap_id=f"{activity.activity_id}:{parameter}", required_for=[parameter],
+                description=(f"{parameter} for {activity.capability_id} is stated by neither the person, "
+                             "the conversation nor what Chromie keeps"),
+                preferred_resolution="ask_user", source_kind="execution_input",
+                source_reference=activity.capability_id,
+                resolution_sources_considered=["authoritative_context", "capability_schema"],
+            ) for parameter in gaps[activity.activity_id]]))
+    decisions = {ref: (decision.model_copy(update={"decision": "clarify", "missing": []})
+                       if ref in clarified_refs else decision)
+                 for ref, decision in output.responsibility_decisions.items()}
+    roles = {activity.role for activity in activities}
+    disposition = "clarify" if roles == {"clarification"} else "mixed"
+    repairs = [{"normalization": "ungrounded_input_clarified", "activity_id": key, "parameters": value}
+               for key, value in gaps.items()]
+    return output.model_copy(update={"activities": activities, "responsibility_decisions": decisions,
+                                     "disposition": disposition}), repairs
 
 
 def _verbatim_outcome_spans(ref: str, outcome: str, value: str) -> list[FastPlannerResponsibilityArgumentSource]:

@@ -1884,18 +1884,18 @@ def validate_goal_binding_argument_grounding(
 
 
 def validate_user_supplied_parameter_provenance(
-    output: PlannerModelOutput,
-    *,
-    authoritative_goals: list[dict[str, Any]],
+    output: PlannerModelOutput, *, authoritative_goals: list[dict[str, Any]],
+    answer_text: str = "", answered_goal_ids: set[str] | frozenset[str] = frozenset(),
 ) -> None:
     """Require non-numeric ``user_supplied`` values to have owned Goal evidence.
 
     A Planner may map a Goal binding to a differently named Capability argument,
     but it cannot manufacture a material string/entity value and label it as user
     supplied. An exact literal in both the complete Goal and its source can also
-    establish provenance without a duplicate UMI classification. Numeric provenance
-    retains its older dedicated validator because it
-    also accounts for explicit numeric literals during the binding migration.
+    establish provenance without a duplicate UMI classification. The current turn's
+    words also own a Goal whose open input gap they answered (``answered_goal_ids``,
+    from Goal Association; live 2026-10-27: "我在上海上班。" answered where, and the read failed
+    closed). Numeric provenance keeps its older dedicated validator.
     """
 
     if output.disposition not in {"execute", "mixed"}:
@@ -1911,11 +1911,10 @@ def validate_user_supplied_parameter_provenance(
             resolution.strategy not in {"semantic_realization", "user_supplied"} or step is None
             or not resolution.source_goal_ids
             or not set(resolution.source_goal_ids).issubset(step.source_goal_ids)
-            or any(
-                goal_id not in goals or not intent_source_quote(
-                    resolution.source_quote, outcome=str(goals[goal_id].get("description") or ""),
-                ) for goal_id in resolution.source_goal_ids
-            )
+            or any(goal_id not in goals or not (
+                intent_source_quote(resolution.source_quote, outcome=str(goals[goal_id].get("description") or ""))
+                or (goal_id in answered_goal_ids and intent_source_quote(resolution.source_quote, outcome=answer_text))
+            ) for goal_id in resolution.source_goal_ids)
         ):
             raise ValueError("Planner argument source must cite an exact owned Goal requirement")
         if resolution.strategy == "user_supplied" and not (

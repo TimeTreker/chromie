@@ -2009,8 +2009,9 @@ async def test_a_value_resolved_from_earlier_talk_is_cited_from_the_outcome(loca
     model = _StreamingModel([json.dumps(raw)])
     frames = [f async for f in PlannerResolver(model, _Catalog([weather])).stream_advance(request)]
     if location == "Shanghai" or not earlier:
-        # Not resolved from earlier talk: the person's own words keep authority.
-        assert isinstance(frames[-1], FastPlannerStreamFailure)
+        # Not resolved from earlier talk: the person's own words keep authority, so the place is
+        # asked for instead of read (2026-10-26; earlier this failed closed).
+        assert [item.role for item in frames[-1].advance.activities] == ["clarification"]
         return
     assert isinstance(frames[-1], FastPlannerStreamTerminal), frames[-1]
     cited = frames[-1].advance.activities[0].argument_sources["location"]
@@ -2056,7 +2057,7 @@ async def test_an_outcome_citation_off_its_value_moves_to_the_value_in_that_outc
     model = _StreamingModel([json.dumps(raw)])
     frames = [f async for f in PlannerResolver(model, _Catalog([weather])).stream_advance(request)]
     if location == "北京":
-        assert isinstance(frames[-1], FastPlannerStreamFailure)
+        assert [item.role for item in frames[-1].advance.activities] == ["clarification"]
         return
     assert isinstance(frames[-1], FastPlannerStreamTerminal), frames[-1]
     cited = frames[-1].advance.activities[0].argument_sources["location"]
@@ -2076,8 +2077,9 @@ async def test_a_kept_fact_the_person_told_grounds_a_later_conversations_value(l
     text = "明天早上上班要不要带伞？"
     tokens = user_turn_source_tokens(text)
     whole = {"source_start_token_ref": tokens[0]["ref"], "source_end_token_ref": tokens[-1]["ref"]}
-    memory = [{"kind": "fact", "key": "workplace", "text": "用户在上海上班。", "memory_tier": "long_term",
-               "cognitive_roles": ["umi", "ga", "planner"]}] if kept else []
+    # The working and long-term copies of one kept fact are one fact (live 2026-10-27).
+    memory = [{"kind": "fact", "key": "workplace", "text": "用户在上海上班。", "memory_tier": tier,
+               "cognitive_roles": ["umi", "ga", "planner"]} for tier in ("long_term", "working")] if kept else []
     request = CognitiveWorkRequest(sid="later", text=text, language="zh-CN", interpretation_confidence=1.0,
         context={"session_memory": {"active_memory": {"entries": memory}}},
         responsibilities=[CognitiveResponsibilityProposal(
@@ -2103,11 +2105,62 @@ async def test_a_kept_fact_the_person_told_grounds_a_later_conversations_value(l
     model = _StreamingModel([json.dumps(raw)])
     frames = [f async for f in PlannerResolver(model, _Catalog([weather])).stream_advance(request)]
     if location == "北京" or not kept:
-        assert isinstance(frames[-1], FastPlannerStreamFailure)
+        # No kept fact states it: the person is asked where (2026-10-26), never read for it.
+        assert [item.role for item in frames[-1].advance.activities] == ["clarification"]
         return
     assert isinstance(frames[-1], FastPlannerStreamTerminal), frames[-1]
     assert "location" not in frames[-1].advance.activities[0].argument_sources
     assert frames[-1].advance.metadata["citation_reanchoring"][0]["normalization"] == "turn_citation_reanchored_to_memory"
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("location,outcome,asks", [
+    ("current_location", "回答明天早上上班是否需要带伞", True),
+    ("unknown", "回答明天早上上班是否需要带伞", True),
+    ("Shanghai", "answer whether to bring an umbrella to work in Shanghai tomorrow morning", False),
+])
+async def test_a_read_input_no_source_states_is_asked_for_never_read(location, outcome, asks):
+    """Live 2026-10-26 (adult_umbrella_no_city_zh): "明天早上上班要不要带伞？" was read for
+    "current_location" and, in a later conversation, for "unknown", geocoded to Unknown, Bangladesh,
+    and that weather was reported as the person's. A cross-script value stands only where a served
+    outcome or a kept fact states it; otherwise the person is asked for that input."""
+    from shared.chromie_contracts.user_turn import user_turn_source_tokens
+
+    text = "明天早上上班要不要带伞？"
+    tokens = user_turn_source_tokens(text)
+    whole = {"source_start_token_ref": tokens[0]["ref"], "source_end_token_ref": tokens[-1]["ref"]}
+    request = CognitiveWorkRequest(sid="umbrella", text=text, language="zh-CN", interpretation_confidence=1.0,
+        responsibilities=[CognitiveResponsibilityProposal(
+            local_ref="r1", outcome=outcome, output_mode="information", confidence=1.0, source_evidence=whole)])
+    weather = CatalogCapability(
+        capability_id="chromie.weather.lookup", agent_id="chromie.weather", description="Retrieve a forecast.",
+        input_schema={"type": "object", "properties": {"location": {"type": "string"}}, "required": ["location"],
+                      "additionalProperties": False},
+        available=True, interaction_executable=True, prompt_tier="common", idempotent=True, side_effect_free=True,
+        safety_class="safe_read", hints={"side_effect_free": True, "resource_contract": {"provider_role": "acquire_information"},
+                                         "semantic_scope": {"responsibility_type": "acquire_and_deliver_resource",
+                                                            "resource_kinds": ["information"]}})
+    raw = {"ability_needs": [{"need": "read the weather forecast", "closest_loaded": "chromie.weather.lookup",
+                              "closest_loaded_does": "Retrieve a forecast.", "fits": True}],
+           "responsibility_decisions": {"r1": {"needed_abilities_fit": True, "decision": "work", "missing": []}},
+           "activity_count": 1,
+           "activities": [{"role": "capability", "source_responsibility_refs": ["r1"], "capability_id": "chromie.weather.lookup",
+                           "activity_id": "act_weather", "args": {"location": location},
+                           "argument_sources": {"location": whole}, "depends_on": []}],
+           "disposition": "execute", "coverage": "complete", "covered_responsibility_refs": ["r1"],
+           "confidence": 1.0, "unresolved": [], "reason_summary": "Read tomorrow morning's forecast."}
+    model = _StreamingModel([json.dumps(raw)])
+    frames = [f async for f in PlannerResolver(model, _Catalog([weather])).stream_advance(request)]
+    assert isinstance(frames[-1], FastPlannerStreamTerminal), frames[-1]
+    advance = frames[-1].advance
+    if not asks:
+        assert [item.role for item in advance.activities] == ["capability"]
+        return
+    [question] = advance.activities
+    assert question.role == "clarification"
+    assert [(gap.source_kind, gap.source_reference, gap.required_for) for gap in question.information_gaps] == [
+        ("execution_input", "chromie.weather.lookup", ["location"])]
+    assert advance.metadata["citation_reanchoring"][0]["normalization"] == "ungrounded_input_clarified"
 
 
 def test_one_activity_for_every_work_responsibility_serves_them_all():

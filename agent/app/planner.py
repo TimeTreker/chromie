@@ -44,6 +44,7 @@ from .planner_schema import (
 )
 from .planner_native_schema import native_goal_outcome_branches
 from .planner_context import (
+    gap_answered_goal_ids,
     planner_provider_vocal_goal_ids,
     provider_media_goal_ids_without_capability,
     completed_acquisition_goal_ids,
@@ -86,6 +87,7 @@ from .planner_fast_validation import (
     drop_repeated_identical_activities,
     merge_identical_reads_across_responsibilities,
     normalize_fast_capability_activity_purpose,
+    clarify_ungrounded_information_inputs,
     person_told_memory_texts,
     reanchor_turn_citations_to_memory,
     reanchor_turn_citations_to_outcomes,
@@ -302,6 +304,9 @@ class PlannerResolver:
                     output, source=current.original_user_text, capabilities=capabilities,
                     memory_texts=person_told_memory_texts(current.context))
                 citation_repairs += memory_repairs
+                output, clarified_inputs = clarify_ungrounded_information_inputs(
+                    output, request=current, responsibilities=responsibilities, capabilities=capabilities)
+                citation_repairs += clarified_inputs
                 if citation_repairs:
                     logger.info("fast_planner_citation_reanchored sid=%s repairs=%s",
                                 request.sid, bounded_json(citation_repairs, 1000))
@@ -794,6 +799,8 @@ class PlannerResolver:
                     validate_user_supplied_parameter_provenance(
                         validated_model_output,
                         authoritative_goals=authoritative_goals,
+                        answer_text=request.original_user_text,
+                        answered_goal_ids=gap_answered_goal_ids(request.context),
                     )
                 except PlannerDTOContractError:
                     raise

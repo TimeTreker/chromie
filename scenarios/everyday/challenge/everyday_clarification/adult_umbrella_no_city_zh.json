@@ -2,7 +2,7 @@
   "schema_version": 1,
   "kind": "chromie_general_ability_live_text",
   "id": "adult_umbrella_no_city_zh",
-  "stage": "core",
+  "stage": "challenge",
   "difficulty": "hard",
   "provenance": {
     "origin": "agent_authored_common_scene",
