@@ -107,6 +107,8 @@ class TextScenarioCase:
     require_llm_integrity: bool = True
     require_safe_idle: bool = False
     interrupt_text: str = ""
+    # A later conversation with the same person: the turn starts after the Host's conversation boundary.
+    new_conversation: bool = False
     interrupt_capability_prefix: str = "soridormi."
     expect_cancelled: bool = False
     expected_repeat_of_previous_speech: bool = False
@@ -1155,6 +1157,7 @@ def _text_scenario_case(
         require_llm_integrity=bool(raw.get("require_llm_integrity", True)),
         require_safe_idle=bool(raw.get("require_safe_idle", False)),
         interrupt_text=str(raw.get("interrupt_text") or "").strip(),
+        new_conversation=bool(raw.get("new_conversation", False)),
         interrupt_capability_prefix=str(raw.get("interrupt_capability_prefix") or "soridormi."),
         expect_cancelled=bool(raw.get("expect_cancelled", False)),
         expected_repeat_of_previous_speech=bool(
@@ -2025,6 +2028,7 @@ def _live_case_namespace(
         arg_tolerance=args.arg_tolerance,
         timeout_s=args.timeout_s,
         interrupt_text=case.interrupt_text,
+        new_conversation=case.new_conversation,
         interrupt_capability_prefix=case.interrupt_capability_prefix,
         interrupt_start_timeout_s=30.0,
         expect_cancelled=case.expect_cancelled,
@@ -2263,7 +2267,8 @@ def _semantic_review_bundle(
         if case.turns:
             inputs = {
                 "turns": [
-                    {"text": turn.text, "language": turn.language}
+                    {"text": turn.text, "language": turn.language,
+                     **({"new_conversation": True} if turn.new_conversation else {})}
                     for turn in case.turns
                 ]
             }

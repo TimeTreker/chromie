@@ -1251,6 +1251,30 @@ class GoalAssociationRepairPreservationTests(unittest.TestCase):
                 if len(criteria) <= 4:
                     self.assertFalse(indices.is_valid([0, 0]))
 
+    def test_each_decoded_change_branch_carries_its_whole_required_shape(self):
+        """Live 2026-10-26 (adult_umbrella_no_city_zh T5): the native decoder follows a oneOf branch and
+        ignores sibling properties, so a requirement change came out without source_responsibility_refs."""
+        from jsonschema import Draft202012Validator
+        from agent.app.clients.sglang_protocol import _openai_response_format
+        from agent.app.goal_association_contract import GoalAssociationModelOutput
+        from agent.app.goal_association_schema import goal_association_response_schema
+
+        schema = goal_association_response_schema(
+            GoalAssociationModelOutput,
+            [{"goal_id": "goal-a", "goal": {"description": "x", "success_criteria": ["Answer the umbrella question."]}}],
+            [], responsibility_refs=["r1"])
+        wire = _openai_response_format(schema)["json_schema"]["schema"]
+        [branch] = wire["$defs"]["GoalAssociationModelRequirementChange"]["oneOf"]
+        self.assertEqual(list(branch["properties"])[:3],
+                         ["target_goal_id", "replace_requirement_indices", "source_responsibility_refs"])
+        decoded = Draft202012Validator({**branch, "$defs": wire["$defs"]})
+        self.assertFalse(decoded.is_valid({"target_goal_id": "goal-a", "replace_requirement_indices": [0]}))
+        self.assertTrue(decoded.is_valid({"target_goal_id": "goal-a", "replace_requirement_indices": [0],
+                                          "source_responsibility_refs": ["r1"]}))
+        for item in wire["$defs"]["GoalAssociationModelBindingChange"]["oneOf"]:
+            if "properties" in item:
+                self.assertIn("path", item["required"])
+
     def test_shape_repair_cannot_change_requirement_replacement_scope(self):
         req, valid, _ = self.candidate_case()
         req.context["active_goal_snapshots"][0]["goal"]["success_criteria"] = ["Requirement A", "Requirement B"]

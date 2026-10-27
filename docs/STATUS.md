@@ -60,7 +60,13 @@ repairs and owner decisions in force.
 1. The owner's 8-iteration loop is complete (iteration 8: 69/69 automatic, 65/69 judged). Per the owner, 50 persona cases were
    added on 2026-10-26 (119 cases); their first cohort stopped at 30/119 on a weather read for an invented
    place. Read-only tools now declare an unservable request (no such place or period, no result) as an honest
-   non-completion, so the runner judges such a case; the complete cohort runs next. The streaming Planner still decides
+   non-completion, so the runner judges such a case. Its rerun (`personas2-20261026/`, b78e89457) stopped at 10/119
+   on an open-meteo geocoding timeout (a service failure). Owner loop 2 (6 iterations, 2026-10-26), iteration 1:
+   Chromie keeps a lasting fact the person told (where they work) for the conversation, asks once whether to
+   remember it, and keeps it as consent-bound profile Memory on their yes; a later conversation used it for
+   "明天早上上班要不要带伞？" (focused run `it1-memory-20261026/focused/`). **Truthfulness defect, next:** a
+   Latin placeholder location in a Chinese turn passes the cross-script citation exemption, and the geocoder
+   matched "unknown" to Unknown, Bangladesh, whose weather was reported as the person's. The streaming Planner still decides
    work with an assumed place for an unstated workplace (clarify trails by 12-15 nats; four prompt and decision-field
    probes moved nothing); the owner wants Chromie to ask where the person works and remember it. Open judged failures: "Say hi to my friend with a
    wave!" waves without a greeting; "你都会做些什么呀？" describes chatting and small tasks rather than real abilities;

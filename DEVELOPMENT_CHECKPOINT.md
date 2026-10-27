@@ -69,9 +69,20 @@ Evidence and per-run judgments: `.chromie/acceptance/iter8-20261026/`, `iter7-20
   Chinese span), the provider answered location_not_found and the runner treated it as a Runtime failure. Read-only
   local tools now declare an unservable request as the owner's honest non-completion (`provider_output`), never a
   timeout or outage. Owner direction (2026-10-26): ask where the person works the first time and remember it until
-  they say it changed; the case is now that three-turn flow. Remembering across sessions needs consent-bound profile
-  Memory (Charter: persistence keeps the consent contract), not yet decided. Next: the complete 119-case cohort,
-  judged by stage; then latency (prefix caching, prompt size, serial UMI
+  they say it changed; the case is now that three-turn flow. Owner loop 2 (2026-10-26: up to 6 iterations,
+  my recommendations decide, commit and push each). Iteration 1 builds that memory within the consent contract:
+  Social Cognition states `personal_fact` at ingress (key + text, `stated` first); Host keeps it as working Memory
+  and, with profile Memory on (`.env.common`, owner direction), offers it; the first answer-giving reply asks and
+  states `memory_consent_asked`; the next ingress states `memory_consent_reply`; a yes keeps it as profile Memory
+  visible to UMI, GA and Planner, a later yes for the same key replaces it. A kept fact grounds a later information
+  read's value its turn words lack (`turn_citation_reanchored_to_memory`). GA change branches now carry their
+  whole shape in the SGLang transport (a requirement change had lost `source_responsibility_refs`). The live-text
+  harness gives each case its own profile store and supports `new_conversation` turns. Live focused runs found and
+  removed: an SC-time need changed the reserved Plan fingerprint; a confirmation need doubled the evidence-answer
+  contract past the prompt budget; a question appended to a reused acknowledgement broke its identity. Open: a
+  Latin placeholder location ("unknown") passes the cross-script exemption and was geocoded to Bangladesh (next
+  iteration); UMI sometimes reads "我在上海上班。" as a statement only and drops "明天" in a follow-up. Next: the
+  complete 119-case cohort, judged by stage; then latency (prefix caching, prompt size, serial UMI
   and SC ingress), then the standing-attention skill plan (`.chromie/plans/`). Open judged failures: wave_friend
   greeting, ability self-description, a confirmed wrong sum, a delayed wave; expression use under the lively style.
   Measure the schema size of any Social Cognition schema change before deploying it.

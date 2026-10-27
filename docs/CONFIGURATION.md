@@ -610,7 +610,7 @@ cancellation scope.
 | `ORCH_CONVERSATION_COMPLETED_TASK_RETENTION_SEC` | `180`; recently completed task hints stay briefly available for follow-up questions. |
 | `ORCH_ENABLE_TASK_CONTEXT_STORE` | `0`; when enabled, compact unfinished task contexts are saved locally and restored as recoverable after restart. |
 | `ORCH_TASK_CONTEXT_STORE_PATH` | `.chromie/conversation/task_contexts.json`; relative paths resolve from the project root. |
-| `ORCH_ENABLE_DURABLE_PROFILE_MEMORY` | `0`; opt in to consent-bound profile memory. Disabled mode never creates or writes the profile store. |
+| `ORCH_ENABLE_DURABLE_PROFILE_MEMORY` | `1` in `.env.common` (owner decision 2026-10-26); the Host code default is `0`. Consent-bound profile memory: when Social Cognition hears a lasting fact the person told about their life (such as where they work), Chromie keeps it for the conversation, asks once whether to remember it, and keeps it under its key only after the person's yes; a later yes for the same key replaces it. Disabled mode never asks, never creates or writes the profile store. The live-text harness gives every case its own store beside its evidence. |
 | `ORCH_DURABLE_PROFILE_MEMORY_PATH` | `.chromie/memory/profile.json`; owner-local JSON written atomically with mode `0600`. The store is not encrypted and must not hold secrets. |
 | `ORCH_DURABLE_PROFILE_MEMORY_MAX_ENTRIES` | `64`; bounded retained profile entries. Each durable remember requires model-authored explicit current-turn consent, a stable key, and `retention_days`; forget and clear also require retained current-turn consent evidence. |
 

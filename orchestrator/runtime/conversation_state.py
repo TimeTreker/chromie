@@ -1304,6 +1304,7 @@ class ConversationStateManager:
         self._discourse_referents.clear()
         self._discourse_focus.clear()
         self._memory_store.clear()
+        self._durable_memory.pending_consent = None
         self._persist_task_contexts_if_enabled()
         self.last_split_reason = reason
         return {
@@ -1916,9 +1917,7 @@ class ConversationStateManager:
             activation_texts=activation_texts,
             limit=8,
         )
-        combined_summary_lines = [
-            f"- {entry['text']}" for entry in combined_entries if entry.get("text")
-        ]
+        combined_summary_lines = [f"- {entry['text']}" for entry in combined_entries if entry.get("text")]
         summaries = [
             str(task.get("summary") or task.get("type") or "task")
             for task in active_tasks[-4:]
@@ -1984,6 +1983,7 @@ class ConversationStateManager:
                 "entries": durable_entries,
                 "protected_storage": "owner_local_mode_0600",
                 "last_error": self._durable_memory.last_error,
+                "pending_consent": copy.deepcopy(self._durable_memory.pending_consent),
             },
             "forgetting_policy": {
                 "conversation_boundary_clears_history_and_ephemeral_tasks": True,

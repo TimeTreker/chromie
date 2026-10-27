@@ -5,6 +5,16 @@ remains available in Git history.
 
 ## Unreleased
 
+### Chromie remembers where you work, with your yes (owner loop 2, iteration 1, 2026-10-26)
+
+- Social Cognition notices a lasting fact the person tells about their life (`personal_fact`); Chromie keeps it for
+  the conversation, asks once whether to remember it, and keeps it as consent-bound profile Memory on their yes
+  (`memory_consent_asked`, `memory_consent_reply`); `.env.common` turns profile Memory on. A kept fact grounds a
+  later information read's value ("明天早上上班要不要带伞？" in a later conversation reads Shanghai).
+- The SGLang transport gives each Goal Association change branch its whole shape; a requirement change had lost
+  its required `source_responsibility_refs`.
+- The live-text harness gives every case its own profile store and supports `new_conversation` turns.
+
 ### An unservable read is honest non-completion (2026-10-26)
 
 - Weather and external-information reads that ran and found the request cannot be served (no such place or

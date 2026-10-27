@@ -23,11 +23,11 @@ from .prompt_projection import required_json
 
 from shared.chromie_contracts.plan import FastProgressKind, validate_communicative_activity_identity
 from shared.chromie_contracts.social_cognition import (
-    SocialCognitionOutput, SocialCognitionRequest, SocialCognitionResolution,
+    MEMORY_KEY_PATTERN, SocialCognitionOutput, SocialCognitionRequest, SocialCognitionResolution,
     SocialStartupGreetingOutput, SocialStartupGreetingRequest, SocialStartupGreetingResolution,
     asks_about_uncertain_meaning, completed_work_need_ids, earlier_acknowledgement_ids, must_say_now_need_ids,
-    need_asks_uncertain_meaning, pre_evidence_act_violation, uncertain_task_responsibility_refs,
-    value_review_responsibility_refs, value_withheld_need_ids,
+    memory_consent_question_due, need_asks_uncertain_meaning, pending_memory_consent, pre_evidence_act_violation,
+    uncertain_task_responsibility_refs, value_review_responsibility_refs, value_withheld_need_ids,
 )
 from shared.chromie_contracts.text import normalize_whitespace
 from shared.chromie_contracts.user_turn import user_turn_prohibits_speech
@@ -519,6 +519,37 @@ def social_cognition_response_schema(
         schema["required"].append("preference_memory_candidates")
     else:
         preference["maxItems"] = 0
+    # Owner decision 2026-10-26: whether the person's words told a lasting fact about their life
+    # is decided first (`stated`), and only their answer to Chromie's asked question settles it.
+    for name in ("SocialPersonalFact", "SocialMemoryConsentReply"):
+        schema["$defs"].pop(name, None)
+    own_refs = {"type": "array", "minItems": 1, "maxItems": 4, "uniqueItems": True, "items": {
+        "type": "string", "enum": [item.local_ref for item in request.responsibilities]}}
+    consent = pending_memory_consent(request.context)
+    ingress = request.trigger == "interpretation" and bool(request.responsibilities)
+    schema["properties"]["personal_fact"] = {"oneOf": [UNSTATED_PERSONAL_FACT, {
+        "type": "object", "additionalProperties": False,
+        "required": ["stated", "key", "text", "source_responsibility_refs"],
+        "properties": {"stated": {"type": "boolean", "const": True},
+                       "key": {"type": "string", "pattern": MEMORY_KEY_PATTERN},
+                       "text": {"type": "string", "minLength": 3, "maxLength": 160},
+                       "source_responsibility_refs": own_refs}}]} if ingress else {
+        "anyOf": [{"type": "null"}, UNSTATED_PERSONAL_FACT]}
+    schema["properties"]["memory_consent_reply"] = {
+        "type": "object", "additionalProperties": False, "required": ["key", "answer", "source_responsibility_refs"],
+        "properties": {"key": {"type": "string", "const": consent["key"]},
+                       "answer": {"type": "string", "enum": ["yes", "no", "not_answered"]},
+                       "source_responsibility_refs": own_refs},
+    } if ingress and consent and consent.get("asked") else {"type": "null"}
+    # The first Plan-bound reply after the fact asks whether to keep it; it says whether its words did.
+    asking = memory_consent_question_due(request) is not None
+    schema["properties"]["memory_consent_asked"] = {"type": "boolean"} if asking else {"type": "null"}
+    if asking:
+        schema["required"].append("memory_consent_asked")
+    if ingress:
+        schema["required"].append("personal_fact")
+        if consent and consent.get("asked"):
+            schema["required"].append("memory_consent_reply")
     need_ids = [item.need_id for item in request.communication_needs]
     required_failure_need_ids = [
         need.need_id for need in request.communication_needs
@@ -835,6 +866,10 @@ def social_cognition_response_schema(
             properties["need_outcomes"] = {"type": "object", "enum": [{}]}
             for name in ("memory_candidates", "self_memory_candidates", "preference_memory_candidates"):
                 properties[name]["maxItems"] = 0
+            if "oneOf" in properties["personal_fact"]:
+                properties["personal_fact"] = copy.deepcopy(UNSTATED_PERSONAL_FACT)
+            properties["memory_consent_reply"] = {"type": "null"}
+            properties["memory_consent_asked"] = {"type": "null"}
         else:
             properties["need_outcomes"]["required"] = need_ids
             if disposition == "silence":
@@ -1410,6 +1445,32 @@ def _social_language_guard(request: SocialCognitionRequest) -> str:
     return f"\nReply language: {language}. Every spoken text is in this language.\n"
 
 
+UNSTATED_PERSONAL_FACT = {"type": "object", "additionalProperties": False, "required": ["stated"],
+                          "properties": {"stated": {"type": "boolean", "const": False}}}
+
+
+def _social_memory_guard(request: SocialCognitionRequest) -> str:
+    """Keep a lasting fact the person tells; keep it long-term only with their yes (owner 2026-10-26).
+
+    Next to the output contract: in the standing instructions the same words moved unrelated
+    ingress decisions from communicate to deliberate (replays 2026-10-26)."""
+
+    lines = []
+    consent = pending_memory_consent(request.context)
+    if request.trigger == "interpretation" and request.responsibilities:
+        lines.append("personal_fact is stated true only when the person's words in this turn tell a lasting "
+                     "fact about their life, such as where they live or work: key names it (workplace, "
+                     "home_city), text states it about them in one short sentence.")
+        if consent and consent.get("asked"):
+            lines.append(f"You asked whether to remember this about them: {consent['text']} memory_consent_reply "
+                         "is their answer in this turn: yes, no, or not_answered when their words do not answer it.")
+    if (due := memory_consent_question_due(request)) is not None:
+        lines.append(f"They told you a lasting fact about their life: {due['text']} After anything else you say, "
+                     "ask in one short question whether you may remember it from now on; it is not remembered yet. "
+                     "memory_consent_asked is true only when your spoken words ask it.")
+    return "\n" + " ".join(lines) + "\n" if lines else ""
+
+
 LIMITATION_RESULT_NOTICE = (
     "\nCurrent limitation result need: part of this request will not be done (a Planner "
     "result whose facts.disposition is unavailable or refused, or Chromie's own value_declined "
@@ -1647,7 +1708,7 @@ class SocialCognitionResolver:
                 schema, max_chars=self.num_ctx * 3, label="Social Cognition output contract",
             ) + "\n" + SOCIAL_COGNITION_WORK_STATE_PROMPT
             + _social_current_turn_output_guard(request) + _social_value_judgment_guard(request)
-            + _social_language_guard(request),
+            + _social_language_guard(request) + _social_memory_guard(request),
             system=SOCIAL_COGNITION_AUTHORITY_PROMPT + (
                 "This is the sole deeper pass; decide communicate or silence now." if deep else ""
             ),

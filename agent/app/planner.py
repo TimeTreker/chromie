@@ -86,6 +86,8 @@ from .planner_fast_validation import (
     drop_repeated_identical_activities,
     merge_identical_reads_across_responsibilities,
     normalize_fast_capability_activity_purpose,
+    person_told_memory_texts,
+    reanchor_turn_citations_to_memory,
     reanchor_turn_citations_to_outcomes,
     project_responsibility_decisions,
     validate_fast_advance_output,
@@ -296,6 +298,10 @@ class PlannerResolver:
                     capabilities=capabilities, earlier_talk=[
                         str(item.get("text") or "") for item in current.history or current.context.get("history") or []
                         if isinstance(item, dict)])
+                output, memory_repairs = reanchor_turn_citations_to_memory(
+                    output, source=current.original_user_text, capabilities=capabilities,
+                    memory_texts=person_told_memory_texts(current.context))
+                citation_repairs += memory_repairs
                 if citation_repairs:
                     logger.info("fast_planner_citation_reanchored sid=%s repairs=%s",
                                 request.sid, bounded_json(citation_repairs, 1000))

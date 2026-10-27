@@ -18,6 +18,7 @@ from shared.chromie_contracts.semantic_task import InformationGap
 from orchestrator.runtime import goal_outcome_state
 
 from orchestrator.runtime.conversation_state import _now_ms
+from orchestrator.runtime.memory import MemoryEntry
 
 logger = logging.getLogger("chromie.orchestrator.conversation_state")
 
@@ -931,6 +932,21 @@ def record_memory_updates(state: Any, sid: str | None, memory_updates: list[Any]
                 update.get("value"), operation="clear_profile"
             ):
                 state.clear_durable_memory()
+            continue
+        # A lasting fact the person told is kept for this conversation and offered for long-term
+        # keeping; Chromie's question and the person's answer settle the offer (owner 2026-10-26).
+        key = str(update.get("key") or "")
+        if update_type == "personal_fact" and key and str(update.get("text") or "").strip():
+            state._store_explicit_memory_entries([MemoryEntry(
+                scope="session", kind="fact", key=key, text=str(update["text"]), confidence=0.9,
+                source_sids=[sid] if sid else [], cognitive_roles=["umi", "ga", "planner"])])
+            state._durable_memory.offer_fact(key=key, text=str(update["text"]))
+            continue
+        if update_type == "memory_consent_asked" and key:
+            state._durable_memory.mark_consent_asked(key)
+            continue
+        if update_type == "memory_consent_reply" and key:
+            state._durable_memory.settle_consent(key=key, answer=str(update.get("answer") or ""), sid=sid)
             continue
         if update_type not in {"pending_task", "task_status", "active_task"}:
             continue

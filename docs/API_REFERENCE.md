@@ -37,6 +37,17 @@ Memory updates, and Social Cognition reads them back from `session_memory.active
 (for example the language to answer in). Host keeps them once that response's words have
 played, also when Work produces the turn's final response; one Memory ID per entry makes a
 second application idempotent.
+The same ingress resolution states `personal_fact` (`stated` first): whether the person's
+words told a lasting fact about their life, such as where they work, with a stable `key`
+and one short `text`. Host keeps it as working Memory (visible to UMI, GA and Planner) and,
+when consent-bound profile Memory is enabled, holds it as `durable_profile_memory.pending_consent`.
+The first Plan-bound resolution after that asks, after anything else it says, whether Chromie
+may remember the fact and states `memory_consent_asked`; the Plan is unchanged (a confirmation
+need for it doubled the evidence-answer contract past the prompt budget), and once those words
+are heard Host marks the offer asked.
+The next ingress then states `memory_consent_reply` (`yes`, `no` or `not_answered`) for that key;
+Host closes the offer and keeps the fact as profile Memory only on `yes`, replacing an earlier
+fact under the same key.
 An act already pending or delivered in the turn may be reused unchanged to cover a need only
 if it was written with that need in hand: a need that reports completed Work Evidence
 (`completed_work_dependencies`) cannot be covered by words said before that Evidence reached

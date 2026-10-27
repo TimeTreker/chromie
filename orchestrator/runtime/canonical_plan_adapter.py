@@ -29,7 +29,9 @@ from shared.chromie_contracts.interaction import (
     output_schema_sha256,
     validate_output_schema_declaration,
 )
-from shared.chromie_contracts.social_cognition import SocialCognitionRequest, SocialCognitionResolution
+from shared.chromie_contracts.social_cognition import (
+    SocialCognitionRequest, SocialCognitionResolution, pending_memory_consent,
+)
 from shared.chromie_contracts.plan import (
     AuxiliaryPlanActivity,
     CanonicalPlan,
@@ -848,6 +850,11 @@ class CanonicalPlanRuntimeAdapter:
             key for key, value in resolution.need_outcomes.items() if value == "pending"
         ]
         response.metadata["social_cognition_resolution"] = resolution.model_dump(mode="json")
+        consent = pending_memory_consent(request.context)
+        if resolution.memory_consent_asked and consent:
+            # Once these words are heard, the person's next words may answer whether to keep the fact.
+            response.metadata["memory_updates"] = [*(response.metadata.get("memory_updates") or []),
+                                                   {"type": "memory_consent_asked", "key": consent["key"]}]
         if any(act.auxiliary_activities for act in resolution.activities):
             response = await self.prepare_social_response(response, social_cognition=resolution,
                 session_id=session_id, turn_id=str(request.source_turn.get("turn_id") or request.request_id),

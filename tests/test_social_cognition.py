@@ -118,9 +118,10 @@ def response(**changes):
     act = {"activity_id": "sc-act", "text": "还在进行中。", "function": "inform",
            "truth_stage": "context_grounded", "source_goal_ids": ["goal:1"]}
     act.update(changes)
-    # An ingress decision states whether a lasting preference was kept (2026-10-23).
+    # An ingress decision states whether a lasting preference was kept (2026-10-23) and whether
+    # the person told a lasting fact about their life (2026-10-26).
     return {"disposition": "communicate", "activities": [act], "reason_summary": "Meaningful progress.",
-            "preference_memory_candidates": []}
+            "preference_memory_candidates": [], "personal_fact": {"stated": False}}
 
 
 @pytest.mark.parametrize("state", ["queued", "playing", "completed", "interrupted", "failed"])
@@ -261,7 +262,7 @@ def test_fresh_addressed_task_cannot_silently_disappear_while_work_runs_in_paral
     )
     schema = social_cognition_response_schema(current, [])
     silence = {"disposition": "silence", "activities": [], "reason_summary": "Wait for Planner.",
-               "preference_memory_candidates": []}
+               "preference_memory_candidates": [], "personal_fact": {"stated": False}}
     assert list(Draft202012Validator(schema).iter_errors(silence))
     with pytest.raises(ValueError, match="requires acknowledgement"):
         validate_social_cognition_output(SocialCognitionOutput.model_validate(silence), current, [])
@@ -436,7 +437,8 @@ def test_goal_scoped_speech_is_only_acknowledged_before_its_answer_need():
                            source_evidence={"source_start_token_ref": "t0", "source_end_token_ref": "t1"})])
 
     def act(function):
-        return {"disposition": "communicate", "reason_summary": "Reply.", "preference_memory_candidates": [], "activities": [{
+        return {"disposition": "communicate", "reason_summary": "Reply.", "preference_memory_candidates": [],
+                "personal_fact": {"stated": False}, "activities": [{
             "activity_id": "a1", "text": "Once upon a time...", "function": function,
             "truth_stage": "context_grounded", "progress_kind": None,
             "source_responsibility_refs": ["r1"], "source_goal_ids": [], "evidence_refs": [],
@@ -1316,6 +1318,50 @@ async def test_sc_words_bind_to_work_without_changing_its_identity_or_completing
     assert interaction.speech[0].metadata["wording_owner"] == "social_cognition"
     assert interaction.speech[0].metadata["communication_completion_goal_ids"] == (["goal:1"] if covered else [])
     assert interaction.metadata["pending_communication_need_ids"] == ([] if covered else ["answer:1"])
+
+
+@pytest.mark.asyncio
+async def test_asking_to_keep_a_told_fact_holds_nothing_and_marks_the_question_asked():
+    """Owner decision 2026-10-26: the first Plan-bound reply after the fact asks whether to keep it
+    long-term and says so; once heard, the next turn's answer may settle it. The Plan is unchanged (live
+    2026-10-26: a confirmation need for it doubled the evidence-answer contract past the prompt budget)."""
+    from tests.cognitive_runtime_test_support import FakeRuntime
+    from orchestrator.runtime.canonical_plan_adapter import CanonicalPlanRuntimeAdapter
+    from orchestrator.runtime.cognitive_runtime import CognitiveRuntimePolicy, GoalDrivenRuntimeCoordinator
+    from shared.chromie_contracts.core_interpretation import CognitiveWorkRequest
+    from shared.chromie_contracts.plan import CanonicalPlan
+    from shared.chromie_contracts.social_cognition import SocialCognitionResolution
+
+    plan = CanonicalPlan(
+        plan_id="plan:chat", planner_tier="fast", disposition="respond", coverage="complete",
+        goal_ids=["goal:1"], goal_outcomes=[{"goal_id": "goal:1", "disposition": "respond", "coverage": "complete"}],
+        communication_needs=[{"need_id": "answer:1", "owner": "planner", "kind": "answer",
+                              "source_goal_ids": ["goal:1"], "reference_id": "plan:chat"}],
+    )
+    live = {"session_memory": {"durable_profile_memory": {"pending_consent": {
+        "key": "workplace", "text": "The person works in Shanghai.", "asked": False}}}}
+
+    class Agent:
+        async def resolve_social_cognition(self, session, *, request, **kwargs):
+            acts = [{"activity_id": "answer", "text": "明天不用带伞。要我记住你在上海上班吗？", "function": "inform",
+                     "truth_stage": "context_grounded", "source_goal_ids": ["goal:1"], "addressed_need_ids": ["answer:1"]}]
+            return SocialCognitionResolution(
+                request_id=request.request_id, snapshot_digest=request.snapshot_digest(),
+                need_outcomes={"answer:1": "covered"}, disposition="communicate", activities=acts,
+                reason_summary="Answer, then ask.", memory_consent_asked=True, model_call_count=1)
+
+    adapter = CanonicalPlanRuntimeAdapter(FakeRuntime())
+    coordinator = GoalDrivenRuntimeCoordinator(
+        agent_client=Agent(), adapter=adapter, policy=CognitiveRuntimePolicy(mode="apply"),
+        context_refresh=lambda sid: live)
+    work = CognitiveWorkRequest(sid="sid", text="明天早上上班要不要带伞？", context={}, history=[],
+        responsibilities=[{"local_ref": "r1", "outcome": "回答明天早上上班是否需要带伞", "output_mode": "information",
+                           "confidence": 1.0}])
+    interaction = await coordinator.resolve_plan_interaction(
+        None, plan=plan, work_request=work, session_id="sid", language="zh-CN", context={})
+    assert interaction.metadata["memory_updates"] == [{"type": "memory_consent_asked", "key": "workplace"}]
+    assert interaction.metadata["canonical_plan_id"] == plan.plan_id
+    assert not interaction.metadata.get("runtime_confirmation_required")
 
 
 @pytest.mark.asyncio
@@ -2947,6 +2993,90 @@ def test_a_stated_preference_is_kept_as_session_memory_and_read_back():
     state.record_interaction_response("pref", response)
     entries = state.session_memory()["active_memory"]["entries"]
     assert any(item.get("kind") == "preference" and item.get("text") == "Answer me in Chinese." for item in entries)
+
+
+def _fact_turn(pending=None):
+    from shared.chromie_contracts.core_interpretation import CognitiveResponsibilityProposal
+
+    return _preference_turn(
+        source_turn={"turn_id": "turn:fact", "original_text": "我在上海上班。"},
+        responsibilities=[CognitiveResponsibilityProposal(
+            local_ref="r1", outcome="告诉Chromie我在上海上班", output_mode="speech", continuity_scope="turn",
+            confidence=1.0)],
+        context={"interaction_context": {"events": [], "already_spoken": [], "pending_speech": [],
+                                         "prior_delivered_speech": []},
+                 "session_memory": {"durable_profile_memory": {"pending_consent": pending}}},
+    )
+
+
+def test_a_told_lasting_fact_is_decided_first_and_only_the_answer_to_the_asked_question_settles_it():
+    """Owner decision 2026-10-26: Chromie asks where the person works, then asks before keeping it
+    long-term; only their next words answer that question (Charter: consent-bound profile Memory)."""
+    from agent.app.social_cognition import (
+        _social_memory_guard, social_cognition_response_schema, validate_social_cognition_output,
+    )
+    from orchestrator.runtime.response_plan import build_social_interaction_response
+    from shared.chromie_contracts.social_cognition import SocialCognitionOutput, SocialCognitionResolution
+
+    current = _fact_turn()
+    schema = social_cognition_response_schema(current, [])
+    assert "personal_fact" in schema["required"] and "memory_consent_reply" not in schema["required"]
+    unstated, stated = schema["properties"]["personal_fact"]["oneOf"]
+    assert unstated["properties"]["stated"]["const"] is False
+    assert stated["properties"]["source_responsibility_refs"]["items"]["enum"] == ["r1"]
+    deliberate = next(item for item in schema["oneOf"] if item["properties"]["disposition"]["const"] == "deliberate")
+    assert deliberate["properties"]["personal_fact"]["properties"]["stated"]["const"] is False
+    assert "personal_fact is stated true only" in _social_memory_guard(current)
+
+    act = {"activity_id": "ack", "text": "好的，我知道你在上海上班了。", "function": "acknowledge",
+           "truth_stage": "context_grounded", "source_responsibility_refs": ["r1"]}
+    output = SocialCognitionOutput.model_validate({
+        "disposition": "communicate", "reason_summary": "Note it.", "need_outcomes": {}, "activities": [act],
+        "preference_memory_candidates": [],
+        "personal_fact": {"stated": True, "key": "workplace", "text": "The person works in Shanghai.",
+                          "source_responsibility_refs": ["r1"]},
+    })
+    validate_social_cognition_output(output, current, [])
+    result = SocialCognitionResolution(**output.model_dump(), request_id=current.request_id,
+                                       snapshot_digest=current.snapshot_digest(), model_call_count=1)
+    response = build_social_interaction_response(current, result, session_id="fact", interaction_context=None)
+    assert response.metadata["memory_updates"] == [
+        {"type": "personal_fact", "key": "workplace", "text": "The person works in Shanghai."}]
+    later = current.model_copy(update={"trigger": "work_state"})
+    with pytest.raises(ValueError, match="personal fact is kept only at ingress"):
+        SocialCognitionResolution(**output.model_dump(), request_id=later.request_id,
+                                  snapshot_digest=later.snapshot_digest(), model_call_count=1).validate_request(later)
+
+    reply = {**output.model_dump(), "personal_fact": {"stated": False},
+             "memory_consent_reply": {"key": "workplace", "answer": "yes", "source_responsibility_refs": ["r1"]}}
+    with pytest.raises(ValueError, match="only the person's next words answer"):
+        SocialCognitionResolution(**reply, request_id=current.request_id,
+                                  snapshot_digest=current.snapshot_digest(), model_call_count=1).validate_request(current)
+    answering = _fact_turn({"key": "workplace", "text": "The person works in Shanghai.", "asked": True})
+    schema = social_cognition_response_schema(answering, [])
+    assert "memory_consent_reply" in schema["required"]
+    assert schema["properties"]["memory_consent_reply"]["properties"]["key"]["const"] == "workplace"
+    assert "memory_consent_reply is their answer" in _social_memory_guard(answering)
+    answered = SocialCognitionResolution(**reply, request_id=answering.request_id,
+                                         snapshot_digest=answering.snapshot_digest(), model_call_count=1)
+    answered.validate_request(answering)
+    assert build_social_interaction_response(answering, answered, session_id="fact", interaction_context=None
+                                             ).metadata["memory_updates"] == [
+        {"type": "memory_consent_reply", "key": "workplace", "answer": "yes"}]
+
+    unasked = {"durable_profile_memory": {"pending_consent": {
+        "key": "workplace", "text": "The person works in Shanghai.", "asked": False}}}
+    asking = request(context={**request().context, "session_memory": unasked, "canonical_plan_resolution": {"steps": []}})
+    schema = social_cognition_response_schema(asking, [])
+    assert "memory_consent_asked" in schema["required"]
+    # Progress words before Work Evidence never carry the question.
+    progress = request(context={**asking.context, "canonical_plan_resolution": {"steps": [{"step_id": "weather"}]}})
+    assert "memory_consent_asked" not in social_cognition_response_schema(progress, [])["required"]
+    assert "whether you may remember it from now on" in _social_memory_guard(asking)
+    claimed = {**output.model_dump(), "personal_fact": None, "memory_consent_asked": True}
+    with pytest.raises(ValueError, match="only a spoken Plan-bound reply asks"):
+        SocialCognitionResolution(**claimed, request_id=current.request_id,
+                                  snapshot_digest=current.snapshot_digest(), model_call_count=1).validate_request(current)
 
 
 @pytest.mark.parametrize("kept", [False, True])

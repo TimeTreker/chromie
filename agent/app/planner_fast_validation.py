@@ -20,6 +20,7 @@ from shared.chromie_contracts.core_interpretation import (
     responsibility_binding_material_value,
 )
 from shared.chromie_contracts.interaction import VOCAL_MODES, VOCAL_PERFORMANCE_CAPABILITY_ID
+from shared.chromie_contracts.memory import project_active_memory_for_role
 from shared.chromie_contracts.user_turn import (
     canonical_literal_user_turn_source_span, resolve_user_turn_source_span,
     user_turn_source_span_contains,
@@ -1284,6 +1285,10 @@ def validate_fast_advance_output(
                     for ref in activity.source_responsibility_refs
                 ):
                     continue
+                if (fast_capability_acquires_information(definition) and isinstance(activity.args.get(parameter), str)
+                        and sum(activity.args[parameter] in text
+                                for text in person_told_memory_texts(request.context)) == 1):
+                    continue  # a fact the person told and Chromie keeps (owner decision 2026-10-26)
                 if _drop_redundant_unbound_schema_default(
                     activity.args,
                     parameter=parameter,
@@ -1667,6 +1672,60 @@ def reanchor_turn_citations_to_outcomes(
                 sources[parameter] = found[0]
                 repairs.append({"normalization": normalization, "activity_id": activity.activity_id,
                                 "parameter": parameter, "source_responsibility_ref": found[0].source_responsibility_ref})
+        activities.append(activity.model_copy(update={"argument_sources": sources})
+                          if sources != activity.argument_sources else activity)
+    if not repairs:
+        return output, []
+    return output.model_copy(update={"activities": activities}), repairs
+
+
+def person_told_memory_texts(context: dict[str, Any]) -> list[str]:
+    """Lasting facts the person told Chromie that she keeps (owner decision 2026-10-26), as Planner Memory."""
+    memory = context.get("session_memory")
+    active = memory.get("active_memory") if isinstance(memory, dict) else None
+    entries = active.get("entries") if isinstance(active, dict) else None
+    return [str(entry.get("text") or "") for entry in project_active_memory_for_role(
+        entries if isinstance(entries, list) else [], role="planner") if entry.get("kind") == "fact" and entry.get("key")]
+
+
+def reanchor_turn_citations_to_memory(
+    output: FastPlannerAdvanceModelOutput, *, source: str, capabilities: list[dict[str, Any]],
+    memory_texts: list[str],
+) -> tuple[FastPlannerAdvanceModelOutput, list[dict[str, Any]]]:
+    """Ground a value the person told in an earlier conversation in the fact Chromie keeps.
+
+    Live 2026-10-26 (adult_umbrella_no_city_zh T5): in a later conversation "明天早上上班要不要带伞？"
+    was planned for 上海 from the kept "用户在上海上班。", but the only citation the Planner can write
+    is the turn, whose words lack it, and the turn failed closed. Only an information read's
+    free-text value whose cited turn words lack it and which one kept fact holds verbatim loses
+    that turn citation; validation then grounds it in that fact (Charter: Planner uses Memory as
+    evidence for HOW). The value is unchanged.
+    """
+
+    by_id = {str(item.get("capability_id") or ""): item for item in capabilities if isinstance(item, dict)}
+    activities: list[Any] = []
+    repairs: list[dict[str, Any]] = []
+    for activity in output.activities:
+        definition = by_id.get(getattr(activity, "capability_id", "")) or {}
+        if activity.role != "capability" or not activity.argument_sources or not fast_capability_acquires_information(definition):
+            activities.append(activity)
+            continue
+        properties = (definition.get("input_schema") or {}).get("properties") or {}
+        sources = dict(activity.argument_sources)
+        for parameter, span in activity.argument_sources.items():
+            value = activity.args.get(parameter)
+            schema = properties.get(parameter) if isinstance(properties.get(parameter), dict) else {}
+            if (isinstance(span, (FastPlannerSituationArgumentSource, FastPlannerResponsibilityArgumentSource))
+                    or not isinstance(value, str) or schema.get("type") != "string" or schema.get("enum")):
+                continue
+            try:
+                quote = resolve_user_turn_source_span(source, span)
+            except ValueError:
+                continue
+            if not _cited_span_supports_string(value, quote) and sum(value in text for text in memory_texts) == 1:
+                sources.pop(parameter)
+                repairs.append({"normalization": "turn_citation_reanchored_to_memory",
+                                "activity_id": activity.activity_id, "parameter": parameter})
         activities.append(activity.model_copy(update={"argument_sources": sources})
                           if sources != activity.argument_sources else activity)
     if not repairs:

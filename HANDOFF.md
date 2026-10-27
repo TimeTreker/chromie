@@ -14,9 +14,13 @@ ordered open work are in [STATUS](docs/STATUS.md).
   revision pinned by `capabilities/soridormi.json` and `release/compatibility.json`. The
   MCP container mounts its `src`, so a `docker restart soridormi-runtime-mcp` loads it and
   resets the scene (user at -90 degrees, 1.5 m).
-- Live Agent: `chromie-agent:latest` = `personas2-20261026` (`3e00bd6e6b2c`), built from this delivery's source and
-  recreated with the quiet-mode timeout overrides; `--verify-agent-source` result in
-  `.chromie/acceptance/personas2-20261026/agent-source-verify.json`. Previous image: `iter8-20261026` (`67023144e8e1`). This file is the single owner of the
+- Live Agent: `chromie-agent:latest` = `it1-memory-20261026` (`9c67fa9dbae9`), built from this delivery's source and
+  recreated with the quiet-mode timeout overrides; `--verify-agent-source` matched
+  (`.chromie/acceptance/it1-memory-20261026/agent-source-verify.json`). Previous image: `personas2-20261026` (`3e00bd6e6b2c`).
+- The host rebooted at 19:35 on 2026-10-26: the Soridormi scene was restarted detached (log
+  `.chromie/acceptance/it1-memory-20261026/soridormi-run.log`); CPU turbo came back on (`no_turbo=0`) while the platform
+  stays quiet/power-saver, so the owner re-runs `sudo .chromie/quiet-mode/quiet-mode.sh on`; deployments keep the
+  quiet-mode timeout overrides. This file is the single owner of the
   deployed identity. Rollback image: `perf2-20261024` (`b27810d373c0`, built from 399894a5a).
   LLM: `chromie-sglang:latest` = `gemma4-fp8`
   (`f59a042e6973`); compose resolves `chromie-sglang:${CHROMIE_IMAGE_TAG}`, so the
@@ -24,7 +28,9 @@ ordered open work are in [STATUS](docs/STATUS.md).
 - Workflow corpus: freeze 47 (`bdb8db08…`; scripts in `.chromie/acceptance/thirsty-offer-20261021/freeze47/`). Restore it with
   `python -m benchmarks.regression restore-fixtures`; do not untar `frozen.tar.xz` over
   `workflow_scenarios/` (its inner `manifest.json` lacks the storage identity).
-- Evidence (README in each): `.chromie/acceptance/personas2-20261026/` (the 119-case cohort of this delivery),
+- Evidence (README in each): `.chromie/acceptance/it1-memory-20261026/` (owner loop 2 iteration 1: focused runs of
+  the five-turn umbrella case, `focused/` is the latest), `personas2-20261026/` (b78e89457: stopped at 10/119 on a
+  geocoding timeout),
   `personas-20261026/` (80606ad48: hard stop at 30/119 on a weather read for an invented place),
   `iter8-20261026/` (iteration 8 on 9358ba34c, quiet mode with its
   overrides: the first complete cohort, 69/69 automatic, 65/69 judged), `iter7-20261026/` (iteration 7 on 7e091a536:

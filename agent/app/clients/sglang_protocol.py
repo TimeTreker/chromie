@@ -169,6 +169,24 @@ def _bound_ga_ownership_rows(schema: dict[str, Any]) -> None:
             rows["maxItems"] = min(rows.get("maxItems", len(association_refs)), len(association_refs))
 
 
+def _complete_ga_change_branches(schema: dict[str, Any]) -> None:
+    """Give each GA change branch the whole change shape the native decoder must write.
+
+    The decoder follows a ``oneOf`` branch and ignores the sibling ``properties``, so fields
+    named only there were never decoded (live 2026-10-26, a later conversation's
+    "明天早上上班要不要带伞？": a requirement change came out without its required
+    ``source_responsibility_refs``; a binding change would lose its ``path`` the same way).
+    """
+    for name in ("GoalAssociationModelRequirementChange", "GoalAssociationModelBindingChange"):
+        node = schema.get("$defs", {}).get(name, {})
+        for branch in node.get("oneOf") or []:
+            if not isinstance(branch.get("properties"), dict):
+                continue
+            branch["properties"] = {**copy.deepcopy(node.get("properties") or {}), **branch["properties"]}
+            branch["required"] = list(dict.fromkeys([*(node.get("required") or []), *branch.get("required", [])]))
+            branch["additionalProperties"] = False
+
+
 def _bound_ga_requirement_indices(schema: dict[str, Any]) -> None:
     """Expose GA's unique requirement indices to the native decoder, which ignores uniqueItems.
 
@@ -200,6 +218,7 @@ def _openai_response_format(response_format: Any) -> dict[str, Any] | None:
         schema, _ = candidate_compatible_schema(response_format)
         if schema.get("title") == "GoalAssociationModelOutput":
             _bound_ga_ownership_rows(schema)
+            _complete_ga_change_branches(schema)
             _bound_ga_requirement_indices(schema)
         if schema.get("title") == "FastPlannerWorkAdvanceOutput":
             _stream_decoder_constraints(schema)

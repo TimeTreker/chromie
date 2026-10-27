@@ -478,6 +478,7 @@ class ProtectedDurableMemoryStore:
     """Atomic owner-local profile memory with restrictive file permissions."""
 
     schema_version = 1
+    fact_retention_days = 365
 
     def __init__(
         self,
@@ -490,8 +491,36 @@ class ProtectedDurableMemoryStore:
         self.path = Path(path).expanduser()
         self.store = MemoryStore(max_entries=max_entries)
         self.last_error: str | None = None
+        # The one fact Chromie offered to keep and the person has not yet answered (owner decision
+        # 2026-10-26): only their yes to her question keeps it, as explicit current-turn consent.
+        self.pending_consent: dict[str, Any] | None = None
         if self.enabled:
             self.load()
+
+    def offer_fact(self, *, key: str, text: str) -> bool:
+        """Hold a fact the person told for their consent, unless profile Memory is off or holds it."""
+        if not self.enabled or any(entry.key == key and entry.text == compact_text(text, limit=260)
+                                   for entry in self.store.entries()):
+            return False
+        self.pending_consent = {"key": key, "text": compact_text(text, limit=260), "asked": False}
+        return True
+
+    def mark_consent_asked(self, key: str) -> None:
+        if self.pending_consent is not None and self.pending_consent["key"] == key:
+            self.pending_consent["asked"] = True
+
+    def settle_consent(self, *, key: str, answer: str, sid: str | None) -> bool:
+        """Close the offer; the person's yes to the asked question keeps the fact under its key."""
+        pending, self.pending_consent = self.pending_consent, None
+        if pending is None or pending["key"] != key or not pending["asked"] or answer != "yes":
+            return False
+        return bool(self.add_many([MemoryEntry(
+            scope="profile", kind="fact", key=key, text=pending["text"], confidence=0.95,
+            source_sids=[sid] if sid else [], expires_ms=now_ms() + self.fact_retention_days * 86400000.0,
+            persistence_policy="durable_with_explicit_consent", consent_basis="explicit_current_turn",
+            # What the person told about their life resolves later meaning ("上班" -> where they work).
+            cognitive_roles=["umi", "ga", "planner"],
+        )]))
 
     def load(self) -> None:
         if not self.enabled or not self.path.is_file():

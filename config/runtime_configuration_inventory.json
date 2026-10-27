@@ -2453,7 +2453,8 @@
       "category": "service_internal",
       "key": "ORCH_DURABLE_PROFILE_MEMORY_PATH",
       "owners": [
-        "orchestrator/runtime/host_settings.py"
+        "orchestrator/runtime/host_settings.py",
+        "scripts/interaction_text_mujoco_check.py"
       ]
     },
     {
@@ -2491,11 +2492,13 @@
       ]
     },
     {
-      "boolean": false,
-      "category": "service_internal",
+      "boolean": true,
+      "category": "profile_constant",
       "key": "ORCH_ENABLE_DURABLE_PROFILE_MEMORY",
       "owners": [
-        "orchestrator/runtime/host_settings.py"
+        ".env.common",
+        "orchestrator/runtime/host_settings.py",
+        "scripts/interaction_text_mujoco_check.py"
       ]
     },
     {
@@ -4095,9 +4098,9 @@
     "category_counts": {
       "acceptance_override": 30,
       "bounded_compatibility_alias": 0,
-      "profile_constant": 103,
+      "profile_constant": 104,
       "public_choice": 9,
-      "service_internal": 253
+      "service_internal": 252
     },
     "compatibility_aliases": 0,
     "public_boolean_choices": 1,

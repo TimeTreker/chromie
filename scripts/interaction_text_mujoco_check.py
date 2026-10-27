@@ -647,6 +647,10 @@ def _configure_environment(args: argparse.Namespace, evidence_dir: Path) -> None
     os.environ["ORCH_EVENT_LOG_PATH"] = str(evidence_dir / "events.jsonl")
     os.environ["RECORDINGS_DIR"] = str(evidence_dir / "recordings")
     os.environ["ORCH_SESSION_TIMING_LOGS"] = "1"
+    # Consent-bound profile Memory runs in every case with its own store beside that case's
+    # evidence, so what one case keeps never reaches another (owner decision 2026-10-26).
+    os.environ["ORCH_ENABLE_DURABLE_PROFILE_MEMORY"] = "1"
+    os.environ["ORCH_DURABLE_PROFILE_MEMORY_PATH"] = str(evidence_dir / "profile_memory.json")
     conversation_id = str(getattr(args, "conversation_id", "") or "").strip()
     if conversation_id:
         os.environ["ORCH_CONVERSATION_ID"] = conversation_id
@@ -1001,6 +1005,9 @@ async def run_check(
     owns_assistant = assistant is None
     if assistant is None:
         assistant = VoiceAssistant()
+    if getattr(args, "new_conversation", False):
+        # A later conversation with the same person starts at the Host's own boundary.
+        assistant.conversation_state.start_new_conversation(reason="scenario_new_conversation")
     errors: list[str] = []
     timings_ms: dict[str, float] = {}
     completion_failure: dict[str, str] | None = None
