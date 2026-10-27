@@ -61,14 +61,14 @@ repairs and owner decisions in force.
    added on 2026-10-26 (119 cases); their first cohort stopped at 30/119 on a weather read for an invented
    place. Read-only tools now declare an unservable request (no such place or period, no result) as an honest
    non-completion, so the runner judges such a case. Its rerun (`personas2-20261026/`, b78e89457) stopped at 10/119
-   on an open-meteo geocoding timeout (a service failure). Owner loop 2 (6 iterations, 2026-10-26), iteration 1:
-   Chromie keeps a lasting fact the person told (where they work) for the conversation, asks once whether to
-   remember it, and keeps it as consent-bound profile Memory on their yes; a later conversation used it for
-   "明天早上上班要不要带伞？" (focused run `it1-memory-20261026/focused/`); its cohort stopped at 30/119 on the same
-   case (a kept fact counted twice across memory tiers). Iteration 2: a cross-script value stands only where a
-   served outcome or a kept fact states it (a Latin placeholder "unknown" had been geocoded to Bangladesh and its
-   weather reported as the person's), and a required read input that no source states is asked for instead of
-   read (the umbrella question now asks where first); a kept fact counts once per key. The streaming Planner still decides
+   on an open-meteo geocoding timeout (a service failure). Owner loop 2 (6 iterations, 2026-10-26): Chromie keeps a lasting fact the person tells
+   about themselves (where they work) the way a friend would, with no "要我记住吗？" question (owner decision
+   2026-10-27, Charter amended), bound to that person (`person:primary` until speaker identification) and kept as
+   profile Memory; a later conversation used it for "明天早上上班要不要带伞？". A cross-script value stands only where a
+   served outcome or a kept fact states it, and a required read input that no source states is asked for instead of
+   read. Iteration 2's cohort stopped at 70/119 (GA decoded a free-form binding change; fixed with empty impossible
+   arrays): smoke 15/15, core 47/55 judged. Iteration 3 also takes "嘘，安静一会儿" as silence and cites a place the
+   person said earlier in the same turn. The streaming Planner still decides
    work with an assumed place for an unstated workplace (clarify trails by 12-15 nats; four prompt and decision-field
    probes moved nothing); the owner wants Chromie to ask where the person works and remember it. Open judged failures: "Say hi to my friend with a
    wave!" waves without a greeting; "你都会做些什么呀？" describes chatting and small tasks rather than real abilities;

@@ -797,7 +797,11 @@ def apply_goal_association_resolution_in_memory(
                 }
             )
             continue
-        if association.relationship in {"continue", "reference"}:
+        # A continuation or reference that answers the Goal's open input gap closes it like a
+        # clarification answer (live 2026-10-27: "我在上海上班。" continued, then referenced, the umbrella
+        # Goal with its location gap resolved; the gap stayed open and the Goal-bound Planner asked again).
+        answers_gap = association.relationship in {"continue", "reference"} and bool(association.resolved_gap_ids)
+        if association.relationship in {"continue", "reference"} and not answers_gap:
             for task_id in target_task_ids:
                 context = state._task_context_by_id(task_id)
                 if context is None:
@@ -834,7 +838,7 @@ def apply_goal_association_resolution_in_memory(
                 )
             continue
 
-        operation_name = relationship_map.get(association.relationship)
+        operation_name = "clarification_answer" if answers_gap else relationship_map.get(association.relationship)
         if operation_name is None:
             results.append(
                 {

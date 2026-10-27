@@ -127,8 +127,10 @@ def test_temporal_realization_lives_in_capability_contract_not_gi_or_ga() -> Non
 
     assert "argument_realization" in weather_block
     assert '"source_entity_type": "temporal_scope"' in weather_block
-    assert "date=today" in weather_block
-    assert "period=night" in weather_block
+    # The contract states the rule, not a worked example: "a current-local-night scope realizes
+    # as date=today" pulled "明天早上" to today (live 2026-10-27, 2.6 nats; 10.7 without it).
+    assert "Populate date when the scope fixes a supported" in weather_block
+    assert "date=today" not in weather_block
 
 
 def test_weather_skill_defers_temporal_mapping_to_selected_capability_contract() -> None:

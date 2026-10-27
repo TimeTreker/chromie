@@ -1275,6 +1275,77 @@ class GoalAssociationRepairPreservationTests(unittest.TestCase):
             if "properties" in item:
                 self.assertIn("path", item["required"])
 
+    def test_a_new_goal_cannot_relate_to_and_supersede_the_same_goal_in_the_decoder(self):
+        """Live 2026-10-27 (adult_umbrella_no_city_zh T3): GA wrote a new Goal that related to and
+        superseded the same retained Goal; the schema's not/contains is ignored by the decoder."""
+        from jsonschema import Draft202012Validator
+        from agent.app.clients.sglang_protocol import _openai_response_format
+        from agent.app.goal_association_contract import GoalAssociationModelOutput
+        from agent.app.goal_association_schema import goal_association_response_schema
+
+        schema = goal_association_response_schema(
+            GoalAssociationModelOutput,
+            [{"goal_id": "goal-a", "goal": {"description": "x", "success_criteria": ["A"]}},
+             {"goal_id": "goal-b", "goal": {"description": "y", "success_criteria": ["B"]}}],
+            [], responsibility_refs=["r1"])
+        wire = _openai_response_format(schema)["json_schema"]["schema"]
+        goal = wire["$defs"]["GoalAssociationModelGoal"]
+        assert "anyOf" not in goal and len(goal["oneOf"]) == 4
+        # The decoder's view: only the branch shapes, never not/contains.
+        decoded = Draft202012Validator({"oneOf": goal["oneOf"]})
+        base = {"source_responsibility_refs": ["r1"]}
+        self.assertFalse(decoded.is_valid({**base, "related_goal_ids": ["goal-a"], "supersedes_goal_ids": ["goal-a"]}))
+        self.assertTrue(decoded.is_valid({**base, "related_goal_ids": ["goal-a"], "supersedes_goal_ids": ["goal-b"]}))
+        self.assertTrue(decoded.is_valid({**base, "related_goal_ids": [], "supersedes_goal_ids": ["goal-a", "goal-b"]}))
+
+    def test_no_binding_to_copy_leaves_the_decoder_no_binding_change(self):
+        """Live 2026-10-27 (adult_shopping_list_zh T2): with no UMI binding, the binding change
+        item was ``{"not": {}}``; the decoder ignored ``not`` and wrote a free-form change."""
+        from agent.app.clients.sglang_protocol import _openai_response_format
+        from agent.app.goal_association_contract import GoalAssociationModelOutput
+        from agent.app.goal_association_schema import goal_association_response_schema
+
+        schema = goal_association_response_schema(
+            GoalAssociationModelOutput,
+            [{"goal_id": "goal-a", "goal": {"description": "x", "success_criteria": ["A"]}}],
+            [], responsibility_refs=["r1"])
+        wire = _openai_response_format(schema)["json_schema"]["schema"]
+        change = wire["$defs"]["GoalAssociationModelRequirementChange"]
+        for shape in (change, *change["oneOf"]):
+            self.assertEqual(shape["properties"]["binding_changes"]["maxItems"], 0)
+
+    def test_a_requirement_keeps_its_goal_modality_in_the_decoder(self):
+        """Live 2026-10-27 (adult_umbrella_no_city_zh): GA replaced an information Goal's requirement
+        with a speech Responsibility (Host rejects a changed modality), and wrote a modify with neither
+        a change nor a resolved gap (the DTO rejects it); the decoder ignored both rules."""
+        from jsonschema import Draft202012Validator
+        from agent.app.clients.sglang_protocol import _openai_response_format
+        from agent.app.goal_association_contract import GoalAssociationModelOutput
+        from agent.app.goal_association_schema import goal_association_response_schema
+
+        def decoder(mode, gaps):
+            goal = {"goal_id": "goal-a", "open_information_gaps": [{"gap_id": "act:location"}] if gaps else [],
+                    "goal": {"description": "x", "success_criteria": ["A"], "metadata": {"output_mode": "information"}}}
+            schema = goal_association_response_schema(
+                GoalAssociationModelOutput, [goal], [], responsibility_refs=["r1"],
+                responsibility_output_modes={"r1": mode})
+            wire = _openai_response_format(schema)["json_schema"]["schema"]
+            association = wire["$defs"]["GoalAssociationModelAssociation"]
+            assert "anyOf" not in association and "allOf" not in association
+            return Draft202012Validator({"oneOf": association["oneOf"], "$defs": wire["$defs"]})
+
+        row = {"source_responsibility_refs": ["r1"], "target_goal_ids": ["goal-a"], "confidence": 1.0}
+        change = {**row, "relationship": "modify", "requirement_changes": [
+            {"target_goal_id": "goal-a", "replace_requirement_indices": [0], "source_responsibility_refs": ["r1"],
+             "binding_changes": []}]}
+        for mode, gaps in (("information", True), ("information", False), ("speech", True), ("speech", False)):
+            with self.subTest(mode=mode, gaps=gaps):
+                decoded = decoder(mode, gaps)
+                self.assertIs(decoded.is_valid(change), mode == "information")
+                self.assertFalse(decoded.is_valid({**row, "relationship": "modify"}))
+                self.assertIs(decoded.is_valid({**row, "relationship": "clarify", "resolved_gap_ids": ["act:location"]}), gaps)
+                self.assertTrue(decoded.is_valid({**row, "relationship": "reference"}))
+
     def test_shape_repair_cannot_change_requirement_replacement_scope(self):
         req, valid, _ = self.candidate_case()
         req.context["active_goal_snapshots"][0]["goal"]["success_criteria"] = ["Requirement A", "Requirement B"]

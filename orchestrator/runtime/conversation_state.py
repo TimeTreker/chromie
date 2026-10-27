@@ -16,6 +16,7 @@ from orchestrator.runtime.memory import (
     MemoryExtractor,
     MemoryPromptBuilder,
     MemoryStore,
+    PRIMARY_PERSON_REF,
     ProtectedDurableMemoryStore,
     rank_memory_prompt_entries,
 )
@@ -160,6 +161,7 @@ class ConversationStateManager:
             max_entries=self.durable_memory_max_entries,
         )
         self._memory_extractor = MemoryExtractor()
+        self.speaker_person_refs = [PRIMARY_PERSON_REF]  # who is talking; no speaker identification yet
         self._memory_prompt_builder = MemoryPromptBuilder()
         self.last_split_reason: str | None = None
         if self.task_store_enabled:
@@ -1304,7 +1306,6 @@ class ConversationStateManager:
         self._discourse_referents.clear()
         self._discourse_focus.clear()
         self._memory_store.clear()
-        self._durable_memory.pending_consent = None
         self._persist_task_contexts_if_enabled()
         self.last_split_reason = reason
         return {
@@ -1889,15 +1890,15 @@ class ConversationStateManager:
         current_task_context = self._current_task_context()
         latest_user = self._latest_turn("user")
         latest_assistant = self._latest_turn("assistant")
-        activation_texts = self._memory_activation_texts()
+        activation_texts, speaker = self._memory_activation_texts(), self.speaker_person_refs
         extracted_memory = self._memory_prompt_builder.build(
             self._memory_store,
             limit=12,
-            activation_texts=activation_texts,
+            activation_texts=activation_texts, audience_refs=speaker,
         )
         durable_entries = self._durable_memory.prompt_entries(
             limit=12,
-            activation_texts=activation_texts,
+            activation_texts=activation_texts, audience_refs=speaker,
         )
         working_entries = [
             {**copy.deepcopy(entry), "memory_tier": "working", "memory_backing": "ram"}
@@ -1909,12 +1910,12 @@ class ConversationStateManager:
         ]
         combined_entries = rank_memory_prompt_entries(
             [*long_term_entries, *working_entries],
-            activation_texts=activation_texts,
+            activation_texts=activation_texts, audience_refs=speaker,
             limit=12,
         )
         durable_entries = rank_memory_prompt_entries(
             long_term_entries,
-            activation_texts=activation_texts,
+            activation_texts=activation_texts, audience_refs=speaker,
             limit=8,
         )
         combined_summary_lines = [f"- {entry['text']}" for entry in combined_entries if entry.get("text")]
@@ -1983,7 +1984,6 @@ class ConversationStateManager:
                 "entries": durable_entries,
                 "protected_storage": "owner_local_mode_0600",
                 "last_error": self._durable_memory.last_error,
-                "pending_consent": copy.deepcopy(self._durable_memory.pending_consent),
             },
             "forgetting_policy": {
                 "conversation_boundary_clears_history_and_ephemeral_tasks": True,

@@ -62,6 +62,42 @@ class ConversationStateTests(unittest.TestCase):
         self.assertTrue(history[0]["metadata"]["accepted_dialogue_evidence"])
         self.assertEqual(history[0]["metadata"]["source"], "goal_driven_cognitive_runtime")
 
+    def test_a_continuation_that_answers_the_open_gap_closes_it(self) -> None:
+        """Live 2026-10-27 (adult_umbrella_no_city_zh T2): GA continued (then referenced) the Goal with
+        its location gap resolved; only modify/clarify closed gaps, so the Goal-bound Planner asked again."""
+        for relationship in ("continue", "reference"):
+            with self.subTest(relationship=relationship):
+                self._answer_gap_with(relationship)
+
+    def _answer_gap_with(self, relationship: str) -> None:
+        manager = ConversationStateManager(base_conversation_id="gap-continue")
+        manager.apply_goal_association_resolution(
+            {"resolution_status": "resolved", "turn_id": "turn-umbrella",
+             "new_goals": [{"goal_id": "goal-umbrella", "description": "Umbrella tomorrow morning?",
+                            "source_text": "明天早上上班要不要带伞？", "source_responsibility_refs": ["r1"]}],
+             "confidence": 1.0},
+            sid="sid-1", user_text="明天早上上班要不要带伞？", atomic=True)
+        manager.apply_planner_information_gaps(
+            {"goal-umbrella": [{"gap_id": "weather:location", "description": "location", "owner": "fast_planner",
+                                "source_kind": "execution_input", "source_reference": "chromie.weather.lookup",
+                                "required_for": ["location"], "preferred_resolution": "ask_user",
+                                "resolution_sources_considered": ["authoritative_context", "capability_schema"]}]},
+            turn_id="turn-umbrella", sid="sid-1", user_text="明天早上上班要不要带伞？")
+        gaps = lambda: [gap["gap_id"] for snapshot in manager.active_goal_snapshots()
+                        for gap in snapshot.get("open_information_gaps") or []]
+        self.assertEqual(gaps(), ["weather:location"])
+
+        results = manager.apply_goal_association_resolution(
+            {"resolution_status": "resolved", "turn_id": "turn-answer",
+             "associations": [{"association_id": "assoc-answer", "relationship": relationship,
+                               "source_responsibility_refs": ["r1"], "target_goal_ids": ["goal-umbrella"],
+                               "resolved_gap_ids": ["weather:location"], "confidence": 1.0}],
+             "confidence": 1.0},
+            sid="sid-2", user_text="我在上海上班。", atomic=True)
+
+        self.assertTrue(all(item.get("applied") for item in results), results)
+        self.assertEqual(gaps(), [])
+
     def test_natural_language_reset_is_not_classified_by_host(self) -> None:
         manager = ConversationStateManager(base_conversation_id="test")
         manager.record_user_turn('s1', 'check the weather')

@@ -297,9 +297,9 @@ class PlannerResolver:
                 repeated_activity_repairs += merged_read_repairs
                 output, citation_repairs = reanchor_turn_citations_to_outcomes(
                     output, source=current.original_user_text, responsibilities=responsibilities,
-                    capabilities=capabilities, earlier_talk=[
+                    capabilities=capabilities, earlier_talk=[current.original_user_text, *(
                         str(item.get("text") or "") for item in current.history or current.context.get("history") or []
-                        if isinstance(item, dict)])
+                        if isinstance(item, dict))])
                 output, memory_repairs = reanchor_turn_citations_to_memory(
                     output, source=current.original_user_text, capabilities=capabilities,
                     memory_texts=person_told_memory_texts(current.context))

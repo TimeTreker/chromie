@@ -318,8 +318,9 @@ def _updates(*items: dict) -> dict:
     return {"metadata": {"memory_updates": list(items)}}
 
 
-class PersonalFactConsentTests(unittest.TestCase):
-    """Owner decision 2026-10-26: Chromie asks before keeping a fact the person told her long-term."""
+class PersonalFactTests(unittest.TestCase):
+    """Owner decisions 2026-10-26/27: a fact a person tells about their life is kept the way a friend
+    remembers, without asking, and belongs to that person."""
 
     FACT = {"type": "personal_fact", "key": "workplace", "text": "The person works in Shanghai."}
 
@@ -328,57 +329,41 @@ class PersonalFactConsentTests(unittest.TestCase):
             durable_memory_enabled=enabled, durable_memory_path=Path(directory) / "profile.json",
         )
 
-    def test_told_fact_is_working_memory_and_pending_consent_until_asked_and_answered(self) -> None:
-        with tempfile.TemporaryDirectory() as directory:
-            manager = self.manager(directory)
-            manager.record_interaction_response("sid-1", _updates(self.FACT))
-            memory = manager.session_memory()
-            working = [entry for entry in memory["active_memory"]["entries"] if entry.get("key") == "workplace"]
-            self.assertEqual([entry["memory_tier"] for entry in working], ["working"])
-            self.assertIn("umi", working[0]["cognitive_roles"])
-            self.assertEqual(memory["durable_profile_memory"]["pending_consent"],
-                             {"key": "workplace", "text": "The person works in Shanghai.", "asked": False})
-            # A yes before Chromie's question was heard keeps nothing.
-            manager.record_interaction_response(
-                "sid-2", _updates({"type": "memory_consent_reply", "key": "workplace", "answer": "yes"}))
-            self.assertEqual(manager.snapshot()["durable_profile_memory"]["entries"], [])
+    @staticmethod
+    def kept(manager: ConversationStateManager) -> list[dict]:
+        return [entry for entry in manager.session_memory()["active_memory"]["entries"]
+                if entry.get("key") == "workplace"]
 
-    def test_yes_to_the_asked_question_keeps_the_fact_under_its_key_for_later_conversations(self) -> None:
+    def test_a_told_fact_is_kept_for_that_person_across_conversations(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             manager = self.manager(directory)
             manager.record_interaction_response("sid-1", _updates(self.FACT))
-            manager.record_interaction_response("sid-1", _updates({"type": "memory_consent_asked", "key": "workplace"}))
-            manager.record_interaction_response(
-                "sid-2", _updates({"type": "memory_consent_reply", "key": "workplace", "answer": "yes"}))
             [kept] = manager.snapshot()["durable_profile_memory"]["entries"]
-            self.assertEqual((kept["key"], kept["text"], kept["consent_basis"], kept["scope"]),
-                             ("workplace", "The person works in Shanghai.", "explicit_current_turn", "profile"))
-            self.assertIsNone(manager.session_memory()["durable_profile_memory"]["pending_consent"])
-
+            self.assertEqual((kept["key"], kept["text"], kept["consent_basis"], kept["audience_refs"]),
+                             ("workplace", "The person works in Shanghai.", "volunteered_current_turn",
+                              ["person:primary"]))
             manager.start_new_conversation(reason="test")
             reloaded = self.manager(directory)
-            entries = [entry for entry in reloaded.session_memory()["active_memory"]["entries"]
-                       if entry.get("key") == "workplace"]
-            self.assertEqual([entry["memory_tier"] for entry in entries], ["long_term"])
-            self.assertIn("umi", entries[0]["cognitive_roles"])
+            [entry] = self.kept(reloaded)
+            self.assertEqual(entry["memory_tier"], "long_term")
+            self.assertIn("umi", entry["cognitive_roles"])
+            # Another person's conversation never sees it.
+            reloaded.speaker_person_refs = ["person:dad"]
+            self.assertEqual(self.kept(reloaded), [])
 
-    def test_a_changed_fact_replaces_the_kept_one_and_no_keeps_nothing(self) -> None:
+    def test_a_changed_fact_replaces_the_kept_one(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             manager = self.manager(directory)
-            for text, answer in (("The person works in Shanghai.", "yes"),
-                                 ("The person works in Hangzhou.", "yes"),
-                                 ("The person works in Suzhou.", "no")):
-                manager.record_interaction_response("sid", _updates(
-                    {**self.FACT, "text": text}, {"type": "memory_consent_asked", "key": "workplace"},
-                    {"type": "memory_consent_reply", "key": "workplace", "answer": answer}))
+            for text in ("The person works in Shanghai.", "The person works in Hangzhou."):
+                manager.record_interaction_response("sid", _updates({**self.FACT, "text": text}))
             [kept] = manager.snapshot()["durable_profile_memory"]["entries"]
             self.assertEqual(kept["text"], "The person works in Hangzhou.")
 
-    def test_without_profile_memory_nothing_is_offered(self) -> None:
+    def test_without_profile_memory_it_lasts_for_the_conversation(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             manager = self.manager(directory, enabled=False)
             manager.record_interaction_response("sid", _updates(self.FACT))
-            self.assertIsNone(manager.session_memory()["durable_profile_memory"]["pending_consent"])
+            self.assertEqual([entry["memory_tier"] for entry in self.kept(manager)], ["working"])
             self.assertFalse((Path(directory) / "profile.json").exists())
 
 

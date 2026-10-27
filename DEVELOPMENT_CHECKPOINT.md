@@ -70,32 +70,37 @@ Evidence and per-run judgments: `.chromie/acceptance/iter8-20261026/`, `iter7-20
   local tools now declare an unservable request as the owner's honest non-completion (`provider_output`), never a
   timeout or outage. Owner direction (2026-10-26): ask where the person works the first time and remember it until
   they say it changed; the case is now that three-turn flow. Owner loop 2 (2026-10-26: up to 6 iterations,
-  my recommendations decide, commit and push each). Iteration 1 builds that memory within the consent contract:
-  Social Cognition states `personal_fact` at ingress (key + text, `stated` first); Host keeps it as working Memory
-  and, with profile Memory on (`.env.common`, owner direction), offers it; the first answer-giving reply asks and
-  states `memory_consent_asked`; the next ingress states `memory_consent_reply`; a yes keeps it as profile Memory
-  visible to UMI, GA and Planner, a later yes for the same key replaces it. A kept fact grounds a later information
-  read's value its turn words lack (`turn_citation_reanchored_to_memory`). GA change branches now carry their
-  whole shape in the SGLang transport (a requirement change had lost `source_responsibility_refs`). The live-text
-  harness gives each case its own profile store and supports `new_conversation` turns. Live focused runs found and
-  removed: an SC-time need changed the reserved Plan fingerprint; a confirmation need doubled the evidence-answer
-  contract past the prompt budget; a question appended to a reused acknowledgement broke its identity. Its cohort
-  (`it1-memory-20261026/cohort/`) stopped at 30/119: smoke 15/15, core 13/15 judged; the umbrella case's
-  "那下班的时候呢？" failed closed because the working and long-term copies of the kept fact both held 上海.
-  Iteration 2: kept facts count once per key; a cross-script value stands only where a served outcome or a kept
-  fact states it (live outcomes state the value in its own language in 122 of 122 reads; "unknown" had been
-  geocoded to Bangladesh and reported); a required free-text input of an information read that no source states
-  becomes that input's clarification (`ungrounded_input_clarified`) instead of a read or a failure; the turn whose
-  words answered a Goal's open input gap (Goal Association `resolved_gap_ids`) owns the value it states. UMI read
-  "我在上海上班。" as a statement (speech -0.00 vs information -5.84 nats on the live request): the old question was
-  untyped speech after a failed read, so the open Goal had no pending clarification; the typed question is the
-  expected repair. Next: the
+  my recommendations decide, commit and push each). Iterations 1-3 build that memory the way a person keeps what a friend tells them (owner
+  decision 2026-10-27: no "要我记住吗？" question; the Charter's memory principle is amended): Social Cognition states
+  `personal_fact` at ingress (key + text, `stated` first) only from the person's own Responsibility; Host keeps it as
+  a fact about the speaker (`person_fact_entry`: subject, source and audience are the person, disclosure
+  `shared_with_audience`, visible to UMI, GA and Planner) — as profile Memory when it is on (`.env.common`), replaced
+  by key, otherwise for the conversation. Without speaker identification the speaker is `person:primary`; another
+  speaker's facts are not shown. A kept fact grounds a later information read's value its turn words lack
+  (`turn_citation_reanchored_to_memory`), counted once per key across tiers. A cross-script value stands only where
+  a served outcome or a kept fact states it ("unknown" had been geocoded to Bangladesh); a required free-text read
+  input no source states is asked for (`ungrounded_input_clarified`); the turn that answered a Goal's open input gap
+  owns the value it states; a value the person said in this turn outside UMI's span moves to the outcome citation
+  ("我明天要去广州出差，那边热不热？" had cited only "那边" and asked which district). GA's native decoder shapes: change
+  branches carry their whole shape, a new Goal relates to or supersedes a retained Goal but never both, and an
+  array whose items nothing can satisfy (`{"not": {}}`, no UMI binding to copy) is decoded empty (the shopping-list
+  follow-up had written a free-form binding change and stopped the iteration-2 cohort at 70/119); a requirement
+  keeps its Goal's outcome modality, so a speech answer to an information Goal resolves its gap or takes another
+  relationship instead of replacing the question (only such requests change shape; the frozen corpus has none);
+  modify and clarify are decoded only with a requirement change or a resolved gap (SGLang transport branches). The weather
+  contract no longer carries the worked example "current-local-night realizes as date=today", which pulled a
+  period-scoped "明天早上" to today (replayed live calls: 2.6 → 10.7 nats, and a wrong T4 corrected). A GA continuation or
+  reference that answers a Goal's open input gap now closes it (only modify/clarify did). The silence
+  reflex also takes a hush and a duration ("嘘，安静一会儿，我在打电话。" had been planned as a body action). The
+  iteration-2 cohort (`it2-ground-20261027/cohort/`, c29f3b7c1): smoke 15/15, core 52/55 automatic and 47/55
+  judged; open: "那上海呢？" keeps today (flaky), "给我倒杯水。" says it was poured when the bottle was brought, SC
+  brushes off loneliness and boredom. Next: the
   complete 119-case cohort, judged by stage; then latency (prefix caching, prompt size, serial UMI
   and SC ingress), then the standing-attention skill plan (`.chromie/plans/`). Open judged failures: wave_friend
   greeting, ability self-description, a confirmed wrong sum, a delayed wave; expression use under the lively style.
   Measure the schema size of any Social Cognition schema change before deploying it.
 
-Verification: clean-worktree gate on this delivery's source: pytest 4,039 passed + 5 skipped (`xgrammar` not
+Verification: clean-worktree gate on this delivery's source: pytest 4,068 passed + 5 skipped (`xgrammar` not
 installed), benchmarks 172, legacy Agent tests 20, all checks. Strict replay not rerun (last 6,000/6,000 on freeze
 47, 2026-10-23).
 

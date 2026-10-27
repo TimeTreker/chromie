@@ -322,7 +322,7 @@ It first assigns one closed cancellation scope:
 
 | Input class | Cancellation scope | Deterministic target |
 |---|---|---|
-| `Stop talking`, `别说了` | `output_only` | The host's shared audible-output resource plus interruptible speech requests in the bound interaction |
+| `Stop talking`, `别说了`, also after a hush or with a short duration (`Shh, be quiet for a bit`, `嘘，安静一会儿`) | `output_only` | The host's shared audible-output resource plus interruptible speech requests in the bound interaction |
 | `Stop the music`, `停止音乐` | `media_output` | Media requests declaring the `media_output` cancellation domain across open runtime interactions; Vocal output is unchanged |
 | `Stop moving`, `停止移动` | `embodied_motion` | Current and queued requests explicitly declared to have a physical-motion effect |
 | Bare `Stop`, `Cancel`, `停止` | `current_interaction` | Every unfinished request in the foreground interaction; completed goals and unrelated remembered goals are unchanged |

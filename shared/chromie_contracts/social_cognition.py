@@ -207,8 +207,9 @@ MEMORY_KEY_PATTERN = r"^[a-z][a-z_]{1,40}$"
 class SocialPersonalFact(BaseModel):
     """Whether the person's own words told a lasting fact about their life, such as where they work.
 
-    Owner decision 2026-10-26: Chromie keeps it for the conversation and asks before keeping it
-    long-term; `stated` is decided first so a turn without such a fact writes nothing else.
+    Owner decisions 2026-10-26/27: Chromie keeps it as that person's Memory, the way a friend
+    remembers, without asking; `stated` is decided first so a turn without such a fact writes
+    nothing else.
     """
 
     model_config = ConfigDict(extra="forbid", frozen=True)
@@ -224,34 +225,6 @@ class SocialPersonalFact(BaseModel):
         return self
 
 
-class SocialMemoryConsentReply(BaseModel):
-    """The person's answer, in this turn, to Chromie's question whether to keep a fact long-term."""
-
-    model_config = ConfigDict(extra="forbid", frozen=True)
-    key: str = Field(pattern=MEMORY_KEY_PATTERN)
-    answer: Literal["yes", "no", "not_answered"]
-    source_responsibility_refs: list[str] = Field(min_length=1, max_length=4)
-
-
-def pending_memory_consent(context: dict[str, Any]) -> dict[str, Any] | None:
-    """The fact Chromie offered to keep long-term and has not settled, from trusted session Memory."""
-    memory = context.get("session_memory")
-    profile = memory.get("durable_profile_memory") if isinstance(memory, dict) else None
-    pending = profile.get("pending_consent") if isinstance(profile, dict) else None
-    return pending if isinstance(pending, dict) and pending.get("key") and pending.get("text") else None
-
-
-def memory_consent_question_due(request: "SocialCognitionRequest") -> dict[str, Any] | None:
-    """The offered fact Chromie asks to keep now: only in a reply that gives the turn's answer
-    (Evidence, or a Plan with no Work), never in progress words (live 2026-10-26: appended to a
-    reused acknowledgement it broke that act's identity)."""
-    consent = pending_memory_consent(request.context)
-    plan = request.context.get("canonical_plan_resolution")
-    answering = request.trigger == "evidence" or (
-        request.trigger == "work_state" and isinstance(plan, dict) and not plan.get("steps"))
-    return consent if consent and not consent.get("asked") and answering else None
-
-
 class SocialCognitionOutput(BaseModel):
     """One primary semantic result; a depth request cannot contain a decision."""
 
@@ -264,8 +237,6 @@ class SocialCognitionOutput(BaseModel):
     self_memory_candidates: list[SituationalSelfMemoryCandidate] = Field(default_factory=list, max_length=4)
     preference_memory_candidates: list[SocialPreferenceMemoryCandidate] = Field(default_factory=list, max_length=2)
     personal_fact: SocialPersonalFact | None = None
-    memory_consent_asked: bool | None = None
-    memory_consent_reply: SocialMemoryConsentReply | None = None
 
     @model_validator(mode="after")
     def validate_decision(self) -> "SocialCognitionOutput":
@@ -273,8 +244,7 @@ class SocialCognitionOutput(BaseModel):
             raise ValueError("only communicate may carry a nonempty complete act decision")
         if self.disposition == "deliberate" and (
             self.memory_candidates or self.self_memory_candidates or self.preference_memory_candidates
-            or (self.personal_fact and self.personal_fact.stated) or self.memory_consent_asked
-            or self.memory_consent_reply
+            or (self.personal_fact and self.personal_fact.stated)
         ):
             raise ValueError("unresolved cognition cannot author a Memory decision")
         if self.disposition == "deliberate" and self.need_outcomes:
@@ -525,13 +495,6 @@ class SocialCognitionResolution(SocialCognitionOutput):
         fact = self.personal_fact if self.personal_fact and self.personal_fact.stated else None
         if fact and (request.trigger != "interpretation" or not set(fact.source_responsibility_refs) <= own_refs):
             raise ValueError("a personal fact is kept only at ingress from the person's own Responsibility")
-        reply, pending = self.memory_consent_reply, pending_memory_consent(request.context)
-        if self.memory_consent_asked and (not memory_consent_question_due(request)
-                                          or not any(act.text.strip() for act in self.activities)):
-            raise ValueError("only a spoken Plan-bound reply asks whether to keep the offered fact")
-        if reply and (request.trigger != "interpretation" or not pending or not pending.get("asked")
-                      or pending["key"] != reply.key or not set(reply.source_responsibility_refs) <= own_refs):
-            raise ValueError("only the person's next words answer Chromie's question whether to keep a fact")
         evidence_need_ids = completed_work_need_ids(request)
         earlier_bindings_all = earlier_act_need_bindings(request.context)
         earlier_bindings = earlier_bindings_all if evidence_need_ids else {}

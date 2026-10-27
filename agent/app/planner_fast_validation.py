@@ -1633,8 +1633,9 @@ def reanchor_turn_citations_to_outcomes(
     "there", and Host rejected the turn. The turn-versus-outcome choice was a 0.1-nat near-tie.
     Only an information read's free-text value whose cited turn words lack it, which occurs
     verbatim exactly once in the outcomes of the Responsibilities that Activity serves, and which
-    earlier talk already said, moves to that outcome span; the value is unchanged and validation
-    follows. A value that only the outcome holds would let UMI override the person's own words
+    the talk already said (this turn outside the cited span included: live 2026-10-27, "我明天要去广州
+    出差，那边热不热？" cited "那边" for 广州), moves to that outcome span; the value is unchanged and
+    validation follows. A value that only the outcome holds would let UMI override the person's own words
     ("What is the weather in Paris?" with an outcome saying Chongqing still fails closed). An
     outcome citation whose tokens miss its value moves to that value's single verbatim run in the
     same outcome.

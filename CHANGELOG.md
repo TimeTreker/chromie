@@ -5,6 +5,24 @@ remains available in Git history.
 
 ## Unreleased
 
+### Remember what a person tells you like a friend does (owner loop 2, iteration 3, 2026-10-27)
+
+- No "要我记住吗？" question (owner decision): a lasting fact the person tells about themselves is kept as theirs —
+  subject, source and audience are that person (`person:primary` until speaker identification) — as profile Memory
+  replaced by key; the Charter's memory principle is amended. The iteration-1 consent fields are removed.
+- GA's native decoder: a new Goal relates to or supersedes a retained Goal, never both; an array whose items nothing
+  can satisfy is decoded empty (a free-form binding change had stopped the iteration-2 cohort at 70/119); a
+  requirement keeps its Goal's outcome modality ("我在上海上班。" had replaced the umbrella question); modify and
+  clarify are decoded only with a requirement change or a resolved gap ("那下班的时候呢？" had carried neither).
+- The weather contract states its date/period rule without the worked example "a current-local-night scope
+  realizes as date=today", which pulled "明天早上" to today (replayed live calls: tomorrow-morning margins 2.6 → 10.7
+  nats and a wrong one corrected; elliptical "那上海呢？" stays wrong).
+- A continuation or reference that answers a Goal's open input gap closes it, as a clarification answer does; the gap had
+  stayed open after "我在上海上班。" and the Goal-bound Planner asked again.
+- The silence reflex takes a hush and a duration ("嘘，安静一会儿，我在打电话。", "Shh, be quiet for a bit").
+- A place the person said in this turn, outside UMI's span, is cited from the Responsibility outcome instead of
+  being asked for ("我明天要去广州出差，那边热不热？").
+
 ### Ask for a place nobody named instead of reading an invented one (owner loop 2, iteration 2, 2026-10-27)
 
 - A cross-script value (a Latin location for a Chinese turn) stands only where a served outcome or a kept fact

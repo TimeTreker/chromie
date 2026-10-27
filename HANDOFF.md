@@ -14,9 +14,9 @@ ordered open work are in [STATUS](docs/STATUS.md).
   revision pinned by `capabilities/soridormi.json` and `release/compatibility.json`. The
   MCP container mounts its `src`, so a `docker restart soridormi-runtime-mcp` loads it and
   resets the scene (user at -90 degrees, 1.5 m).
-- Live Agent: `chromie-agent:latest` = `it2-ground-20261027` (`e4b22dd087c8`), built from this delivery's source and
-  recreated with the quiet-mode timeout overrides; `--verify-agent-source` result in
-  `.chromie/acceptance/it2-ground-20261027/agent-source-verify.json`. Previous image: `it1-memory-20261026` (`9c67fa9dbae9`).
+- Live Agent: `chromie-agent:latest` = `it3-person-20261027` (`971e6024cf3f`), built from this delivery's source and
+  recreated with the quiet-mode timeout overrides; `--verify-agent-source` matched
+  (`.chromie/acceptance/it3-person-20261027/deploy4/agent-source-verify.json`). Previous image: `it2-ground-20261027` (`e4b22dd087c8`).
 - The host rebooted at 19:35 on 2026-10-26: the Soridormi scene was restarted detached (log
   `.chromie/acceptance/it1-memory-20261026/soridormi-run.log`); CPU turbo came back on (`no_turbo=0`) while the platform
   stays quiet/power-saver, so the owner re-runs `sudo .chromie/quiet-mode/quiet-mode.sh on`; deployments keep the
@@ -28,7 +28,8 @@ ordered open work are in [STATUS](docs/STATUS.md).
 - Workflow corpus: freeze 47 (`bdb8db08…`; scripts in `.chromie/acceptance/thirsty-offer-20261021/freeze47/`). Restore it with
   `python -m benchmarks.regression restore-fixtures`; do not untar `frozen.tar.xz` over
   `workflow_scenarios/` (its inner `manifest.json` lacks the storage identity).
-- Evidence (README in each): `.chromie/acceptance/it2-ground-20261027/` (owner loop 2 iteration 2),
+- Evidence (README in each): `.chromie/acceptance/it3-person-20261027/` (owner loop 2 iteration 3),
+  `it2-ground-20261027/` (iteration 2; `cohort/` stopped at 70/119, judged by stage in its README),
   `it1-memory-20261026/` (iteration 1: focused runs of the five-turn umbrella case; `cohort/` stopped at 30/119), `personas2-20261026/` (b78e89457: stopped at 10/119 on a
   geocoding timeout),
   `personas-20261026/` (80606ad48: hard stop at 30/119 on a weather read for an invented place),

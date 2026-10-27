@@ -810,8 +810,7 @@ def chromie_manifests(
                                 "selected. Populate date when the scope fixes a supported "
                                 "relative calendar day and populate period when it fixes a "
                                 "supported local within-day period; a compound scope may "
-                                "require both. A current-local-night scope therefore realizes "
-                                "as date=today and period=night. Do not narrow broader scope, "
+                                "require both. Do not narrow broader scope, "
                                 "invent a missing dimension, or rewrite the canonical Goal."
                             ),
                         }

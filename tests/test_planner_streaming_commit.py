@@ -2020,6 +2020,54 @@ async def test_a_value_resolved_from_earlier_talk_is_cited_from_the_outcome(loca
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("location", ["广州", "深圳"])
+async def test_a_value_said_earlier_in_the_same_turn_is_cited_from_the_outcome(location):
+    """Live 2026-10-27 (adult_trip_weather_zh): "我明天要去广州出差，那边热不热？" — UMI's span was the
+    question clause, the decoder let the Planner cite only "那边" for 广州, and the read became a
+    question about the place. A place the person said in this turn moves to the outcome; one they
+    never said is still asked for."""
+    from shared.chromie_contracts.user_turn import user_turn_source_tokens
+
+    text = "我明天要去广州出差，那边热不热？"
+    tokens = user_turn_source_tokens(text)
+
+    def span(surface):
+        start = text.index(surface)
+        found = [t for t in tokens if start <= t["start"] and t["end"] <= start + len(surface)]
+        return {"source_start_token_ref": found[0]["ref"], "source_end_token_ref": found[-1]["ref"]}
+
+    request = CognitiveWorkRequest(sid="trip", text=text, language="zh-CN", interpretation_confidence=1.0,
+        responsibilities=[CognitiveResponsibilityProposal(
+            local_ref="r1", outcome="回答明天广州的天气是否炎热", output_mode="information", confidence=1.0,
+            source_evidence=span("那边热不热"))])
+    weather = CatalogCapability(
+        capability_id="chromie.weather.lookup", agent_id="chromie.weather", description="Retrieve a forecast.",
+        input_schema={"type": "object", "properties": {"location": {"type": "string"}}, "required": ["location"],
+                      "additionalProperties": False},
+        available=True, interaction_executable=True, prompt_tier="common", idempotent=True, side_effect_free=True,
+        safety_class="safe_read", hints={"side_effect_free": True, "resource_contract": {"provider_role": "acquire_information"},
+                                         "semantic_scope": {"responsibility_type": "acquire_and_deliver_resource",
+                                                            "resource_kinds": ["information"]}})
+    raw = {"ability_needs": [{"need": "read the weather forecast", "closest_loaded": "chromie.weather.lookup",
+                              "closest_loaded_does": "Retrieve a forecast.", "fits": True}],
+           "responsibility_decisions": {"r1": {"needed_abilities_fit": True, "decision": "work", "missing": []}},
+           "activity_count": 1,
+           "activities": [{"role": "capability", "source_responsibility_refs": ["r1"], "capability_id": "chromie.weather.lookup",
+                           "activity_id": "act_weather", "args": {"location": location},
+                           "argument_sources": {"location": span("那边")}, "depends_on": []}],
+           "disposition": "execute", "coverage": "complete", "covered_responsibility_refs": ["r1"],
+           "confidence": 1.0, "unresolved": [], "reason_summary": "Read tomorrow's forecast."}
+    model = _StreamingModel([json.dumps(raw)])
+    frames = [f async for f in PlannerResolver(model, _Catalog([weather])).stream_advance(request)]
+    if location == "深圳":
+        assert [item.role for item in frames[-1].advance.activities] == ["clarification"]
+        return
+    assert isinstance(frames[-1], FastPlannerStreamTerminal), frames[-1]
+    cited = frames[-1].advance.activities[0].argument_sources["location"]
+    assert cited.source_start_token_ref.startswith("r1.") and cited.source_end_token_ref.startswith("r1.")
+
+
+@pytest.mark.asyncio
 @pytest.mark.parametrize("location", ["上海", "北京"])
 async def test_an_outcome_citation_off_its_value_moves_to_the_value_in_that_outcome(location):
     """Live 2026-10-25 (multi_weather_followup_zh T2): for "那上海呢？" the Planner wrote location

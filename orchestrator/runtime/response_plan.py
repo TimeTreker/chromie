@@ -223,17 +223,14 @@ def build_social_interaction_response(
             },
         ))
     # A lasting preference the person stated becomes session Memory when this turn's response is
-    # recorded (owner decision 2026-10-23); so does a lasting fact about their life, which Chromie
-    # then offers to keep long-term, and their answer to her question settles that offer (2026-10-26).
+    # recorded (owner decision 2026-10-23); a lasting fact they told about their life becomes their
+    # Memory, kept the way a friend remembers (owner decisions 2026-10-26/27).
     memory_updates: list[dict[str, Any]] = [{"type": "memory_entry", "value": {
         "kind": "preference", "scope": "session", "text": item.text, "confidence": 0.9,
     }} for item in result.preference_memory_candidates]
     if result.personal_fact is not None and result.personal_fact.stated:
         memory_updates.append({"type": "personal_fact", "key": result.personal_fact.key,
                                "text": result.personal_fact.text})
-    if result.memory_consent_reply is not None:
-        memory_updates.append({"type": "memory_consent_reply", "key": result.memory_consent_reply.key,
-                               "answer": result.memory_consent_reply.answer})
     return InteractionResponse(
         interaction_id="sc_" + hashlib.sha256(
             f"{request.request_id}|{result.snapshot_digest}".encode()

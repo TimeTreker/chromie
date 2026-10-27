@@ -151,6 +151,28 @@ class ReflexFilterTests(unittest.TestCase):
         exact = ReflexFilter().evaluate("别说话。")
         self.assertFalse(exact.metadata["residual_semantic_input"])
 
+    def test_hushed_and_timed_silence_requests_stay_deterministic(self) -> None:
+        """Live 2026-10-27 (adult_be_quiet_zh): a hush and a duration around the request."""
+        for text, residual in (
+            ("嘘，安静一会儿，我在打电话。", True),
+            ("安静一会儿。", False),
+            ("嘘，安静点！", False),
+            ("嘘！", False),
+            ("你先别说话，点两下头。", True),
+            ("Shh, be quiet for a bit, I'm on the phone.", True),
+            ("Be quiet for a minute.", False),
+            ("Shh!", False),
+        ):
+            with self.subTest(text=text):
+                outcome = ReflexFilter().evaluate(text)
+
+                self.assertEqual(outcome.cancellation_scope, "output_only")
+                self.assertIs(outcome.metadata["residual_semantic_input"], residual)
+
+        for text in ("安静的地方在哪里？", "嘘，我告诉你一个秘密。", "他让我安静。"):
+            with self.subTest(text=text):
+                self.assertEqual(ReflexFilter().evaluate(text).action, "continue")
+
     def test_named_selective_stop_stays_cognitive(self) -> None:
         reflex_filter = ReflexFilter()
 

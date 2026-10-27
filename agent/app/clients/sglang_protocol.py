@@ -187,6 +187,36 @@ def _complete_ga_change_branches(schema: dict[str, Any]) -> None:
             branch["additionalProperties"] = False
 
 
+def _disjoint_ga_goal_links(schema: dict[str, Any]) -> None:
+    """Let a new Goal relate to or supersede a retained Goal, never both, in the native decoder.
+
+    The schema states the disjointness with ``not``/``contains``, which the decoder ignores
+    (live 2026-10-27, "好呀，记住吧。": a new Goal related to and superseded the same Goal and
+    the DTO rejected it). Up to three candidates are offered as one branch per related subset
+    whose superseded subsets come from the remaining candidates.
+    """
+    goal = schema.get("$defs", {}).get("GoalAssociationModelGoal", {})
+    properties = goal.get("properties") or {}
+    candidates = ((properties.get("related_goal_ids") or {}).get("items") or {}).get("enum")
+    if not isinstance(candidates, list) or not candidates or len(candidates) > 3:
+        return
+
+    def subsets(values: list[Any]) -> list[list[Any]]:
+        return [list(subset) for size in range(len(values) + 1) for subset in itertools.combinations(values, size)]
+
+    branches = []
+    for related in subsets(candidates):
+        branch = {"type": "object", "additionalProperties": False, "required": list(goal.get("required") or []),
+                  "properties": copy.deepcopy(properties)}
+        branch["properties"]["related_goal_ids"] = {"type": "array", "enum": [related]}
+        branch["properties"]["supersedes_goal_ids"] = {
+            "type": "array", "enum": subsets([value for value in candidates if value not in related])}
+        branches.append(branch)
+    goal.pop("anyOf", None)
+    goal.pop("allOf", None)
+    goal["oneOf"] = branches
+
+
 def _bound_ga_requirement_indices(schema: dict[str, Any]) -> None:
     """Expose GA's unique requirement indices to the native decoder, which ignores uniqueItems.
 
@@ -209,6 +239,71 @@ def _bound_ga_requirement_indices(schema: dict[str, Any]) -> None:
             indices["maxItems"] = len(values)
 
 
+def _empty_impossible_arrays(schema: dict[str, Any]) -> None:
+    """Close arrays whose items no value can satisfy, which the native decoder cannot see.
+
+    ``{"not": {}}`` admits nothing, but the decoder ignores ``not`` and decodes any object
+    (live 2026-10-27, "我刚才说要买什么来着？": with no UMI binding to copy, GA wrote a binding
+    change of its own shape and the DTO rejected the turn). Such an array is decoded empty.
+    """
+    definitions = schema.get("$defs") or {}
+
+    def impossible(node: Any) -> bool:
+        if isinstance(node, dict) and isinstance(node.get("$ref"), str):
+            node = definitions.get(node["$ref"].rsplit("/", 1)[-1])
+        return isinstance(node, dict) and (node.get("not") == {} or node.get("oneOf") == [{"not": {}}])
+
+    def close(node: Any) -> None:
+        if isinstance(node, dict):
+            if node.get("type") == "array" and impossible(node.get("items")):
+                node["maxItems"] = 0
+            for value in node.values():
+                close(value)
+        elif isinstance(node, list):
+            for value in node:
+                close(value)
+
+    close(schema)
+
+
+def _ga_relationship_branches(schema: dict[str, Any]) -> None:
+    """State GA's modify/clarify invariant as branches the native decoder follows.
+
+    A modify or clarify association needs a requirement change or a resolved gap; the schema
+    says so with ``if``/``then``, which the decoder ignores (live 2026-10-27, "那下班的时候呢？":
+    a modify carried neither and the DTO rejected the turn). Each relationship group gets its own
+    complete shape; a change or gap branch exists only when the request allows one.
+    """
+    definitions = schema.get("$defs") or {}
+    association = definitions.get("GoalAssociationModelAssociation")
+    fields = (association or {}).get("properties") or {}
+    relationships = list((fields.get("relationship") or {}).get("enum") or [])
+    if not relationships or "oneOf" in association:
+        return
+    change = definitions.get("GoalAssociationModelRequirementChange") or {}
+    can_change = change.get("oneOf") != [{"not": {}}] and (fields.get("requirement_changes") or {}).get("maxItems") != 0
+    gaps = (fields.get("resolved_gap_ids") or {})
+    can_resolve = bool((gaps.get("items") or {}).get("enum")) and gaps.get("maxItems") != 0
+    updates = [name for name in relationships if name in {"modify", "clarify"}]
+
+    def branch(names: list[str], required_field: str | None) -> dict[str, Any]:
+        shape = copy.deepcopy(fields)
+        shape["relationship"] = {**shape["relationship"], "enum": names}
+        if required_field:
+            shape[required_field] = {**shape[required_field], "minItems": 1}
+        return {"type": "object", "additionalProperties": False, "properties": shape,
+                "required": [*association.get("required", []), *([required_field] if required_field else [])]}
+
+    branches = [
+        *([branch(updates, "requirement_changes")] if updates and can_change else []),
+        *([branch(updates, "resolved_gap_ids")] if updates and can_resolve else []),
+        branch([name for name in relationships if name not in {"modify", "clarify"}], None),
+    ]
+    association.pop("allOf", None)
+    association.pop("anyOf", None)
+    association["oneOf"] = branches
+
+
 def _openai_response_format(response_format: Any) -> dict[str, Any] | None:
     if response_format == "text":
         return None
@@ -219,7 +314,10 @@ def _openai_response_format(response_format: Any) -> dict[str, Any] | None:
         if schema.get("title") == "GoalAssociationModelOutput":
             _bound_ga_ownership_rows(schema)
             _complete_ga_change_branches(schema)
+            _disjoint_ga_goal_links(schema)
             _bound_ga_requirement_indices(schema)
+            _empty_impossible_arrays(schema)
+            _ga_relationship_branches(schema)
         if schema.get("title") == "FastPlannerWorkAdvanceOutput":
             _stream_decoder_constraints(schema)
         if schema.get("title") in {

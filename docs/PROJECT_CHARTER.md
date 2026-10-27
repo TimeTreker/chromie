@@ -686,7 +686,12 @@ a Beijing hotel object-location memory can remain retained after Chromie is in a
 hotel while no longer entering ordinary current planning; stable preferences may remain active
 when relevant across both contexts. Today only consent-bound profile Memory and unfinished
 Goals have a durable owner, so such a world/object fact is Working Memory bounded by its TTL
-and is lost at restart until a durable owner with consent and retention rules exists.
+and is lost at restart until a durable owner with consent and retention rules exists. A lasting
+fact a person volunteers about their own life (where they live or work, for example) is the one
+owner-approved exception to asking (owner decision 2026-10-27): Chromie keeps it the way a friend
+remembers, without a consent question, as that person's profile Memory bound to that person, so
+only their own conversations activate it; a later fact under the same key replaces it. Until
+speaker identification exists, the speaker is the household's primary person.
 
 Storage lifetime and activation do not create semantic authority: a long-term item is not more
 true merely because it is durable, an active item is not necessarily current physical fact, and

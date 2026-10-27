@@ -474,11 +474,39 @@ class MemoryStore:
             self._entries = deque(retained, maxlen=self.max_entries)
 
 
+PRIMARY_PERSON_REF = "person:primary"
+SELF_FACT_RELATION = "self_fact"
+PROFILE_CONSENT_BASES = {"explicit_current_turn", "volunteered_current_turn"}
+
+
+def person_fact_entry(*, person_ref: str, key: str, text: str, sid: str | None, durable: bool) -> MemoryEntry:
+    """A lasting fact a person told Chromie about themselves, bound to that person.
+
+    Owner decisions 2026-10-26/27: Chromie keeps it the way a friend remembers, without asking,
+    and it belongs to the person who said it: only their own conversations see it (audience).
+    Until speaker identification exists, the speaker is the household's primary person.
+    """
+    return MemoryEntry(
+        scope="profile" if durable else "session", kind="fact", key=key, text=text, confidence=0.95,
+        relation=SELF_FACT_RELATION, subject_refs=[person_ref], source_person_refs=[person_ref],
+        audience_refs=[person_ref], disclosure_scope="shared_with_audience", source_sids=[sid] if sid else [],
+        expires_ms=now_ms() + 365 * 86400000.0 if durable else None,
+        persistence_policy="durable_with_explicit_consent" if durable else "ephemeral",
+        consent_basis="volunteered_current_turn" if durable else None,
+        cognitive_roles=["umi", "ga", "planner"],
+    )
+
+
+def _own_fact(entry: MemoryEntry) -> bool:
+    """A person's own fact (subject, source and audience are that one person) may be kept long-term."""
+    return (entry.relation == SELF_FACT_RELATION and len(entry.subject_refs) == 1
+            and entry.subject_refs == entry.source_person_refs == entry.audience_refs)
+
+
 class ProtectedDurableMemoryStore:
     """Atomic owner-local profile memory with restrictive file permissions."""
 
     schema_version = 1
-    fact_retention_days = 365
 
     def __init__(
         self,
@@ -491,36 +519,8 @@ class ProtectedDurableMemoryStore:
         self.path = Path(path).expanduser()
         self.store = MemoryStore(max_entries=max_entries)
         self.last_error: str | None = None
-        # The one fact Chromie offered to keep and the person has not yet answered (owner decision
-        # 2026-10-26): only their yes to her question keeps it, as explicit current-turn consent.
-        self.pending_consent: dict[str, Any] | None = None
         if self.enabled:
             self.load()
-
-    def offer_fact(self, *, key: str, text: str) -> bool:
-        """Hold a fact the person told for their consent, unless profile Memory is off or holds it."""
-        if not self.enabled or any(entry.key == key and entry.text == compact_text(text, limit=260)
-                                   for entry in self.store.entries()):
-            return False
-        self.pending_consent = {"key": key, "text": compact_text(text, limit=260), "asked": False}
-        return True
-
-    def mark_consent_asked(self, key: str) -> None:
-        if self.pending_consent is not None and self.pending_consent["key"] == key:
-            self.pending_consent["asked"] = True
-
-    def settle_consent(self, *, key: str, answer: str, sid: str | None) -> bool:
-        """Close the offer; the person's yes to the asked question keeps the fact under its key."""
-        pending, self.pending_consent = self.pending_consent, None
-        if pending is None or pending["key"] != key or not pending["asked"] or answer != "yes":
-            return False
-        return bool(self.add_many([MemoryEntry(
-            scope="profile", kind="fact", key=key, text=pending["text"], confidence=0.95,
-            source_sids=[sid] if sid else [], expires_ms=now_ms() + self.fact_retention_days * 86400000.0,
-            persistence_policy="durable_with_explicit_consent", consent_basis="explicit_current_turn",
-            # What the person told about their life resolves later meaning ("上班" -> where they work).
-            cognitive_roles=["umi", "ga", "planner"],
-        )]))
 
     def load(self) -> None:
         if not self.enabled or not self.path.is_file():
@@ -537,7 +537,7 @@ class ProtectedDurableMemoryStore:
                     continue
                 if item.get("persistence_policy") != "durable_with_explicit_consent":
                     continue
-                if item.get("consent_basis") != "explicit_current_turn":
+                if item.get("consent_basis") not in PROFILE_CONSENT_BASES:
                     continue
                 entry = MemoryEntry(
                     scope="profile",
@@ -575,7 +575,7 @@ class ProtectedDurableMemoryStore:
                     ),
                     id=str(item.get("id") or "") or None,
                 )
-                if not entry.is_relational:
+                if not entry.is_relational or _own_fact(entry):
                     entries.append(entry)
             self.store.replace(entries)
             self.store.prune_expired()
@@ -592,13 +592,14 @@ class ProtectedDurableMemoryStore:
             if (
                 entry.scope != "profile"
                 or entry.persistence_policy != "durable_with_explicit_consent"
-                or entry.consent_basis != "explicit_current_turn"
+                or entry.consent_basis not in PROFILE_CONSENT_BASES
                 or not entry.key
                 # Privacy-scoped relational Memory keeps third-party/social relationships session-scoped.
                 # Durable relational retention needs a separately qualified principal,
                 # deletion, consent, and privacy policy rather than piggybacking on the
-                # owner's ordinary profile-memory consent surface.
-                or entry.is_relational
+                # owner's ordinary profile-memory consent surface. A person's own fact,
+                # bound to that person, is the owner-approved exception (2026-10-27).
+                or (entry.is_relational and not _own_fact(entry))
             ):
                 continue
             self.store.add(entry)

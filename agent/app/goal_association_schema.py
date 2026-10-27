@@ -239,6 +239,16 @@ def goal_association_response_schema(
 
     constrain(schema)
     change_schema = schema.get("$defs", {}).get("GoalAssociationModelRequirementChange")
+
+    def same_modality_refs(snapshot: dict[str, Any]) -> list[str]:
+        # A requirement keeps its Goal's outcome modality; a changed modality needs a new Goal
+        # (apply_goal_meaning_update). Live 2026-10-27: "我在上海上班。" (speech) replaced the
+        # umbrella question's (information) requirement and Host rejected the turn.
+        mode = ((snapshot.get("goal") or {}).get("metadata") or {}).get("output_mode") or "unspecified"
+        return [ref for ref in responsibility_refs if mode == "unspecified"
+                or responsibility_output_modes.get(ref, "unspecified") in {"unspecified", mode}]
+
+    changeable = [(snapshot, same_modality_refs(snapshot)) for snapshot in candidate_goals]
     if isinstance(change_schema, dict):
         change_schema["oneOf"] = [
             {
@@ -251,11 +261,13 @@ def goal_association_response_schema(
                             or [(snapshot.get("goal") or {}).get("description")]
                         )))},
                     },
+                    **({} if refs == responsibility_refs else {"source_responsibility_refs": {
+                        "type": "array", "minItems": 1, "items": {"type": "string", "enum": refs}}}),
                 },
                 "required": ["target_goal_id", "replace_requirement_indices"],
             }
-            for snapshot in candidate_goals
-        ]
+            for snapshot, refs in changeable if refs or not responsibility_refs
+        ] or [{"not": {}}]
     binding_change = schema.get("$defs", {}).get("GoalAssociationModelBindingChange")
     if isinstance(binding_change, dict):
         binding_change["oneOf"] = [

@@ -262,33 +262,38 @@ _CHINESE_EMERGENCY_PATTERNS = (
         r"现在|马上|立即|立刻|一下|一下子)*[。！!？?]*$"
     ),
 )
+# A hush ("嘘", "shh") may lead the silence request and a short duration may follow it
+# (live 2026-10-27: "嘘，安静一会儿，我在打电话。" missed the rule and was planned as a body action).
+_ENGLISH_HUSH = r"(?:(?:shh+|sh+|hush)\s*[,!.]*\s*)?"
+_ENGLISH_OUTPUT_STOP = (
+    r"(?:quiet|hush|shut\s+up|be\s+quiet|keep\s+quiet|quiet\s+down|"
+    r"stop\s+(?:talking|speaking)|do\s+not\s+speak|don['’]t\s+speak)"
+    r"(?:\s*,?\s*(?:now|right\s+now|please|immediately|anymore|"
+    r"for\s+(?:a\s+)?(?:moment|second|minute|while|bit)|a\s+bit))*"
+)
+_CHINESE_OUTPUT_STOP = (
+    r"(?:嘘+\s*[，,、！!。]*\s*)?(?:请|麻烦你)?你?先?"
+    r"(?:闭嘴|别说话|不要说话|别说了|不要说了|安静|停止说话|别讲话|不要讲话|别出声|不要出声)"
+    r"(?:现在|马上|立即|立刻|一会儿|一会|会儿|一下子|一下|片刻|一点|点)*"
+)
 _OUTPUT_STOP_PATTERNS = (
     re.compile(
-        rf"^{_COMMAND_PREFIX}(?:quiet|shut\s+up|be\s+quiet|"
-        r"stop\s+(?:talking|speaking)|do\s+not\s+speak|don['’]t\s+speak)"
-        r"(?:\s*,?\s*(?:now|right\s+now|please|immediately|anymore|"
-        r"for\s+(?:a\s+)?(?:moment|second|minute|while)))*[.!?]*$",
+        rf"^{_ENGLISH_HUSH}{_COMMAND_PREFIX}{_ENGLISH_OUTPUT_STOP}[.!?]*$",
         re.IGNORECASE,
     ),
-    re.compile(
-        r"^(?:请|麻烦你)?(?:闭嘴|别说话|不要说话|别说了|不要说了|安静|停止说话|"
-        r"别讲话|不要讲话)(?:现在|马上|立即|立刻|一下)*[。！!？?]*$"
-    ),
+    re.compile(r"^(?:shh+|hush)[.!]*$", re.IGNORECASE),
+    re.compile(rf"^{_CHINESE_OUTPUT_STOP}[。！!？?]*$"),
+    re.compile(r"^嘘+[。！!～~]*$"),
 )
 # Output-only control can be the first clause of a compound request. The reflex
 # owns deterministic silence while Core still receives the unchanged full
 # utterance and interprets the residual action.
 _OUTPUT_STOP_COMPOUND_PATTERNS = (
     re.compile(
-        rf"^{_COMMAND_PREFIX}(?:quiet|shut\s+up|be\s+quiet|"
-        r"stop\s+(?:talking|speaking)|do\s+not\s+speak|don['’]t\s+speak)"
-        r"\s*[,;]\s*\S.+$",
+        rf"^{_ENGLISH_HUSH}{_COMMAND_PREFIX}{_ENGLISH_OUTPUT_STOP}\s*[,;.!]\s*\S.+$",
         re.IGNORECASE,
     ),
-    re.compile(
-        r"^(?:请|麻烦你)?(?:闭嘴|别说话|不要说话|别说了|不要说了|安静|"
-        r"停止说话|别讲话|不要讲话)\s*[，,、;；]\s*\S.+$"
-    ),
+    re.compile(rf"^{_CHINESE_OUTPUT_STOP}\s*[，,、;；。！!]\s*\S.+$"),
 )
 _MEDIA_STOP_PATTERNS = (
     re.compile(
