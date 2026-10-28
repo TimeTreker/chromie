@@ -59,7 +59,16 @@ source-complete. Remaining order:
    repair each failure at its earliest responsible owner. Scope:
    [checkpoint](DEVELOPMENT_CHECKPOINT.md); next steps:
    [Status open work](docs/STATUS.md#current-open-work).
-2. **Semantic transaction simplification and generalization.** Source-span
+2. **Long-running social skill (owner-approved 2026-10-25 and 2026-10-28).** In
+   order: Soridormi's mock perception marks the current speaker and the Host projects
+   it as trusted target evidence (this also lets auxiliary looks and gestures aim at
+   the person); Soridormi `attend_to_person` (gaze follow, natural blinking,
+   listening and thinking posture, head-resource suspension, stop) with deterministic
+   simulator tests; Runtime lifecycle across turns; one optional Social Cognition
+   field, its schema size measured before deployment; live-text scenarios and a
+   supervised voice_mujoco measurement of speech-to-gaze time. Contract:
+   [Social Attention](docs/SOCIAL_ATTENTION_BEHAVIOR_DOMAIN.md#long-running-social-skill).
+3. **Semantic transaction simplification and generalization.** Source-span
    provenance, semantic-artifact lineage, the SC model-view diet and the
    provider-declared semantic Capability facade substrate are implemented.
    Remaining, in order:
@@ -73,7 +82,7 @@ source-complete. Remaining order:
      infrastructure;
    - only then requalify the model/profile on the reduced transactions, then
      SGLang priority/contention, then latency.
-3. **Persistent Social Mind qualification.** The person-first identity,
+4. **Persistent Social Mind qualification.** The person-first identity,
    Goal-free Situation wake, trusted social-perception ingress, relational
    Memory with privacy provenance, social feedback and bounded self-initiative
    contracts are source-implemented. Concrete perception and identity
@@ -81,7 +90,7 @@ source-complete. Remaining order:
    remain unqualified. Extend General Ability evidence (family life, meeting a
    new person, familiarity, negative feedback, privacy boundaries, doing
    nothing, Capability temptation without need) before wider autonomy.
-4. **Evidence closure.** Preserve the canonical local gate, then narrow
+5. **Evidence closure.** Preserve the canonical local gate, then narrow
    current-revision voice proof, then default target-evidence closure.
 
 Across all lines: `use less to solve more`; fix the earliest wrong boundary; do

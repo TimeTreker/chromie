@@ -90,17 +90,21 @@ repairs and owner decisions in force.
    "我没看清楚" when both bottles are in view, device-like "设置提醒或闹钟的功能". The corpus has
    no SC step or perceived-answer turn. A GA-requested re-plan still replaces the first Plan rather than revising
    it (owner decision 2026-10-08); only a self-contradictory revision is now rejected.
-4. The same request can change a near-tie decision between `chromie-llm` restarts (about 3 nats
+4. Long-running social skill (owner-approved 2026-10-28; [Roadmap](../ROADMAP.md) item 2): first the current
+   speaker marked by Soridormi's mock perception and copied by the Host into trusted target evidence (no producer
+   exists today, so Social Cognition cannot aim a look or gesture at the person); then the Soridormi skill, its
+   Runtime lifecycle and one Social Cognition field.
+5. The same request can change a near-tie decision between `chromie-llm` restarts (about 3 nats
    observed), and within one lifetime after other traffic (2026-10-23: the unchanged coffee request
    worded its need "brew a cup of coffee", then after probe calls "walk to a physical object and
    deliver it", which fits a fetch); measure logprob margins across restarts before a prompt repair
    claims stability, and start cohorts on a fresh lifetime.
-5. Constrained Planner decoding runs about 12-15 tokens/s in grammar-heavy regions,
+6. Constrained Planner decoding runs about 12-15 tokens/s in grammar-heavy regions,
    so a second Planner pass can miss the turn deadline.
-6. Review the SC fresh-turn silence finding; qualify
+7. Review the SC fresh-turn silence finding; qualify
    Schema/DTO/native grammar, SC context budget and latency, provider scene and
    geographic Evidence, and Goal/action/provenance coverage.
-7. After the cohort: narrow current-revision voice proof, then the default
+8. After the cohort: narrow current-revision voice proof, then the default
    [target-evidence profile](TARGET_EVIDENCE_CLOSURE.md). Physical microphone,
    speaker and robot evidence stays supervised; text, discarded TTS and simulated
    acquisition do not replace it.

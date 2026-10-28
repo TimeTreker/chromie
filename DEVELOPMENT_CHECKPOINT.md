@@ -141,10 +141,17 @@ Evidence and per-run judgments: `.chromie/acceptance/iter8-20261026/`, `iter7-20
   JSON (median 906 characters, 255 of them whitespace), and 30 of 76 speech-only turns ran a post-Planner Social
   Cognition call that added nothing. UMI and ingress Social Cognition stay serial (Social Cognition answers UMI's
   Responsibilities); one combined generation for all modules was discussed with the owner and set aside (Host
-  gates between stages, deliberate per-module views, lost concurrency). Next: the full cohort on this revision;
-  then the standing-attention design for owner approval (`.chromie/plans/`); then latency (fewer generated
-  tokens, no unneeded wake-ups, partial-prefix reuse) and voiceprint speaker identification (owner decisions
-  2026-10-27).
+  gates between stages, deliberate per-module views, lost concurrency). The owner approved the long-running
+  social skill on 2026-10-28 (contract: Social Attention; order: Roadmap item 2): its name, its ends (5 s after
+  the person is lost, conversation idle, 10 minutes), Social Cognition alone starting it and switching people,
+  and as the first step the current speaker marked by Soridormi's mock perception and copied by the Host into
+  trusted target evidence. Since the legacy runtime's removal (27ff14e72, 2026-08-17) nothing produces that
+  evidence: 293 of 297 Social Cognition calls in the iteration-6 cohort read `target_evidence: {"available":
+  false}` and 3 used a gesture. Delivery-constraint exception (owner-approved): one new architecture term,
+  "long-running social skill", defined once in `docs/SOCIAL_ATTENTION_BEHAVIOR_DOMAIN.md`; no new document or
+  environment variable. Next: judge the running cohort (f99c1c1fd); then the marked current speaker; then the
+  rest of Roadmap item 2; then latency (fewer generated tokens, no unneeded wake-ups, partial-prefix reuse) and
+  voiceprint speaker identification (owner decisions 2026-10-27).
   Measure the schema size of any Social Cognition schema change before deploying it.
 
 Verification: canonical gate on this delivery's source (2026-10-28): pytest 4,079 passed + 5 skipped

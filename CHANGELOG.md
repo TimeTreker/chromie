@@ -5,6 +5,14 @@ remains available in Git history.
 
 ## Unreleased
 
+### Long-running social skill designed (owner-approved, 2026-10-28)
+
+- Social Cognition orchestrates skills, never motions: a long-running social skill (first `soridormi.attend_to_person`)
+  follows the person every frame with no meaning of its own; Social Cognition alone starts it, chooses and switches
+  the person, and stops it; it ends 5 s after the person is lost, at conversation idle or after 10 minutes. The first
+  step restores the trusted current speaker, now marked by Soridormi's perception rather than assumed by the Host.
+  Contract in `docs/SOCIAL_ATTENTION_BEHAVIOR_DOMAIN.md`; order in the Roadmap. Not implemented yet.
+
 ### An earlier question cannot be reused for a later one (2026-10-28)
 
 - "帮我把老花镜拿过来。" stopped the cohort at 48/121: after the fetch failed, Social Cognition re-cited its earlier

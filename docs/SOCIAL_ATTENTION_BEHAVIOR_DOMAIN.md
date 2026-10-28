@@ -53,6 +53,52 @@ phrase; Planner owns explicitly requested actions; SC owns optional interaction 
 An auxiliary activity must not duplicate a Capability already used by its anchor's
 primary realization.
 
+## Long-running social skill
+
+Owner decisions 2026-10-25 and 2026-10-28: Social Cognition orchestrates skills, never
+motions. Continuous, closed-loop or timing-sensitive body behaviour toward a person is a
+Soridormi skill; Social Cognition chooses only the skill, its target, and when it starts
+and stops. If Soridormi lacks the skill, Social Cognition does not emit finer motion.
+
+A **long-running social skill** is one Social-Cognition-chosen invocation of such a skill
+(first: `soridormi.attend_to_person`) with a person target, a closed set of non-semantic
+behaviours and a lifetime. Soridormi closes the perception loop every frame: gaze follow,
+natural blinking and glancing away, a listening or thinking posture.
+
+| | Auxiliary activity | Long-running social skill |
+| --- | --- | --- |
+| Anchor | one communicative act | the conversation |
+| Duration | one bounded motion | until it ends (below) |
+| Meaning | may carry meaning (a nod to one sentence) | none; it never nods or shakes the head |
+| Loop | open loop | Soridormi follows the person every frame |
+
+- Start and switch: only Social Cognition, in its existing primary decision (one optional
+  field naming the target, behaviours and lifetime, or a stop), when a fresh addressed turn
+  or a trusted Situation change wakes it. No new model call; the Planner is unchanged; no
+  joint, angle or trajectory reaches a model contract.
+- Target: a person the current Situation reports, by default the current speaker
+  (`requester`). Runtime and Soridormi never retarget; another person needs a new Social
+  Cognition decision.
+- End: Social Cognition's stop; deterministic stop, cancel, emergency or silence (Host);
+  5 s after the target is lost; conversation idle (the conversation-state idle limit,
+  180 s); 10 minutes at most.
+- Resources: Goal Work that claims the head suspends it, and Soridormi resumes it after
+  release. A requested "look at me" stays Planner Work (`look_at_person`).
+- Its start, suspension, resumption and end are interaction-ledger records, never Evidence
+  that Chromie understood or that a Goal progressed.
+- Social Cognition sees the option only when the live Soridormi catalog declares the skill;
+  there is no environment switch.
+
+### Trusted current speaker
+
+Which perceived person is speaking is a perception fact. Soridormi's scene observation
+marks the current speaker (in simulation the scenario declares it; a speaker-localization
+provider replaces that mock later). The Host copies only that mark into trusted target
+evidence (`target_ref: "requester"`, `source: live_perception`) for Social Cognition and
+the Runtime target check below; with no marked speaker the target is unavailable. The Host
+never treats a perceived person as the speaker on its own. Auxiliary expression and the
+long-running social skill use the same evidence.
+
 ## SC input and output
 
 SC receives the following in its primary interaction request:
