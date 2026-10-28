@@ -94,13 +94,11 @@ result-free index of exact original arguments and provenance; the capability
 returns data only when the already-resolved Goal bindings match exactly and the
 record is fresh enough. See
 [`DISCOURSE_REFERENTS_AND_VERIFIED_MEMORY.md`](DISCOURSE_REFERENTS_AND_VERIFIED_MEMORY.md).
-Keeping what a person asks Chromie to remember ("帮我记一下，要买鸡蛋和面包。") is the Host
-capability `chromie.memory.keep` (effect `memory_write`, no physical effect): its `text` cites the
-person's own words, `holds` (required, citing the words that show it) is `lasting` or `for_now`, and its
-Evidence (`kept_for`: `long_term`, `this_conversation` or `for_now`) is told by Social Cognition, since
-the person cannot see it happen. What is kept for now outlasts the conversation for its day.
-A lasting fact the person merely mentions about themselves is kept through Social Cognition's
-`personal_fact` at ingress.
+A lasting fact a person tells about themselves is kept through Social Cognition's `personal_fact` at
+ingress. No Capability keeps a requested note for later
+("帮我记一下，明天要买鸡蛋和面包。" in a new conversation): the 2026-10-27 `chromie.memory.keep` was
+removed because the local Planner model planned every reminder request as a keep and Chromie then
+promised reminders she cannot give (`scenarios/model_limited/`).
 User Meaning Interpretation remains WHAT-only and never hands planning to a separate
 deep-thinking agent. The one Planner consumes the bounded
 Goal/Situation/Memory/Evidence/current-Work authorities.
@@ -219,14 +217,13 @@ The former `ORCH_CONTEXT_*` aliases are removed. Exact maintained settings and d
 Conversation state now exposes an explicit two-tier cognitive projection while retaining the
 existing storage/privacy owners. Working Memory is process-local RAM state. Long-term Memory is
 only what an existing durable owner already permits: protected profile Memory of the lasting facts
-a person tells about themselves or asks Chromie to keep (owner decisions 2026-10-26/27: kept the way
+a person tells about themselves (owner decisions 2026-10-26/27: kept the way
 a friend remembers, without a consent question, bound to that person and deleted on request) and,
 when `ORCH_ENABLE_TASK_CONTEXT_STORE=1`, unfinished canonical Goals persisted for restart
 continuity. Durable Goal state is reloaded as an open Goal with `recoverable` Work status and
 must be revalidated before new Work; physical execution never resumes blindly. Other world or
 object facts (for example where something was delivered) have no durable owner today: they live
-in Working Memory with its TTL and are lost at restart. What a person asks Chromie to keep only for
-now (a shopping list, where they put their keys) is their Working Memory for a day.
+in Working Memory with its TTL and are lost at restart.
 
 The model-facing long-term Goal surface is intentionally abstract: it keeps canonical Goal
 identity and stable human outcome/constraints needed by GA, while omitting transient execution

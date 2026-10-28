@@ -2334,13 +2334,8 @@ def fast_advance_response_schema(
                             # come from the person's words. Host admits them only as an
                             # exact literal or with a span, and the decoder cannot enforce
                             # literalness, so they must cite a span (a translated city stays
-                            # provable). So do a stateful effect's (what the person asked
-                            # Chromie to remember). Authored text and enum strings keep their
-                            # own paths.
-                            scope = capability.get("semantic_scope") or (capability.get("hints") or {}).get(
-                                "semantic_scope") or {}
-                            acquires_information = fast_capability_acquires_information(capability) or (
-                                "stateful_effect" in (scope.get("output_modes") or []))
+                            # provable). Authored text and enum strings keep their own paths.
+                            acquires_information = fast_capability_acquires_information(capability)
                             required_source_inputs = sorted(
                                 name
                                 for name in required_inputs

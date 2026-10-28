@@ -10,7 +10,6 @@ from dataclasses import dataclass
 from typing import Any
 
 from orchestrator.clients.agent_client import AgentClient
-from orchestrator.runtime.conversation_memory_provider import keep_person_fact
 from orchestrator.runtime.conversation_state import ConversationStateManager
 from orchestrator.runtime.evidence_identity import load_runtime_evidence_identity
 from orchestrator.runtime.episode import EpisodeRecorder
@@ -158,7 +157,6 @@ def build_interaction_runtime(
         conversation_memory_handler=(
             assistant.conversation_state.retrieve_verified_tool_memory
         ),
-        memory_keep_handler=lambda args: keep_person_fact(assistant.conversation_state, args),
         capability_manifest_paths=cognition.capability_manifest_paths,
         max_concurrency=settings.capability_runtime.capability_max_concurrency,
         catalog_refresh_ttl_s=settings.capability_runtime.catalog_refresh_ttl_s,

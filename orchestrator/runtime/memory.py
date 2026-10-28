@@ -383,16 +383,6 @@ class MemoryStore:
     def clear(self) -> None:
         self._entries.clear()
 
-    def clear_conversation(self) -> None:
-        """End a conversation: what a person asked Chromie to keep for now stays its day.
-
-        Live 2026-10-27 (adult_note_shopping_later_zh): "帮我记一下，明天要买鸡蛋和面包。" was kept
-        for now, a later conversation cleared it, and "我明天要买什么来着？" was answered from
-        the scene. Every other conversation entry ends with its conversation.
-        """
-        self.replace(entry for entry in self.entries()
-                     if entry.relation == SELF_FACT_RELATION and entry.expires_ms is not None)
-
     def entries(self) -> list[MemoryEntry]:
         self.prune_expired()
         return list(self._entries)
@@ -489,24 +479,18 @@ SELF_FACT_RELATION = "self_fact"
 PROFILE_CONSENT_BASES = {"explicit_current_turn", "volunteered_current_turn"}
 
 
-FOR_NOW_FACT_MS = 24 * 3600000.0
-
-
-def person_fact_entry(*, person_ref: str, key: str, text: str, sid: str | None, durable: bool,
-                      lasting: bool = True) -> MemoryEntry:
-    """A fact a person told Chromie about themselves or asked her to keep, bound to that person.
+def person_fact_entry(*, person_ref: str, key: str, text: str, sid: str | None, durable: bool) -> MemoryEntry:
+    """A lasting fact a person told Chromie about themselves, bound to that person.
 
     Owner decisions 2026-10-26/27: Chromie keeps it the way a friend remembers, without asking,
     and it belongs to the person who said it: only their own conversations see it (audience).
-    Until speaker identification exists, the speaker is the household's primary person. What holds
-    only for now (a shopping list, where the keys are) lasts a day, never long-term.
+    Until speaker identification exists, the speaker is the household's primary person.
     """
-    durable = durable and lasting
     return MemoryEntry(
         scope="profile" if durable else "session", kind="fact", key=key, text=text, confidence=0.95,
         relation=SELF_FACT_RELATION, subject_refs=[person_ref], source_person_refs=[person_ref],
         audience_refs=[person_ref], disclosure_scope="shared_with_audience", source_sids=[sid] if sid else [],
-        expires_ms=now_ms() + (365 * 86400000.0 if durable else FOR_NOW_FACT_MS) if durable or not lasting else None,
+        expires_ms=now_ms() + 365 * 86400000.0 if durable else None,
         persistence_policy="durable_with_explicit_consent" if durable else "ephemeral",
         consent_basis="volunteered_current_turn" if durable else None,
         cognitive_roles=["umi", "ga", "planner"],

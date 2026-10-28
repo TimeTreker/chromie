@@ -13,7 +13,7 @@ proof, then default target-evidence closure.
 
 ## Active Issue — everyday live-cohort root-cause repairs
 
-Run the everyday live-text cohort (`scenarios/everyday/`, 122 cases since three remember-this cases of iteration 5; `scenarios/model_limited/` holds cases the
+Run the everyday live-text cohort (`scenarios/everyday/`, 121 cases; `scenarios/model_limited/` holds cases the
 owner skips as local-model limits) against
 Soridormi MuJoCo, judge every case, and repair each failure at its earliest
 responsible owner. One invocation and one debug bundle per run; a hard failure in
@@ -98,27 +98,29 @@ Evidence and per-run judgments: `.chromie/acceptance/iter8-20261026/`, `iter7-20
   and answer_from_perception (both respond) under mixed and stopped the iteration-3 cohort. The acceptance oracle
   listed the retired sidestep field `vy_mps`, so a sidestep that did go right failed; the library check now rejects an
   expected argument the oracle never observes, and `child_spin_en` accepts the truthful limitation (turn_in_place
-  covers at most about 4 rad per request). Iteration 5: "帮我记一下，要买鸡蛋和面包。" is kept through the Host capability
-  `chromie.memory.keep` (`memory_write`, no physical effect): the person's own cited words become their Memory,
-  `lasting` (profile Memory, or this conversation while durable Memory is off) or `for_now` (Working Memory for a
-  day, across conversations); `holds` is required and cited (an omitted one kept a peanut allergy for a day), and
-  terminal Evidence of a stateful effect the person cannot see reaches Social Cognition as a result to tell (the kept
-  list had been retained in silence; Chromie had earlier said "没法帮你记"). A read
-  merged across Responsibilities cites the value the person said from the first served outcome holding it once
-  ("北京今天冷不冷？我出门要不要多穿点？": both outcomes said 北京, the citation stayed on "今天冷", the place was asked
-  for, and Social Cognition's reuse of its acknowledgement as that question stopped the iteration-4 cohort).
-  The iteration-4 cohort (`it4-cues-20261027/cohort/`, 1bce6eae2) stopped at 65/119 on that 422: smoke 15/15
-  automatic and judged; core 48/50 automatic and 41/50 judged; challenge not reached. Open judged failures:
-  "给我倒杯水。" says it was poured when the bottle was brought; "那上海呢？" after tomorrow's Beijing weather reads
-  today (UMI said tomorrow; the Planner chose `date=today`); boredom, a scraped knee and loneliness get no offer of
-  company or next step; wave_friend has no greeting; the celebrate reply echoes the user; "嘘，安静一会儿，我在打电话。"
-  ran `stand_idle` once (model variance after the silence reflex). Not reached this time but open from iteration 3:
-  a drawing or shirt Chromie cannot see is praised, and "你都会做些什么呀？" names abilities she lacks. Compound
-  fetch-and-read turns take 348-587 s. Next: the iteration-5 cohort, then iteration 6 chosen from it, then latency
-  (prefix caching, prompt size, serial UMI and SC ingress), then the standing-attention skill plan (`.chromie/plans/`).
+  covers at most about 4 rad per request). Iteration 5 (c93bee6c9) added a keep Capability for "帮我记一下…", a
+  result need for a stateful effect the person cannot see, and a merged read that cites the value the person said from
+  the first served outcome holding it once (the iteration-4 stop). Its cohort (`it5-keep-20261027/cohort/`) stopped at
+  67/122: smoke 15/15 automatic and judged, core 48/52 automatic and 42/52 judged, challenge not reached. The keep
+  contract was the one stateful-effect contract in view and the local Planner named every reminder after it
+  ("一会儿提醒我。" was kept with a promise to remind; the umbrella reminder deferred a keep on another
+  Responsibility's read and stopped the cohort). Iteration 6 removes `chromie.memory.keep`: replays of the recorded
+  Planner calls under four contract/prompt variants and a live rare-tier run all still chose it; reminders again get
+  an honest limitation, and the cross-conversation note case waits in `scenarios/model_limited/`. A handover's result
+  need now carries what was handed over (`handed_over`, from schema-validated Evidence): "给我倒杯水。" had been told
+  as poured water. Not qualified and not shipped: a Social Cognition care sentence and UMI "offer the concrete help"
+  wordings (replays in `it6-final-20261028/README.md`). Open judged failures: boredom, a scraped knee and loneliness
+  get a question instead of an offer (UMI's bodily-need outcome says "ask whether they want help"); "Please remember
+  that I'm allergic to peanuts." is answered "I can't remember that" while Social Cognition keeps it (UMI makes it a
+  stateful effect, so the Planner reports a limitation); wave_friend has no greeting; the celebrate reply echoes;
+  `stand_idle` after a hush; "跟我打个招呼吧！" was once announced instead of said; from iteration 3, a drawing or shirt
+  Chromie cannot see is praised and "你都会做些什么呀？" names abilities she lacks. Compound fetch-and-read turns take
+  329-538 s. Next: the iteration-6 cohort closes owner loop 2; then latency (prefix caching, prompt size, serial UMI
+  and SC ingress), voiceprint speaker identification (owner decisions 2026-10-27), and the standing-attention skill
+  plan (`.chromie/plans/`).
   Measure the schema size of any Social Cognition schema change before deploying it.
 
-Verification: canonical gate on this delivery's source (2026-10-27): pytest 4,081 passed + 5 skipped
+Verification: canonical gate on this delivery's source (2026-10-28): pytest 4,078 passed + 5 skipped
 (`xgrammar` not installed), benchmarks 172, legacy Agent tests 20, all checks. Workflow replay tests 94/94; strict
 replay not rerun (last 6,000/6,000 on freeze 47, 2026-10-23).
 

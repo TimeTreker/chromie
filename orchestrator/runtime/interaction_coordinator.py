@@ -141,7 +141,6 @@ class InteractionRuntimeCoordinator:
         work_dag_cancel_handler: WorkDAGCancelHandler | None = None,
         agent_tool_handler: AgentToolHandler | None = None,
         conversation_memory_handler: ConversationMemoryHandler | None = None,
-        memory_keep_handler: ConversationMemoryHandler | None = None,
         vocal_provider: VocalPerformanceCapabilityProvider | None = None,
         media_provider: MediaPlaybackCapabilityProvider | None = None,
         capability_manifest_paths: str | None = None,
@@ -192,7 +191,7 @@ class InteractionRuntimeCoordinator:
                 self.registry.register(definition)
             if memory_definitions:
                 self.runtime.register_provider(
-                    ConversationMemoryCapabilityProvider(conversation_memory_handler, memory_keep_handler)
+                    ConversationMemoryCapabilityProvider(conversation_memory_handler)
                 )
         self._work_dag_enabled = work_dag_handler is not None
         if work_dag_handler is not None:

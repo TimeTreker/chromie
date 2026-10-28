@@ -351,30 +351,6 @@ class PersonalFactTests(unittest.TestCase):
             reloaded.speaker_person_refs = ["person:dad"]
             self.assertEqual(self.kept(reloaded), [])
 
-    def test_what_holds_for_now_is_kept_a_day_never_long_term(self) -> None:
-        """A shopping list or where the keys are lasts a day; a lasting fact is kept long-term."""
-        from orchestrator.runtime.conversation_memory_provider import keep_person_fact
-
-        with tempfile.TemporaryDirectory() as directory:
-            manager = self.manager(directory)
-            self.assertEqual(keep_person_fact(manager, {"holds": "for_now", "key": "shopping_list",
-                                                        "text": "要买鸡蛋和面包"})["kept_for"], "for_now")
-            self.assertEqual(keep_person_fact(manager, {"holds": "lasting", "key": "dog_name",
-                                                        "text": "我家小狗叫豆豆"})["kept_for"], "long_term")
-            self.assertEqual([entry["key"] for entry in manager.snapshot()["durable_profile_memory"]["entries"]],
-                             ["dog_name"])
-            [note] = [entry for entry in manager.session_memory()["active_memory"]["entries"]
-                      if entry.get("key") == "shopping_list"]
-            self.assertLess(note["expires_ms"] - note["created_ms"], 25 * 3600000)
-            # A later conversation still has it (live 2026-10-27: it was cleared and the scene answered).
-            from orchestrator.runtime.memory import MemoryEntry
-
-            manager._store_explicit_memory_entries([MemoryEntry(scope="session", kind="fact", key="milk",
-                                                                text="The milk on the table is cold.")])
-            manager.start_new_conversation(reason="scenario_new_conversation")
-            self.assertEqual([entry["key"] for entry in manager.session_memory()["active_memory"]["entries"]
-                              if entry.get("scope") == "session"], ["shopping_list"])
-
     def test_a_changed_fact_replaces_the_kept_one(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             manager = self.manager(directory)

@@ -1370,6 +1370,16 @@ async def optional_completed_resource_social_response(
             "prior_delivered_speech": [],
         }
     )
+    # What was handed over, from its trusted Evidence: the request may have asked for more (live
+    # 2026-10-27: "给我倒杯水。" brought a bottle, and SC, seeing only the request, said "水已经给你倒好了。").
+    handed_over = [
+        str(outcome["resource_description"])
+        for item in completed_resource
+        for observation in [getattr(item, "observation", None)]
+        if observation is not None and observation.status == "available" and observation.schema_validated
+        for outcome in [observation.data.get("resource_outcome")]
+        if isinstance(outcome, dict) and outcome.get("resource_delivered") and outcome.get("resource_description")
+    ]
     need = SocialCommunicationNeed(
         need_id=communication_need_id(plan.plan_id, "resource_delivery_completed"),
         owner="runtime",
@@ -1380,6 +1390,7 @@ async def optional_completed_resource_social_response(
             "status": "completed",
             "result_kind": "resource_delivery_handover",
             "optional_completion_update": True,
+            **({"handed_over": handed_over} if handed_over else {}),
         },
         # Built after the handover completed: the ordering is already met, and
         # this independent SC interaction transports immediate acts only (live

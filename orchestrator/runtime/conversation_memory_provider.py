@@ -1,13 +1,11 @@
 from __future__ import annotations
 
 import json
-import re
 from collections.abc import Callable
 from typing import Any
 
 from agent.app.capabilities.loader import build_configured_registry, parse_manifest_paths
 from shared.chromie_runtime.env_values import parse_bool
-from shared.chromie_contracts.social_cognition import MEMORY_KEY_PATTERN
 from shared.chromie_contracts.interaction import (
     CapabilityRequest,
     CapabilityResult,
@@ -15,10 +13,8 @@ from shared.chromie_contracts.interaction import (
 )
 
 from .capability_runtime import CapabilityDefinition, CapabilityExecutionContext
-from .memory import person_fact_entry
 
 ConversationMemoryHandler = Callable[[dict[str, Any]], dict[str, Any]]
-KEEP_CAPABILITY_ID = "chromie.memory.keep"
 
 
 def _canonical_json_text(value: Any) -> str:
@@ -32,14 +28,12 @@ def _canonical_json_text(value: Any) -> str:
 
 
 class ConversationMemoryCapabilityProvider:
-    """Host-owned Memory: exact retrieval of verified tool evidence, and keeping what a person asks."""
+    """Host-owned exact retrieval of verified short-term tool evidence."""
 
     provider_id = "chromie.conversation_memory"
 
-    def __init__(self, handler: ConversationMemoryHandler,
-                 keep_handler: ConversationMemoryHandler | None = None) -> None:
+    def __init__(self, handler: ConversationMemoryHandler) -> None:
         self._handler = handler
-        self._keep_handler = keep_handler
 
     async def execute(
         self,
@@ -47,8 +41,6 @@ class ConversationMemoryCapabilityProvider:
         definition: CapabilityDefinition,
         context: CapabilityExecutionContext,
     ) -> CapabilityResult:
-        if request.capability_id == KEEP_CAPABILITY_ID:
-            return self._keep(request, definition)
         retrieved = self._handler(dict(request.args))
         reject_forbidden_low_level_fields(retrieved)
         found = bool(retrieved.get("found"))
@@ -102,18 +94,6 @@ class ConversationMemoryCapabilityProvider:
             message="" if found else "No exact fresh verified tool result matched the resolved bindings",
         )
 
-    def _keep(self, request: CapabilityRequest, definition: CapabilityDefinition) -> CapabilityResult:
-        kept = self._keep_handler(dict(request.args)) if self._keep_handler is not None else {}
-        output = {"kept": bool(kept.get("kept")), "key": str(kept.get("key") or ""),
-                  "text": str(kept.get("text") or ""), "kept_for": str(kept.get("kept_for") or "for_now")}
-        return CapabilityResult(
-            request_id=request.request_id, capability_id=request.capability_id,
-            capability_version=definition.version, provider_id=self.provider_id,
-            status="completed" if output["kept"] else "failed", output=output,
-            reason_code=None if output["kept"] else str(kept.get("reason") or "memory_unavailable"),
-            message="" if output["kept"] else "Memory did not keep it",
-        )
-
     async def cancel(
         self,
         request: CapabilityRequest,
@@ -140,9 +120,7 @@ def host_runtime_memory_definitions(
             default=False,
         ):
             continue
-        # Retrieval reads only; keeping writes nothing but the person's own Memory.
-        keeps = tool.name == KEEP_CAPABILITY_ID and set(tool.effects) == {"memory_write"}
-        if not keeps and (tool.safety_class != "safe_read" or not tool.execution.side_effect_free):
+        if tool.safety_class != "safe_read" or not tool.execution.side_effect_free:
             continue
         if tool.confirmation.required:
             continue
@@ -183,25 +161,7 @@ def host_runtime_memory_definitions(
     return definitions
 
 
-def keep_person_fact(state: Any, args: dict[str, Any]) -> dict[str, Any]:
-    """Keep what the person asked Chromie to remember as the speaker's Memory (owner decision 2026-10-27)."""
-    key, text = str(args.get("key") or "note"), " ".join(str(args.get("text") or "").split())
-    lasting = args.get("holds") == "lasting"
-    if not state.enabled or not re.fullmatch(MEMORY_KEY_PATTERN, key) or len(text) < 3:
-        return {"kept": False, "key": key, "text": text, "reason": "memory_unavailable"}
-    durable = bool(state._durable_memory.enabled)
-    # Kept in the person's own words, said by them, like the person facts Social Cognition writes
-    # (live 2026-10-27: a kept "I'm allergic to peanuts." was later read as Chromie's own allergy).
-    state._store_explicit_memory_entries([person_fact_entry(
-        person_ref=state.speaker_person_refs[0], key=key, text=f'The person said: "{text}"', sid=None,
-        durable=durable, lasting=lasting)])
-    kept_for = "for_now" if not lasting else "long_term" if durable else "this_conversation"
-    return {"kept": True, "key": key, "text": text, "kept_for": kept_for}
-
-
 __all__ = [
-    "KEEP_CAPABILITY_ID",
-    "keep_person_fact",
     "ConversationMemoryHandler",
     "ConversationMemoryCapabilityProvider",
     "host_runtime_memory_definitions",

@@ -5,6 +5,19 @@ remains available in Git history.
 
 ## Unreleased
 
+### Never promise a reminder; say what was handed over (owner loop 2, iteration 6, 2026-10-28)
+
+- `chromie.memory.keep` (iteration 5) is removed. It was the one stateful-effect contract in view, and the local
+  Planner named every reminder after it: "一会儿提醒我。" was kept and Chromie promised "到时候会提醒你的", and
+  "…If it is, remind me to take an umbrella." deferred a keep on another Responsibility's read, which stopped the
+  iteration-5 cohort at 67/122. Replays of the recorded Planner calls under four contract and prompt variants and a
+  live rare-tier run all still chose keep. Reminders again get an honest "I can't set reminders"; lasting facts a
+  person tells stay kept through Social Cognition; a note kept across conversations (`adult_note_shopping_later_zh`)
+  moves to `scenarios/model_limited/`.
+- The result need after a handover carries what was handed over, from its schema-validated Evidence
+  (`handed_over`): "给我倒杯水。" brought a bottle, and Social Cognition, seeing only the request, said the water was
+  poured.
+
 ### Remember what the person asks you to; a merged read keeps the place the person named (owner loop 2, iteration 5, 2026-10-27)
 
 - "帮我记一下，要买鸡蛋和面包。" is kept: the Host capability `chromie.memory.keep` (effect `memory_write`, no physical

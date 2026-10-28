@@ -1196,8 +1196,9 @@ async def test_agent_session_releases_idle_connections_before_the_agent_closes_t
 @pytest.mark.parametrize("output_mode,result_kind", [
     ("stateful_effect", "unseen_effect"), ("information", "requested_information"), ("body_action", None)])
 def test_terminal_evidence_of_an_unseen_effect_reaches_social_cognition(output_mode, result_kind):
-    """Live 2026-10-27 (adult_shopping_list_zh): "帮我记一下，要买鸡蛋和面包。" was kept, nobody planned
-    a word about it, and the Host retained the Evidence without speech. A result the person asked to
+    """Live 2026-10-27 (adult_shopping_list_zh, through the since-removed keep Capability):
+    "帮我记一下，要买鸡蛋和面包。" was kept, nobody planned a word about it, and the Host retained the
+    Evidence without speech. A result the person asked to
     be told, or an effect they cannot see happen, reaches Social Cognition; a body action they see
     does not."""
     from orchestrator.runtime.planner_reentry_host import requested_result_evidence_social_response

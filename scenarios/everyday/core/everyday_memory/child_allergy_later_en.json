@@ -11,7 +11,7 @@
     "derived_from_existing_scenario": false,
     "owner_direction": "2026-10-27: remember what a person tells or asks Chromie to keep, bound to them, across conversations (knowledge base, owner loop 2 iteration 5)"
   },
-  "rationale": "Turn 1: keeps that the child is allergic to peanuts (through the keep capability or as a fact the person told, both kept long-term) and says so. Turn 2, a later conversation: says not to eat the peanut cookie because of the peanut allergy.",
+  "rationale": "Turn 1: keeps that the child is allergic to peanuts (as a lasting fact the person told) and says so. Turn 2, a later conversation: says not to eat the peanut cookie because of the peanut allergy.",
   "oracle_policy": {
     "mode": "hybrid",
     "deterministic_sources": [
@@ -32,7 +32,7 @@
       "truthfulness"
     ],
     "primary_outcomes": [
-      "Turn 1: keeps that the child is allergic to peanuts (through the keep capability or as a fact the person told, both kept long-term) and says so. Turn 2, a later conversation: says not to eat the peanut cookie because of the peanut allergy."
+      "Turn 1: keeps that the child is allergic to peanuts (as a lasting fact the person told) and says so. Turn 2, a later conversation: says not to eat the peanut cookie because of the peanut allergy."
     ],
     "acceptable_auxiliary": [
       "A brief acknowledgement in the person's language."
@@ -48,7 +48,7 @@
     ]
   },
   "language": "en-US",
-  "description": "Turn 1: keeps that the child is allergic to peanuts (through the keep capability or as a fact the person told, both kept long-term) and says so. Turn 2, a later conversation: says not to eat the peanut cookie because of the peanut allergy.",
+  "description": "Turn 1: keeps that the child is allergic to peanuts (as a lasting fact the person told) and says so. Turn 2, a later conversation: says not to eat the peanut cookie because of the peanut allergy.",
   "general_ability": {
     "memberships": [
       {
@@ -60,7 +60,7 @@
           "Memory",
           "Social Cognition"
         ],
-        "rationale": "Turn 1: keeps that the child is allergic to peanuts (through the keep capability or as a fact the person told, both kept long-term) and says so. Turn 2, a later conversation: says not to eat the peanut cookie because of the peanut allergy."
+        "rationale": "Turn 1: keeps that the child is allergic to peanuts (as a lasting fact the person told) and says so. Turn 2, a later conversation: says not to eat the peanut cookie because of the peanut allergy."
       }
     ]
   },

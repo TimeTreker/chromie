@@ -2318,39 +2318,3 @@ def test_one_activity_for_every_work_responsibility_serves_them_all():
     assert not validator.is_valid(output(["r1"]))
     assert validator.is_valid(output(["r1", "r2"]))
 
-
-@pytest.mark.asyncio
-@pytest.mark.parametrize("cited", [True, False])
-async def test_a_remember_request_is_kept_from_the_persons_words(cited):
-    """Owner decision 2026-10-27: "帮我记一下，要买鸡蛋和面包。" had no Capability, so the Planner decided
-    unavailable and Chromie said she could not remember it. Keeping it is a Memory Capability whose
-    text cites the person's own words."""
-    from agent.app.capabilities.catalog import CapabilityCatalog
-    from agent.app.capabilities.loader import build_configured_registry, parse_manifest_paths
-    from shared.chromie_contracts.user_turn import user_turn_source_tokens
-
-    keep = next(item for item in CapabilityCatalog(build_configured_registry(parse_manifest_paths("")).registry).entries()
-                if item.capability_id == "chromie.memory.keep")
-    text = "帮我记一下，要买鸡蛋和面包。"
-    tokens = user_turn_source_tokens(text)
-    start = text.index("要买")
-    span = [t["ref"] for t in tokens if start <= t["start"] and t["end"] <= text.index("。")]
-    request = CognitiveWorkRequest(sid="keep", text=text, language="zh-CN", interpretation_confidence=1.0,
-        responsibilities=[CognitiveResponsibilityProposal(
-            local_ref="r1", outcome=text, output_mode="stateful_effect", confidence=1.0,
-            source_evidence={"source_start_token_ref": tokens[0]["ref"], "source_end_token_ref": tokens[-1]["ref"]})])
-    activity = {"role": "capability", "source_responsibility_refs": ["r1"], "capability_id": "chromie.memory.keep",
-                "activity_id": "act_keep", "args": {"holds": "for_now", "key": "shopping_list",
-                                                     "text": "The person needs eggs and bread."},
-                "depends_on": []}
-    if cited:
-        cited_span = {"source_start_token_ref": span[0], "source_end_token_ref": span[-1]}
-        activity["argument_sources"] = {"holds": cited_span, "text": cited_span}
-    raw = {"ability_needs": [{"need": "remember a note", "closest_loaded": "chromie.memory.keep",
-                              "closest_loaded_does": "Keep one thing", "fits": True}],
-           "responsibility_decisions": {"r1": {"needed_abilities_fit": True, "decision": "work", "missing": []}},
-           "activity_count": 1, "activities": [activity], "disposition": "execute", "coverage": "complete",
-           "covered_responsibility_refs": ["r1"], "confidence": 1.0, "unresolved": [], "reason_summary": "Keep it."}
-    model = _StreamingModel([json.dumps(raw, ensure_ascii=False)])
-    frames = [f async for f in PlannerResolver(model, _Catalog([keep])).stream_advance(request)]
-    assert isinstance(frames[-1], FastPlannerStreamTerminal) is cited, frames[-1]

@@ -33,7 +33,7 @@ def _host():
     return host, runtime
 
 
-def _handover_request(host):
+def _handover_request(host, observation=None):
     return asyncio.run(planner_reentry_host.optional_completed_resource_social_response(
         host,
         source_response=SimpleNamespace(metadata={
@@ -55,6 +55,7 @@ def _handover_request(host):
         selected_execution_evidence=[SimpleNamespace(
             status="completed",
             capability_id="soridormi.acquire_and_deliver_resource",
+            observation=observation,
         )],
     ))
 
@@ -127,3 +128,18 @@ def test_handover_words_bound_to_the_need_reach_the_person() -> None:
     )
 
     assert [item.text for item in response.speech] == ["Here you are."]
+
+
+def test_the_handover_need_says_what_was_handed_over() -> None:
+    """Live 2026-10-27 (elder_water_zh): "给我倒杯水。" brought a bottle of water; Social Cognition saw only
+    the request and said "水已经给你倒好了。". The need carries what the trusted Evidence says was handed over."""
+    host, runtime = _host()
+    observation = SimpleNamespace(status="available", schema_validated=True, data={"resource_outcome": {
+        "resource_delivered": True, "resource_description": "bottle of water", "recipient_description": "requester"}})
+    _handover_request(host, observation)
+    assert runtime.request.communication_needs[0].facts["handed_over"] == ["bottle of water"]
+
+    host, runtime = _host()
+    _handover_request(host, SimpleNamespace(status="available", schema_validated=False, data={"resource_outcome": {
+        "resource_delivered": True, "resource_description": "bottle of water"}}))
+    assert "handed_over" not in runtime.request.communication_needs[0].facts
