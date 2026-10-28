@@ -114,10 +114,21 @@ Evidence and per-run judgments: `.chromie/acceptance/iter8-20261026/`, `iter7-20
   that I'm allergic to peanuts." is answered "I can't remember that" while Social Cognition keeps it (UMI makes it a
   stateful effect, so the Planner reports a limitation); wave_friend has no greeting; the celebrate reply echoes;
   `stand_idle` after a hush; "跟我打个招呼吧！" was once announced instead of said; from iteration 3, a drawing or shirt
-  Chromie cannot see is praised and "你都会做些什么呀？" names abilities she lacks. Compound fetch-and-read turns take
-  329-538 s. Next: the iteration-6 cohort closes owner loop 2; then latency (prefix caching, prompt size, serial UMI
-  and SC ingress), voiceprint speaker identification (owner decisions 2026-10-27), and the standing-attention skill
-  plan (`.chromie/plans/`).
+  Chromie cannot see is praised and "你都会做些什么呀？" names abilities she lacks. The iteration-6 cohort
+  (`it6-final-20261028/cohort/`, da1b6b353) closes owner loop 2: the whole smoke and core stages ran (smoke 15/15
+  automatic, 14/15 judged; core 93/95 automatic, 80/95 judged; the same 52 cases as iteration 5: 43/52 judged) and it
+  stopped at challenge case 112/121: Goal Association repeated one `requirement_changes` item for "给我讲个很短的睡前故事吧。"
+  until its 2,048-token limit. The decoder schema leaves that array unbounded (the native decoder ignores
+  `uniqueItems`, so the DTO's distinct-target rule is invisible while decoding). The reminder cases and "给我倒杯水。"
+  now pass. New judged failures: the homework lie request (Value Judgment declined; Social Cognition left the
+  decline unsaid and spoke UMI's "承认我其实还没写完作业" in Chromie's voice), a recall turn whose non-fitting need
+  led the second Planner pass to a `chromie.clock.local` placeholder step, an unseen remote decided `unavailable`, a
+  dizzy elder asked instead of advised, and a resolved workplace answered "我这就去查" with an empty Plan. Fetches
+  take 185-380 s, compound fetch-and-read turns 355-504 s. Next: bound GA `requirement_changes` by the number of
+  changeable Goals in `agent/app/clients/sglang_protocol.py` (beside `_bound_ga_requirement_indices`), rerun
+  `child_bedtime_zh` and the full cohort; then latency (prefix caching, prompt size, serial UMI and SC ingress),
+  voiceprint speaker identification (owner decisions 2026-10-27), and the standing-attention skill plan
+  (`.chromie/plans/`).
   Measure the schema size of any Social Cognition schema change before deploying it.
 
 Verification: canonical gate on this delivery's source (2026-10-28): pytest 4,078 passed + 5 skipped

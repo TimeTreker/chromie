@@ -17,6 +17,9 @@ remains available in Git history.
 - The result need after a handover carries what was handed over, from its schema-validated Evidence
   (`handed_over`): "给我倒杯水。" brought a bottle, and Social Cognition, seeing only the request, said the water was
   poured.
+- Its cohort (2026-10-28) ran the whole smoke and core stages (smoke 15/15 automatic, 14/15 judged; core 93/95
+  automatic, 80/95 judged) and stopped at challenge 2/11 when Goal Association repeated one requirement change until
+  its token limit (an unbounded decoder array; fix proposed, not made).
 
 ### Remember what the person asks you to; a merged read keeps the place the person named (owner loop 2, iteration 5, 2026-10-27)
 

@@ -31,7 +31,9 @@ ordered open work are in [STATUS](docs/STATUS.md).
   `python -m benchmarks.regression restore-fixtures`; do not untar `frozen.tar.xz` over
   `workflow_scenarios/` (its inner `manifest.json` lacks the storage identity).
 - Evidence (README in each): `.chromie/acceptance/it6-final-20261028/` (owner loop 2 iteration 6: keep-vs-reminder
-  replays, `focus/` and `focus2/` diagnostic runs, warmth wordings that did not qualify),
+  replays, `focus/` and `focus2/` diagnostic runs, warmth wordings that did not qualify; `cohort/` on da1b6b353 ran
+  smoke and core in full and stopped at 112/121 on a truncated GA output, judged by stage with the stop's module
+  workflow; bundle `/home/chromie/Downloads/chromie_debug_bundle_20261028_123852.tar.gz`),
   `it5-keep-20261027/` (iteration 5; `cohort/` stopped at 67/122 on a reminder planned as a keep, judged by stage
   with the stop's module workflow), `it4-cues-20261027/` (iteration 4; `cohort/` stopped at 65/119 on a merged
   read's lost place, judged by stage with the stop's module workflow),
@@ -94,7 +96,7 @@ ordered open work are in [STATUS](docs/STATUS.md).
 ## Deploy and run
 
 ```bash
-# run the complete 119-case cohort on this revision: deploy (skip the build when the Agent already matches),
+# run the complete 121-case cohort on this revision: deploy (skip the build when the Agent already matches),
 # fresh LLM and scene, one invocation, one bundle, judge every case by stage
 # owner: rebuild the Agent from a clean main checkout and deploy it (performance mode; in quiet mode prefix
 # CHROMIE_SERVICE_RUNTIME_OVERRIDE_FILE=.chromie/quiet-mode/agent-timeouts.env)
