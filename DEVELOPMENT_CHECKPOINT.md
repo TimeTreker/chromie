@@ -127,7 +127,13 @@ Evidence and per-run judgments: `.chromie/acceptance/iter8-20261026/`, `iter7-20
   take 185-380 s, compound fetch-and-read turns 355-504 s. The GA decoder now allows one requirement change per
   changeable Goal and none for other relationships (`_bound_ga_requirement_changes` in
   `agent/app/clients/sglang_protocol.py`); the focused `child_bedtime_zh` rerun passes
-  (`ga-bound-20261028/focus/`, diagnostic). Latency, measured on the iteration-6 cohort (136 turns, quiet mode):
+  (`ga-bound-20261028/focus/`, diagnostic). Its cohort (`ga-bound-20261028/cohort/`, 86715d473) stopped at 48/121:
+  after "帮我把老花镜拿过来。" failed (no glasses in the scene), Social Cognition re-cited its earlier ownership
+  question "这是谁的老花镜呀？" for the Planner's "where are they?" need and the contract rejected it; the decoder
+  offered that reuse. The reuse branches now exclude later input and confirmation needs, as the contract does
+  (smoke 15/15 judged; core 27/33 judged; "那上海呢？" read today in two cohorts running). Still open: Value Judgment
+  asked whose glasses an elder's unnamed glasses are, and the harness's silent confirmation grant leaves that
+  question unanswered in the ledger, so a replay asked it again in a new act. Latency, measured on the iteration-6 cohort (136 turns, quiet mode):
   medians UMI 12.1 s, ingress Social Cognition 14.1 s, first audio 28.7 s, Planner 24.4 s (concurrent), turn 60.4 s.
   SGLang reused about 1.5% of prompt tokens: an identical request is reused whole (Social Cognition 8.8 s -> 5.4 s
   on an idle GPU), but a request sharing only its opening (UMI shares about 84% with the previous call) reuses
@@ -136,7 +142,7 @@ Evidence and per-run judgments: `.chromie/acceptance/iter8-20261026/`, `iter7-20
   Cognition call that added nothing. UMI and ingress Social Cognition stay serial (Social Cognition answers UMI's
   Responsibilities); one combined generation for all modules was discussed with the owner and set aside (Host
   gates between stages, deliberate per-module views, lost concurrency). Next: the full cohort on this revision;
-  then the standing-attention Phase 0 design for owner approval (`.chromie/plans/`); then latency (fewer generated
+  then the standing-attention design for owner approval (`.chromie/plans/`); then latency (fewer generated
   tokens, no unneeded wake-ups, partial-prefix reuse) and voiceprint speaker identification (owner decisions
   2026-10-27).
   Measure the schema size of any Social Cognition schema change before deploying it.

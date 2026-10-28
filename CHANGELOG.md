@@ -5,6 +5,15 @@ remains available in Git history.
 
 ## Unreleased
 
+### An earlier question cannot be reused for a later one (2026-10-28)
+
+- "帮我把老花镜拿过来。" stopped the cohort at 48/121: after the fetch failed, Social Cognition re-cited its earlier
+  "这是谁的老花镜呀？" for the Planner's new "where are they?" need, and the contract rejected it (the same rule
+  stopped cohorts on 2026-10-11 and 2026-10-23). The decoder's branches that re-cite an earlier act now exclude a later
+  input or confirmation need, as the contract does, except the ingress question about meaning UMI left uncertain.
+  A replay then asked the ownership question again in a new act: Value Judgment's ownership question and the
+  harness's silent confirmation grant, which leaves that question unanswered, remain open.
+
 ### Goal Association cannot repeat a requirement change (2026-10-28)
 
 - "给我讲个很短的睡前故事吧。" stopped the iteration-6 cohort at 112/121: Goal Association wrote the same requirement

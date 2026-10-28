@@ -266,12 +266,18 @@ def _constrain_social_activity_identity(
     known_need_bindings: dict[str, set[str]] = {}
     acknowledgements = earlier_acknowledgement_ids(request.context)
     prior_ids: set[str] = set()
+    meaning_questions: set[str] = set()
+    uncertain_refs = uncertain_task_responsibility_refs(request)
     terminal_failure_need_ids = _result_needs_said_now(request)
     context = request.context.get("interaction_context", {})
     for key in (
         "events", "already_spoken", "pending_speech", "prior_delivered_speech"
     ):
         for row in context.get(key, []):
+            asked_refs = set(row.get("metadata", {}).get("source_responsibility_refs") or [])
+            if (key != "prior_delivered_speech" and row.get("speech_act") == "ask" and asked_refs
+                    and asked_refs <= uncertain_refs):
+                meaning_questions.update(row.get("metadata", {}).get("communicative_activity_ids") or [])
             ids = row.get("metadata", {}).get("communicative_activity_ids") or row.get("communicative_activity_ids") or []
             if isinstance(ids, list):
                 for identity in ids:
@@ -358,6 +364,14 @@ def _constrain_social_activity_identity(
             unbound = completed_work_need_ids(request) - known_need_bindings.get(identity, set())
             if identity in acknowledgements:
                 unbound |= {need.need_id for need in request.communication_needs if need.kind in {"answer", "result"}}
+            # A question is asked after its need exists, except the ingress question about meaning
+            # UMI left uncertain (live 2026-10-28, elder_glasses_zh: after the fetch failed, the earlier
+            # "这是谁的老花镜呀？" was reused for "where are the glasses?" and the contract rejected it).
+            unbound |= {
+                need.need_id for need in request.communication_needs
+                if need.kind in {"input", "confirmation"}
+                and not (identity in meaning_questions and need_asks_uncertain_meaning(need))
+            } - known_need_bindings.get(identity, set())
             addressed = reuse["properties"].get("addressed_need_ids") or {}
             if unbound and "enum" in (addressed.get("items") or {}):
                 allowed = [key for key in addressed["items"]["enum"] if key not in unbound]

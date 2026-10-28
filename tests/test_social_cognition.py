@@ -2745,8 +2745,10 @@ def test_the_ingress_question_already_asks_the_planners_later_meaning_need(varia
     "那个"; SC reused its delivered "你是说那个牛奶瓶吗？" for that input need and the contract
     rejected it ("a prior communicative act cannot answer a later input"), so the turn ended in
     "抱歉，我没能完成刚才那个任务。". Only a question the ledger records about that uncertain
-    meaning may cover the Planner's need for it; a relabelled acknowledgement still may not."""
-    from agent.app.social_cognition import validate_social_cognition_output
+    meaning may cover the Planner's need for it; a relabelled acknowledgement still may not.
+    Live 2026-10-28 (elder_glasses_zh): the decoder offered the earlier "这是谁的老花镜呀？" for the
+    later "where are they?" need and the contract rejected it; the decoder now offers the same choice."""
+    from agent.app.social_cognition import social_cognition_response_schema, validate_social_cognition_output
     from shared.chromie_contracts.plan import SocialCommunicationNeed
     from shared.chromie_contracts.social_cognition import SocialCognitionOutput
 
@@ -2776,6 +2778,11 @@ def test_the_ingress_question_already_asks_the_planners_later_meaning_need(varia
                         "truth_stage": "context_grounded", "source_responsibility_refs": ["r1"],
                         "source_goal_ids": ["goal:that"], "addressed_need_ids": ["need:which"]}],
     })
+    acts = social_cognition_response_schema(current, [])["$defs"]["SocialCommunicativeAct"]["oneOf"]
+    reused = [act["properties"]["addressed_need_ids"] for act in acts
+              if act["properties"]["activity_id"].get("const") == "ask-which"]
+    assert any("need:which" in (item.get("items") or {}).get("enum", []) for item in reused) is (
+        variant == "meaning_question")
     if variant == "meaning_question":
         validate_social_cognition_output(reuse, current, [])
     else:
