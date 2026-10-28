@@ -392,6 +392,10 @@ class CapabilityCatalog:
                         raise ValueError(
                             "Soridormi skill catalog entry has no skill_id"
                         )
+                    if item.get("lifecycle") == "long_running":
+                        # Social Cognition starts a long-running social skill and the Host
+                        # runs it; it is never a Planner step or a one-shot expression.
+                        continue
                     # Soridormi wire identity stays provider-local; expose only the
                     # translated canonical capability_id above this adapter boundary.
                     capability_id = f"soridormi.{upstream_id}"

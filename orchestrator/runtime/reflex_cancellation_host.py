@@ -18,6 +18,7 @@ from orchestrator.runtime.confirmation import (
     revoked_confirmation_evidence_for_reflex,
 )
 from orchestrator.runtime.input_session_runtime import input_session_runtime_for
+from orchestrator.runtime.long_running_social_skill import social_skill_of
 from shared.chromie_contracts.reflex import (
     CancellationDirective,
     CancellationDispatchReceipt,
@@ -163,6 +164,11 @@ async def apply_reflex_cancellation(
             "specific_goal cancellation requires the Core's exact "
             "committed plan binding and cannot originate from ReflexOutcome"
         )
+    # Every deterministic stop, cancel, emergency or silence ends the long-running social
+    # skill (Social Attention contract); Social Cognition may start it again on a later turn.
+    social_skill = social_skill_of(getattr(host, "interaction_runtime", None))
+    if social_skill is not None:
+        social_skill.schedule_stop(f"reflex:{scope}")
     if scope in {"current_interaction", "global_emergency"}:
         input_session_runtime_for(host)._cancel_active_routed_turns(
             excluding=asyncio.current_task(),

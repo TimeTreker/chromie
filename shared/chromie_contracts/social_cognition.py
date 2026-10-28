@@ -22,6 +22,7 @@ from .plan import (
 )
 from .situation import (
     CognitiveOpportunity, SituationProjection, SituationalRelationshipMemoryCandidate, SituationalSelfMemoryCandidate,
+    trusted_target_evidence,
 )
 
 
@@ -225,6 +226,61 @@ class SocialPersonalFact(BaseModel):
         return self
 
 
+ATTEND_TO_PERSON_CAPABILITY_ID = "soridormi.attend_to_person"
+SOCIAL_SKILL_CONTEXT_KEY = "long_running_social_skill"
+
+
+class LongRunningSocialSkillDecision(BaseModel):
+    """Start, re-pose, keep or stop the long-running social skill (owner decisions 2026-10-25/28).
+
+    Soridormi runs the skill across the conversation (it follows the person every frame and
+    means nothing by itself); Social Cognition chooses only the skill, the person and when it
+    starts and stops. While it runs, keep leaves it as it is; otherwise no decision does.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+    action: Literal["attend", "keep", "stop"]
+    capability_id: Literal["soridormi.attend_to_person"] | None = None
+    target_ref: str | None = Field(default=None, min_length=1, max_length=120)
+    posture: Literal["listening", "thinking"] | None = None
+
+    @model_validator(mode="after")
+    def validate_action(self) -> "LongRunningSocialSkillDecision":
+        attending = (self.capability_id, self.target_ref, self.posture)
+        if self.action == "attend" and None in attending:
+            raise ValueError("attending names the skill, the person and a posture")
+        if self.action != "attend" and attending != (None, None, None):
+            raise ValueError(f"{self.action} names nothing else")
+        return self
+
+
+def social_skill_options(context: Any) -> dict[str, Any]:
+    """What Social Cognition may decide about the long-running social skill now.
+
+    The Host's lifecycle state says whether Soridormi offers the skill and what runs; a
+    person can be attended to only as trusted live perception shows them.
+    """
+
+    context = context if isinstance(context, dict) else {}
+    state = context.get(SOCIAL_SKILL_CONTEXT_KEY)
+    state = state if isinstance(state, dict) else {}
+    target = trusted_target_evidence(context) if state.get("available") is True else {}
+    refs = [str(target["target"]["target_ref"])] if (
+        target.get("available") and target.get("source") == "live_perception"
+        and (target.get("target") or {}).get("target_ref")
+    ) else []
+    return {"attend_target_refs": refs, "can_stop": state.get("active") is True}
+
+
+def social_skill_decision_error(decision: LongRunningSocialSkillDecision, context: Any) -> str | None:
+    options = social_skill_options(context)
+    if decision.action != "attend":
+        return None if options["can_stop"] else f"no long-running social skill is running to {decision.action}"
+    if decision.target_ref not in options["attend_target_refs"]:
+        return "the long-running social skill attends only to a person trusted perception shows"
+    return None
+
+
 class SocialCognitionOutput(BaseModel):
     """One primary semantic result; a depth request cannot contain a decision."""
 
@@ -237,11 +293,14 @@ class SocialCognitionOutput(BaseModel):
     self_memory_candidates: list[SituationalSelfMemoryCandidate] = Field(default_factory=list, max_length=4)
     preference_memory_candidates: list[SocialPreferenceMemoryCandidate] = Field(default_factory=list, max_length=2)
     personal_fact: SocialPersonalFact | None = None
+    social_skill: LongRunningSocialSkillDecision | None = None
 
     @model_validator(mode="after")
     def validate_decision(self) -> "SocialCognitionOutput":
         if (self.disposition == "communicate") != bool(self.activities):
             raise ValueError("only communicate may carry a nonempty complete act decision")
+        if self.disposition == "deliberate" and self.social_skill is not None:
+            raise ValueError("unresolved cognition cannot decide the long-running social skill")
         if self.disposition == "deliberate" and (
             self.memory_candidates or self.self_memory_candidates or self.preference_memory_candidates
             or (self.personal_fact and self.personal_fact.stated)
@@ -491,6 +550,10 @@ class SocialCognitionResolution(SocialCognitionOutput):
             for item in self.preference_memory_candidates
         )):
             raise ValueError("a stated preference is kept only at ingress from the person's own Responsibility")
+        if self.social_skill is not None:
+            skill_error = social_skill_decision_error(self.social_skill, request.context)
+            if skill_error:
+                raise ValueError(skill_error)
         own_refs = {resp.local_ref for resp in request.responsibilities}
         fact = self.personal_fact if self.personal_fact and self.personal_fact.stated else None
         if fact and (request.trigger != "interpretation" or not set(fact.source_responsibility_refs) <= own_refs):

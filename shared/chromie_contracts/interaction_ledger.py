@@ -53,6 +53,14 @@ InteractionEventType = Literal[
     "social_decoration_timed_out",
     "social_decoration_refused",
     "social_decoration_not_run",
+    # The long-running social skill's lifecycle: interaction facts, never Evidence that
+    # Chromie understood or that a Goal progressed.
+    "social_skill_started",
+    "social_skill_changed",
+    "social_skill_suspended",
+    "social_skill_resumed",
+    "social_skill_ended",
+    "social_skill_not_run",
 ]
 
 
@@ -165,14 +173,15 @@ class InteractionLedgerEvent(BaseModel):
                 raise ValueError(
                     "activity events must retain their trusted runtime owner"
                 )
-        elif self.event_type.startswith("social_decoration_"):
+        elif self.event_type.startswith(("social_decoration_", "social_skill_")):
             if (
                 self.owner != "trusted_capability_runtime"
                 or self.domain != "social_attention"
+                or (self.event_type.startswith("social_skill_") and self.goal_ids)
             ):
                 raise ValueError(
-                    "social decoration events must be owned by the trusted "
-                    "capability runtime"
+                    "social decoration and social skill events must be owned by the "
+                    "trusted capability runtime, and a social skill serves no Goal"
                 )
         elif (
             self.owner != "cognitive_runtime"

@@ -22,6 +22,7 @@ from shared.chromie_contracts.interaction import (
     reject_forbidden_low_level_fields,
 )
 from shared.chromie_contracts.situation import CognitiveOpportunity, SituationProjection, trusted_target_evidence
+from shared.chromie_contracts.social_cognition import SOCIAL_SKILL_CONTEXT_KEY
 from shared.chromie_contracts.tool_result import ToolResultEvidence
 
 
@@ -1255,11 +1256,14 @@ def auxiliary_social_prompt_context(
         for item in (context.get("recent_auxiliary_behavior_evidence") or [])[-12:]
         if isinstance(item, dict)
     ]
+    skill = context.get(SOCIAL_SKILL_CONTEXT_KEY)
     return {
         "eligible_capabilities": candidates,
         "target_evidence": target_evidence,
         "social_interaction_style": style,
         "recent_auxiliary_behavior_evidence": recent,
+        **({SOCIAL_SKILL_CONTEXT_KEY: {key: value for key, value in skill.items() if key != "available"}}
+           if isinstance(skill, dict) and skill.get("available") is True else {}),
     }
 
 

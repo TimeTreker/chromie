@@ -208,7 +208,7 @@ ORCH_TASK_CONTEXT_STORE_PATH=.chromie/conversation/task_contexts.json
 Conversation boundaries are deliberately non-semantic in the Host. It applies
 the hard-idle timeout and typed control state; it does not use reset or follow-up
 phrases, pronoun lists, or new-topic starters, and no model-owned
-conversation-control path is enabled yet. `ORCH_CONVERSATION_IDLE_TIMEOUT_SEC` remains a bounded conversation-state value but does not authorize phrase-based soft-idle splitting.
+conversation-control path is enabled yet. `ORCH_CONVERSATION_IDLE_TIMEOUT_SEC` remains a bounded conversation-state value but does not authorize phrase-based soft-idle splitting; its one enforced use is ending the [long-running social skill](SOCIAL_ATTENTION_BEHAVIOR_DOMAIN.md#long-running-social-skill) after that long without conversation activity or body work.
 
 The former `ORCH_CONTEXT_*` aliases are removed. Exact maintained settings and defaults are documented in [`CONFIGURATION.md`](CONFIGURATION.md).
 

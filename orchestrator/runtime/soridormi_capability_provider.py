@@ -265,6 +265,9 @@ def import_soridormi_capability_catalog(
         upstream_skill_id = str(item.get("skill_id", "")).strip()
         if not upstream_skill_id:
             raise ValueError("Soridormi skill catalog entry has no skill_id")
+        if item.get("lifecycle") == "long_running":
+            # Run by its lifecycle tools on Social Cognition's decision, never as a request.
+            continue
         capability_id = f"soridormi.{upstream_skill_id}"
         if capability_id in seen:
             raise ValueError(

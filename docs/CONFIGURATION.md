@@ -598,7 +598,7 @@ cancellation scope.
 | `ORCH_ENABLE_CONVERSATION_STATE` | `1`. |
 | `ORCH_CONVERSATION_ID` | `local_default`. |
 | `ORCH_CONVERSATION_MAX_TURNS` | `12`. |
-| `ORCH_CONVERSATION_IDLE_TIMEOUT_SEC` | `180`; retained for compatibility and diagnostics. It does not trigger phrase-based topic or follow-up classification. |
+| `ORCH_CONVERSATION_IDLE_TIMEOUT_SEC` | `180`; ends the long-running social skill after this long without conversation activity or body work, and is otherwise retained for diagnostics. It does not trigger phrase-based topic or follow-up classification. |
 | `ORCH_CONVERSATION_HARD_IDLE_TIMEOUT_SEC` | `900`; deterministic context boundary when no active Goal or pending work exists. |
 | `ORCH_CONVERSATION_TURN_MAX_TEXT_CHARS` | `260`. |
 | `ORCH_CONVERSATION_MAX_CONTEXT_CHARS` | `2200`. |

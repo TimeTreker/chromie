@@ -1632,6 +1632,19 @@
       ]
     },
     {
+      "path": "orchestrator/runtime/long_running_social_skill.py",
+      "symbol": "sync_social_skill",
+      "ordinal": 1,
+      "classification": "fail_closed_boundary",
+      "owner": "orchestrator.runtime",
+      "contract": "Contain one failed long-running social skill upkeep read (catalog offer, Soridormi attention status or a deterministic stop) as a visible diagnostic; keep the skill's last known state, never start a skill or wake cognition, and let Soridormi's own target-lost and duration ends still apply.",
+      "review_status": "reviewed",
+      "body_sha256": "64544a4ad2d9b52dcaacda81c3d666ef5d57558662edfc1d88b7396bb98972db",
+      "failure_signals": [
+        "diagnostic"
+      ]
+    },
+    {
       "path": "orchestrator/runtime/soridormi_scene_perception.py",
       "symbol": "run_soridormi_ambient_perception_loop",
       "ordinal": 1,

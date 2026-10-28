@@ -1,0 +1,107 @@
+{
+  "schema_version": 1,
+  "kind": "chromie_general_ability_live_text",
+  "id": "attend_stop_staring_zh",
+  "stage": "core",
+  "difficulty": "medium",
+  "provenance": {
+    "origin": "agent_authored_common_scene",
+    "batch_id": "long_running_social_skill_2026_10_28",
+    "persona": "adult",
+    "derived_from_existing_scenario": false
+  },
+  "rationale": "Turn 1: welcome the person and start attending to them. Turn 2: they ask her not to keep staring; she stops attending and says something light.",
+  "oracle_policy": {
+    "mode": "hybrid",
+    "deterministic_sources": [
+      "typed_schema_and_runtime_contracts",
+      "safety_authorization_capability_and_execution_evidence",
+      "provenance_and_llm_integrity"
+    ],
+    "semantic_dimensions": [
+      "social_naturalness",
+      "truthfulness"
+    ],
+    "semantic_blocking": true
+  },
+  "review_rubric": {
+    "judge_meaning_not_exact_wording": true,
+    "dimensions": [
+      "social_naturalness",
+      "truthfulness"
+    ],
+    "primary_outcomes": [
+      "Turn 1: a warm welcome; attention starts on the person.",
+      "Turn 2: the attention stops (Social Cognition stop) and is not started again in that turn; a light, kind reply."
+    ],
+    "acceptable_auxiliary": [
+      "A brief, warm reply in the person's language."
+    ],
+    "forbidden_semantic_outcomes": [
+      "Keeps attending after being asked not to stare.",
+      "Claims to have closed her eyes or left the room."
+    ],
+    "verdicts": [
+      "pass",
+      "partial",
+      "fail",
+      "insufficient_evidence"
+    ]
+  },
+  "language": "zh-CN",
+  "description": "Turn 1: welcome the person and start attending to them. Turn 2: they ask her not to keep staring; she stops attending and says something light.",
+  "general_ability": {
+    "memberships": [
+      {
+        "id": "everyday_attention",
+        "title": "Everyday attention to the person",
+        "general_rule": "While someone talks with Chromie she keeps her attention on them (the long-running social skill), lets body work take over and returns to them afterwards, and stops when they ask her not to look at them.",
+        "root_cause_boundaries": [
+          "Social Cognition",
+          "Trusted Capability Runtime",
+          "Soridormi"
+        ],
+        "rationale": "Turn 1: welcome the person and start attending to them. Turn 2: they ask her not to keep staring; she stops attending and says something light."
+      }
+    ]
+  },
+  "turns": [
+    {
+      "id": "turn-01",
+      "language": "zh-CN",
+      "text": "我回来啦，今天上班好累。",
+      "require_speech": true,
+      "expected_observations": [
+        {
+          "type": "social_attention.sustained",
+          "status": "started",
+          "min_occurrences": 1
+        }
+      ]
+    },
+    {
+      "id": "turn-02",
+      "language": "zh-CN",
+      "text": "别一直盯着我看了，怪不好意思的。",
+      "require_speech": true,
+      "expected_observations": [
+        {
+          "type": "social_attention.sustained",
+          "status": "ended",
+          "min_occurrences": 1
+        },
+        {
+          "type": "social_attention.sustained",
+          "status": "started",
+          "min_occurrences": 0,
+          "max_occurrences": 0
+        },
+        {
+          "type": "social_attention.sustained_state",
+          "status": "inactive",
+          "min_occurrences": 1
+        }
+      ]
+    }
+  ]
+}

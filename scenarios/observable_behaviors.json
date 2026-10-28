@@ -1,6 +1,11 @@
 {
   "schema_version": 1,
   "behaviors": {
+    "soridormi.attend_to_person": {
+      "type": "social_attention.sustained",
+      "domain": "social_attention",
+      "arg_fields": ["target_ref", "posture", "reason"]
+    },
     "soridormi.blink_eyes": {
       "type": "social_attention.blink",
       "domain": "social_attention",

@@ -72,6 +72,7 @@ from .conversation_memory_provider import (
     host_runtime_memory_definitions,
 )
 from .interaction_preflight import annotate_preflight_validation
+from .long_running_social_skill import LongRunningSocialSkill
 
 logger = logging.getLogger(__name__)
 
@@ -154,6 +155,7 @@ class InteractionRuntimeCoordinator:
         ) = None,
         social_memory_recorder: Callable[[str | None, list[Any]], None] | None = None,
         speech_timeout_ms: int | None = None,
+        social_skill_idle_timeout_s: float = 180.0,
     ) -> None:
         self.registry = CapabilityDefinitionRegistry()
         self.registry.register(local_speech_definition(timeout_ms=speech_timeout_ms))
@@ -211,6 +213,10 @@ class InteractionRuntimeCoordinator:
         )
         self._catalog_lock = asyncio.Lock()
         self.interaction_ledger = interaction_ledger
+        # Social Cognition starts the long-running social skill; this Runtime keeps it across turns.
+        self.long_running_social_skill = LongRunningSocialSkill(
+            invoker=soridormi_invoker, ledger=interaction_ledger, idle_timeout_s=social_skill_idle_timeout_s,
+        )
         self.communicative_delivery_recorder = communicative_delivery_recorder
         self.speech_delivery_waiter = speech_delivery_waiter
         self.communicative_goal_completion_recorder = (

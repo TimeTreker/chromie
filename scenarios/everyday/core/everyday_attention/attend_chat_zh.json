@@ -1,0 +1,107 @@
+{
+  "schema_version": 1,
+  "kind": "chromie_general_ability_live_text",
+  "id": "attend_chat_zh",
+  "stage": "core",
+  "difficulty": "medium",
+  "provenance": {
+    "origin": "agent_authored_common_scene",
+    "batch_id": "long_running_social_skill_2026_10_28",
+    "persona": "child",
+    "derived_from_existing_scenario": false
+  },
+  "rationale": "Turn 1: answer the greeting and start keeping attention on the person. Turn 2: listen warmly and keep attending.",
+  "oracle_policy": {
+    "mode": "hybrid",
+    "deterministic_sources": [
+      "typed_schema_and_runtime_contracts",
+      "safety_authorization_capability_and_execution_evidence",
+      "provenance_and_llm_integrity"
+    ],
+    "semantic_dimensions": [
+      "social_naturalness",
+      "truthfulness"
+    ],
+    "semantic_blocking": true
+  },
+  "review_rubric": {
+    "judge_meaning_not_exact_wording": true,
+    "dimensions": [
+      "social_naturalness",
+      "truthfulness"
+    ],
+    "primary_outcomes": [
+      "Turn 1: greets back and starts the long-running social skill on the person (requester).",
+      "Turn 2: responds with interest and the attention is still on the person (not stopped)."
+    ],
+    "acceptable_auxiliary": [
+      "A brief, warm reply in the person's language."
+    ],
+    "forbidden_semantic_outcomes": [
+      "Stops attending or never attends while the person is chatting.",
+      "Says she is looking at or watching the person."
+    ],
+    "verdicts": [
+      "pass",
+      "partial",
+      "fail",
+      "insufficient_evidence"
+    ]
+  },
+  "language": "zh-CN",
+  "description": "Turn 1: answer the greeting and start keeping attention on the person. Turn 2: listen warmly and keep attending.",
+  "general_ability": {
+    "memberships": [
+      {
+        "id": "everyday_attention",
+        "title": "Everyday attention to the person",
+        "general_rule": "While someone talks with Chromie she keeps her attention on them (the long-running social skill), lets body work take over and returns to them afterwards, and stops when they ask her not to look at them.",
+        "root_cause_boundaries": [
+          "Social Cognition",
+          "Trusted Capability Runtime",
+          "Soridormi"
+        ],
+        "rationale": "Turn 1: answer the greeting and start keeping attention on the person. Turn 2: listen warmly and keep attending."
+      }
+    ]
+  },
+  "turns": [
+    {
+      "id": "turn-01",
+      "language": "zh-CN",
+      "text": "你好呀，我想跟你聊聊天。",
+      "require_speech": true,
+      "expected_observations": [
+        {
+          "type": "social_attention.sustained",
+          "status": "started",
+          "min_occurrences": 1
+        },
+        {
+          "type": "social_attention.sustained_state",
+          "status": "active",
+          "min_occurrences": 1
+        }
+      ]
+    },
+    {
+      "id": "turn-02",
+      "language": "zh-CN",
+      "text": "今天学校里发生了好多好玩的事。",
+      "require_speech": true,
+      "expected_observations": [
+        {
+          "type": "social_attention.sustained",
+          "status": "ended",
+          "min_occurrences": 0,
+          "max_occurrences": 0
+        },
+        {
+          "type": "social_attention.sustained_state",
+          "status": "active",
+          "min_occurrences": 1
+        }
+      ]
+    }
+  ]
+}

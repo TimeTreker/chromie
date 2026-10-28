@@ -89,6 +89,42 @@ natural blinking and glancing away, a listening or thinking posture.
 - Social Cognition sees the option only when the live Soridormi catalog declares the skill;
   there is no environment switch.
 
+Implementation (2026-10-28):
+
+- Soridormi lists the skill in `soridormi.skill.list` with `lifecycle: long_running`, runs it
+  through `soridormi.attention.start|status|stop`, and rejects it on the plan and activity
+  paths. The Agent catalog and the Host named-capability import skip such entries, and the
+  Planner never sees the lifecycle tools, so it is never a Planner step or an auxiliary
+  activity.
+- The Host owner is `LongRunningSocialSkill` (`orchestrator/runtime/long_running_social_skill.py`),
+  held by the interaction runtime coordinator. It adds `long_running_social_skill`
+  (`available`, `active`, target, posture, status, the last end) to every Social Cognition
+  request context, and Social Cognition sees it under `social_expression`.
+- `SocialCognitionOutput.social_skill` is `null`, `attend` (`soridormi.attend_to_person`, the
+  `target_ref` trusted live perception shows, posture `listening` or `thinking`), `keep` or
+  `stop`. The decoder offers only the branches `social_skill_options` allows. While the skill
+  runs it offers `keep` (leave it as it is), another posture or person, and `stop`, never `null`
+  or the run as it already is (live 2026-10-29: restating the run cost about 23 generated tokens
+  per call, and without a short steady choice the model alternated postures). With nothing to
+  decide, the field is absent, and `deliberate` forces `null`. The Agent validator and the Host
+  provenance check apply the same rule; `keep`, and an unchanged attend from another provider,
+  record nothing.
+- The Host carries out a decision after the response that holds it, without delaying it. The
+  decision applies to ingress, post-plan and Situation-triggered Social Cognition alike. An
+  attend for the person already attended to changes only the posture; another person ends the
+  run first.
+- Ends: Social Cognition's stop; every reflex cancellation scope (stop, cancel, emergency,
+  silence); a new conversation; `ORCH_CONVERSATION_IDLE_TIMEOUT_SEC` (180 s) without conversation
+  activity or body work; Soridormi's own ends (the person unseen 5 s, 600 s, motion or
+  emergency stop, simulator reset). A Host starting up stops a run no Host owns.
+- Ledger records (`trusted_capability_runtime`, domain `social_attention`, no Goal IDs):
+  `social_skill_started`, `_changed`, `_suspended`, `_resumed`, `_ended` (with the reason) and
+  `_not_run`. Upkeep (the catalog offer every 30 s, the status every second, idle) runs in the
+  ambient perception loop, never waits behind a decision being carried out, and never invokes
+  cognition. Idle counts from the latest of the last conversation activity, the last body work
+  and the run's start. A start that timed out is adopted when Soridormi reports it running; a
+  stop that failed keeps the run and is retried; a run the Host does not track is stopped.
+
 ### Trusted current speaker
 
 Which perceived person is speaking is a perception fact. Soridormi's scene observation

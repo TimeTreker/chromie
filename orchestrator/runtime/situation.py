@@ -16,6 +16,7 @@ from orchestrator.runtime.cognitive_activation import (
     resolve_cognitive_activation,
 )
 from orchestrator.runtime.response_plan import build_social_interaction_response
+from orchestrator.runtime.long_running_social_skill import apply_social_skill_decision, with_social_skill_context
 from shared.chromie_contracts.core_interpretation import CognitiveResponsibilityProposal
 from shared.chromie_contracts.interaction import InteractionResponse, InteractionSpeech
 from shared.chromie_contracts.social_world import (
@@ -838,7 +839,7 @@ async def resolve_goal_free_situation_response(
         source_refs=list(observation.source_refs), opportunity=opportunity,
         situation=observation.projection,
         language=language or "auto",
-        context=context,
+        context=with_social_skill_context(getattr(host, "interaction_runtime", None), context),
     )
     cognition_call = getattr(
         host.agent_client,
@@ -884,6 +885,8 @@ async def resolve_goal_free_situation_response(
     resolution.validate_request(request)
     if revisions.get(observation.source_id) != identity:
         return None
+    apply_social_skill_decision(getattr(host, "interaction_runtime", None), resolution, request=request,
+                                session_id=session_id)
     # Recheck immutable Activity wording against delivery changes that occurred
     # while inference was running, before committing any proposed Memory.
     if interaction_ledger is not None:

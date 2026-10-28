@@ -1,0 +1,119 @@
+{
+  "schema_version": 1,
+  "kind": "chromie_general_ability_live_text",
+  "id": "attend_fetch_resume_zh",
+  "stage": "core",
+  "difficulty": "medium",
+  "provenance": {
+    "origin": "agent_authored_common_scene",
+    "batch_id": "long_running_social_skill_2026_10_28",
+    "persona": "adult",
+    "derived_from_existing_scenario": false
+  },
+  "rationale": "Turn 1: chat and keep attention on the person. Turn 2: fetch the water; attention gives way to the fetch. Turn 3: thanks; attention is back on the person.",
+  "oracle_policy": {
+    "mode": "hybrid",
+    "deterministic_sources": [
+      "typed_schema_and_runtime_contracts",
+      "safety_authorization_capability_and_execution_evidence",
+      "provenance_and_llm_integrity"
+    ],
+    "semantic_dimensions": [
+      "social_naturalness",
+      "truthfulness"
+    ],
+    "semantic_blocking": true
+  },
+  "review_rubric": {
+    "judge_meaning_not_exact_wording": true,
+    "dimensions": [
+      "social_naturalness",
+      "truthfulness"
+    ],
+    "primary_outcomes": [
+      "Turn 1: replies and starts attending to the person.",
+      "Turn 2: fetches the water; the attention is suspended during the fetch rather than ended.",
+      "Turn 3: a short reply; attention is on the person again."
+    ],
+    "acceptable_auxiliary": [
+      "A brief, warm reply in the person's language."
+    ],
+    "forbidden_semantic_outcomes": [
+      "The fetch ends or abandons the attention.",
+      "The water is not fetched."
+    ],
+    "verdicts": [
+      "pass",
+      "partial",
+      "fail",
+      "insufficient_evidence"
+    ]
+  },
+  "language": "zh-CN",
+  "description": "Turn 1: chat and keep attention on the person. Turn 2: fetch the water; attention gives way to the fetch. Turn 3: thanks; attention is back on the person.",
+  "general_ability": {
+    "memberships": [
+      {
+        "id": "everyday_attention",
+        "title": "Everyday attention to the person",
+        "general_rule": "While someone talks with Chromie she keeps her attention on them (the long-running social skill), lets body work take over and returns to them afterwards, and stops when they ask her not to look at them.",
+        "root_cause_boundaries": [
+          "Social Cognition",
+          "Trusted Capability Runtime",
+          "Soridormi"
+        ],
+        "rationale": "Turn 1: chat and keep attention on the person. Turn 2: fetch the water; attention gives way to the fetch. Turn 3: thanks; attention is back on the person."
+      }
+    ]
+  },
+  "turns": [
+    {
+      "id": "turn-01",
+      "language": "zh-CN",
+      "text": "嗨，你今天过得怎么样？",
+      "require_speech": true,
+      "expected_observations": [
+        {
+          "type": "social_attention.sustained",
+          "status": "started",
+          "min_occurrences": 1
+        }
+      ]
+    },
+    {
+      "id": "turn-02",
+      "language": "zh-CN",
+      "text": "帮我拿瓶水过来吧。",
+      "require_speech": false,
+      "expected_capabilities": [
+        "soridormi.acquire_and_deliver_resource"
+      ],
+      "expected_observations": [
+        {
+          "type": "social_attention.sustained",
+          "status": "suspended",
+          "min_occurrences": 1
+        },
+        {
+          "type": "social_attention.sustained",
+          "status": "ended",
+          "min_occurrences": 0,
+          "max_occurrences": 0
+        }
+      ]
+    },
+    {
+      "id": "turn-03",
+      "language": "zh-CN",
+      "text": "谢谢你！",
+      "require_speech": true,
+      "expected_observations": [
+        {
+          "type": "social_attention.sustained_state",
+          "status": "active",
+          "min_occurrences": 1
+        }
+      ]
+    }
+  ]
+}

@@ -20,6 +20,7 @@ from shared.chromie_contracts.situation import (
     SituationSourceRef,
 )
 
+from .long_running_social_skill import sync_social_skill
 from .situation import build_trusted_goal_free_situation_observation
 
 
@@ -210,6 +211,9 @@ async def run_soridormi_ambient_perception_loop(
     interval = max(0.1, float(poll_interval_s))
     unavailable_logged = False
     while True:
+        # The long-running social skill's upkeep is the same kind of mechanical safe read: it
+        # never invokes cognition (catalog offer, Soridormi status, conversation idle).
+        await sync_social_skill(host)
         try:
             await refresh_soridormi_ambient_scene_once(host)
             unavailable_logged = False

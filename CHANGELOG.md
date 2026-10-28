@@ -5,6 +5,17 @@ remains available in Git history.
 
 ## Unreleased
 
+### Long-running social skill implemented (2026-10-29)
+
+- Soridormi `a49a87f` (now pinned) adds `attend_to_person`, the first long-running social skill: it keeps the head on
+  the person every frame, glances away now and then, blinks when the eyes are free, turns the body to a person
+  beyond the head's range, gives way to any body task and returns afterwards, and ends 5 s after the person is lost,
+  after 10 minutes or on a stop. It runs through `soridormi.attention.start|status|stop` and is not a Planner step.
+- Social Cognition may start it on the person, change its posture, keep it or stop it (`social_skill`, offered only
+  while the skill is available and the person is perceived; while it runs, `keep` is the short way to leave it). The Host holds the run, ends it on a reflex stop, a new
+  conversation or conversation idle, and records `social_skill_*` events in the interaction ledger.
+- The acceptance harness no longer lists one played reply twice when its re-cited text differs only by whitespace.
+
 ### The person speaking is marked by perception (2026-10-28)
 
 - Soridormi's scene observation now marks the person the scenario declares as speaking (`current_speaker`, Soridormi

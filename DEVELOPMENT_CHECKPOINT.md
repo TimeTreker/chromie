@@ -13,12 +13,13 @@ proof, then default target-evidence closure.
 
 ## Active Issue — everyday live-cohort root-cause repairs
 
-Run the everyday live-text cohort (`scenarios/everyday/`, 121 cases; `scenarios/model_limited/` holds cases the
+Run the everyday live-text cohort (`scenarios/everyday/`, 124 cases; `scenarios/model_limited/` holds cases the
 owner skips as local-model limits) against
 Soridormi MuJoCo, judge every case, and repair each failure at its earliest
 responsible owner. One invocation and one debug bundle per run; a hard failure in
 the 15-case `must_pass` smoke stage stops `core` and `challenge` (owner rule).
-Evidence and per-run judgments: `.chromie/acceptance/iter8-20261026/`, `iter7-20261026/`, `iter6-20261026/`, `iter5-20261025/`, `iter4-20261025/`, `iter3-20261025/`, `iter2-20261025/`, `iter1-20261025/`, `acc3-20261024/` (stopped at 57/70), `acc2-focused-20261024/`,
+Evidence and per-run judgments: `.chromie/acceptance/skill-20261028/`, `speaker-20261028/`, `sc-reuse-20261028/`,
+`ga-bound-20261028/`, `it6-final-20261028/`, `iter8-20261026/`, `iter7-20261026/`, `iter6-20261026/`, `iter5-20261025/`, `iter4-20261025/`, `iter3-20261025/`, `iter2-20261025/`, `iter1-20261025/`, `acc3-20261024/` (stopped at 57/70), `acc2-focused-20261024/`,
 `acc1-20261024/`, `perf2-20261024/` and `perf-4f64f5120-20261024/` (performance mode), `review-fixes-20261023/` (stopped),
 `merge-reads-20261023/`, `span-owned-20261023/`, `main-20cce0dfa-20261023/` (complete cohorts),
 `planner-fit-20261023/` and `ingress-awaiting-20261023/` (focused),
@@ -151,18 +152,41 @@ Evidence and per-run judgments: `.chromie/acceptance/iter8-20261026/`, `iter7-20
   `current_speaker: true` in `observe_scene`; the Host turns exactly one mark into a Situation interpretation
   (`scene.current_speaker`) and `trusted_target_evidence` gives `requester` with that interpretation as evidence
   (two marks or none: unavailable). The fixture-injected target in the acceptance harness is removed; about 30
-  recorded benchmark fixtures still carry their recorded target keys. Focused live runs (four cases): all 8 recorded
-  model calls that carry target evidence read `available: true`, and "转过来看着我。" and "Look at me for three seconds." looked at the
-  person. Delivery-constraint exception (owner-approved): one new architecture term,
+  recorded benchmark fixtures still carry their recorded target keys. Its cohort (26f15b95d,
+  `speaker-20261028/README.md`): 121/121 attempted, 119 automatic; judged smoke 15/15, core 79/95, challenge 6/11
+  (f99c1c1fd: 81/95 core); no outcome moved with the mark, and two memory/grounding cases failed that had passed
+  ("我今天早上吃过药了吗？" claimed a check; a Chinese-answer preference was not followed). The whole skill is now
+  built (owner 2026-10-28: before the 18-turn optimization loop). Soridormi `a49a87f` adds `attend_to_person`
+  (`soridormi.attention.start|status|stop`, listed with `lifecycle: long_running`, never a Planner step or a
+  catalog Capability): a per-frame loop under the locomotion and head locks that follows the person, glances away
+  one-sidedly at least 7 s apart (never a nod or shake), blinks only when the eyes are free, turns the body toward a
+  person beyond ±0.55 rad after 2 s, gives way to any body task at the next step and returns, and ends 5 s after the
+  person is lost, after 600 s, on a motion or emergency stop or a simulator reset. Social Cognition decides
+  `social_skill` (null, attend the perceived person in a listening or thinking posture, keep, or stop); the
+  decoder offers only what the Host's offer and trusted perception allow, and while the skill runs offers `keep`
+  instead of `null` or the run as it already is. The Host
+  owner `LongRunningSocialSkill` carries the decision out after the response, ends the run on any reflex scope, a
+  new conversation or 180 s of conversation idle, and records `social_skill_*` ledger events. Live compile of
+  1,200 Social Cognition schema shapes (skill idle or running × the 600 earlier shapes), and of the 600 running
+  shapes after each decoder change: 0 failed. Focused live runs (`skill-20261028/README.md`, diagnostic, dirty tree): the
+  three new `everyday_attention` cases pass; the looks suspend and resume the skill; `adult_be_quiet_zh` still
+  fails on `stand_idle`. Restating the unchanged attend added about 23 generated tokens to every Social Cognition
+  call (ingress median 16.4 s vs 13.9 s in the cohort). Removing only that branch made the model alternate
+  postures (decoder coercion); with `keep` offered instead of `null` while it runs, six focused cases pass with
+  no alternation (10 of 20 calls `keep`). Ingress stayed 16.2 s on those mostly first turns, where the start
+  (about 30 tokens) is decided; the full cohort measures the cost per conversation. The acceptance harness
+  matched played speech to the response by whitespace-sensitive text, so a reply re-cited without a space
+  ("！ 你呢？") was listed twice though played once; matching now ignores whitespace. The speech-to-gaze time
+  on the robot and the rate of voices not addressed to Chromie need a supervised voice session; the onset-glance
+  reflex waits for them. Delivery-constraint exception (owner-approved): one new architecture term,
   "long-running social skill", defined once in `docs/SOCIAL_ATTENTION_BEHAVIOR_DOMAIN.md`; no new document or
-  environment variable. The f99c1c1fd cohort was the first complete one on this line (121/121 attempted, 118
-  automatic; judged smoke 15/15, core 81/95, challenge 6/11; `sc-reuse-20261028/README.md`). Next: the rest of
-  Roadmap item 2 (owner 2026-10-28: build the whole skill before the 18-turn optimization loop); then latency (fewer generated tokens, no unneeded wake-ups, partial-prefix reuse) and
-  voiceprint speaker identification (owner decisions 2026-10-27).
+  environment variable. Next: the owner's 18-turn optimization loop on the complete 124-case cohort; then
+  latency (fewer generated tokens, no unneeded wake-ups, partial-prefix reuse) and voiceprint speaker
+  identification (owner decisions 2026-10-27).
   Measure the schema size of any Social Cognition schema change before deploying it.
 
-Verification: canonical gate on this delivery's source (2026-10-28, clean worktree): pytest 4,082 passed + 5
-skipped (`xgrammar` not installed), benchmarks 172, legacy Agent tests 20, all checks. Workflow replay tests 94/94; strict
+Verification: canonical gate on this delivery's source (2026-10-29, clean worktree): pytest 4,101 passed + 5
+skipped (`xgrammar` not installed), benchmarks 172, legacy Agent tests 20, all checks. Strict
 replay not rerun (last 6,000/6,000 on freeze 47, 2026-10-23).
 
 ## Repairs in force from this Issue

@@ -23,7 +23,9 @@ from .prompt_projection import required_json
 
 from shared.chromie_contracts.plan import FastProgressKind, validate_communicative_activity_identity
 from shared.chromie_contracts.social_cognition import (
-    MEMORY_KEY_PATTERN, SocialCognitionOutput, SocialCognitionRequest, SocialCognitionResolution,
+    ATTEND_TO_PERSON_CAPABILITY_ID, MEMORY_KEY_PATTERN, SOCIAL_SKILL_CONTEXT_KEY, SocialCognitionOutput,
+    SocialCognitionRequest,
+    SocialCognitionResolution, social_skill_decision_error, social_skill_options,
     SocialStartupGreetingOutput, SocialStartupGreetingRequest, SocialStartupGreetingResolution,
     asks_about_uncertain_meaning, completed_work_need_ids, earlier_acknowledgement_ids, must_say_now_need_ids,
     need_asks_uncertain_meaning, pre_evidence_act_violation,
@@ -549,6 +551,16 @@ def social_cognition_response_schema(
     } if ingress else {"anyOf": [{"type": "null"}, UNSTATED_PERSONAL_FACT]}
     if ingress:
         schema["required"].append("personal_fact")
+    # The long-running social skill (owner decisions 2026-10-25/28): offered only while Soridormi
+    # declares it, as exact branches; with nothing to decide the field is absent.
+    schema["$defs"].pop("LongRunningSocialSkillDecision", None)
+    skill_branches = social_skill_decision_branches(request)
+    if skill_branches:
+        running = social_skill_options(request.context)["can_stop"]
+        schema["properties"]["social_skill"] = {"anyOf": [*([] if running else [{"type": "null"}]), *skill_branches]}
+        schema["required"].append("social_skill")
+    else:
+        schema["properties"].pop("social_skill", None)
     need_ids = [item.need_id for item in request.communication_needs]
     required_failure_need_ids = [
         need.need_id for need in request.communication_needs
@@ -867,6 +879,8 @@ def social_cognition_response_schema(
                 properties[name]["maxItems"] = 0
             if "oneOf" in properties["personal_fact"]:
                 properties["personal_fact"] = copy.deepcopy(UNSTATED_PERSONAL_FACT)
+            if "social_skill" in properties:
+                properties["social_skill"] = {"type": "null"}
         else:
             properties["need_outcomes"]["required"] = need_ids
             if disposition == "silence":
@@ -1014,6 +1028,9 @@ def validate_social_cognition_output(
         raise ValueError(
             "fresh addressed turn without pending or delivered reply requires acknowledgement"
         )
+    skill_error = output.social_skill and social_skill_decision_error(output.social_skill, request.context)
+    if skill_error:
+        raise ValueError(skill_error)
     # Acts that already exist (pending or delivered) and the needs they addressed then, and
     # which of them the ledger records as a question about meaning UMI left uncertain.
     previous_need_bindings: dict[str, set[str]] = {}
@@ -1446,6 +1463,50 @@ UNSTATED_PERSONAL_FACT = {"type": "object", "additionalProperties": False, "requ
                           "properties": {"stated": {"type": "boolean", "const": False}}}
 
 
+def social_skill_decision_branches(request: SocialCognitionRequest) -> list[dict[str, Any]]:
+    """The exact long-running social skill decisions available now.
+
+    While the skill runs, keep is the one way to leave it as it is: restating the same attend
+    cost every steady-state call about 23 generated tokens, and without a short steady choice
+    the model alternated postures (live 2026-10-29). Otherwise no change is null."""
+
+    options = social_skill_options(request.context)
+    state = request.context.get(SOCIAL_SKILL_CONTEXT_KEY)
+    state = state if isinstance(state, dict) and state.get("active") is True else {}
+    branches: list[dict[str, Any]] = []
+    for target_ref in options["attend_target_refs"]:
+        postures = [posture for posture in ("listening", "thinking")
+                    if (state.get("target_ref"), state.get("posture")) != (target_ref, posture)]
+        branches.append({
+            "type": "object", "additionalProperties": False,
+            "required": ["action", "capability_id", "target_ref", "posture"],
+            "properties": {"action": {"type": "string", "const": "attend"},
+                           "capability_id": {"type": "string", "const": ATTEND_TO_PERSON_CAPABILITY_ID},
+                           "target_ref": {"type": "string", "const": target_ref},
+                           "posture": {"type": "string", "enum": postures}},
+        })
+    if options["can_stop"]:
+        branches[:0] = [{"type": "object", "additionalProperties": False, "required": ["action"],
+                         "properties": {"action": {"type": "string", "const": "keep"}}}]
+        branches.append({"type": "object", "additionalProperties": False, "required": ["action"],
+                         "properties": {"action": {"type": "string", "const": "stop"}}})
+    return branches
+
+
+def _social_skill_guard(request: SocialCognitionRequest) -> str:
+    """When the long-running social skill is offered, what it is (one general rule)."""
+
+    if not social_skill_decision_branches(request):
+        return ""
+    return ("\nsocial_skill keeps your attention on a person for the conversation: your body follows them with "
+            "your head and eyes, blinking and glancing away now and then, in a listening or thinking posture. "
+            "It means nothing by itself and is never an answer, a nod or a promise. attend the person you are "
+            "talking with when you are not attending to them yet, or to change posture (listening while they "
+            "talk, thinking while you work something out); stop when they ask you not to look at them, leave, "
+            "or end the conversation; keep while it should go on as it is; otherwise null. "
+            "long_running_social_skill shows what runs now.\n")
+
+
 def _social_memory_guard(request: SocialCognitionRequest) -> str:
     """Notice a lasting fact the person tells about themselves (owner decisions 2026-10-26/27).
 
@@ -1707,7 +1768,8 @@ class SocialCognitionResolver:
                 schema, max_chars=self.num_ctx * 3, label="Social Cognition output contract",
             ) + "\n" + SOCIAL_COGNITION_WORK_STATE_PROMPT
             + _social_current_turn_output_guard(request) + _social_value_judgment_guard(request)
-            + _social_language_guard(request) + _social_memory_guard(request) + _social_voice_guard(request),
+            + _social_language_guard(request) + _social_memory_guard(request) + _social_voice_guard(request)
+            + _social_skill_guard(request),
             system=SOCIAL_COGNITION_AUTHORITY_PROMPT + (
                 "This is the sole deeper pass; decide communicate or silence now." if deep else ""
             ),

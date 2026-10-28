@@ -90,6 +90,9 @@ def take_activity_count(raw: dict[str, Any]) -> int | None:
 NON_PLANNER_TRANSPORT_CAPABILITY_IDS = frozenset({"chromie.speak"})
 DETERMINISTIC_CONTROL_CAPABILITY_IDS = frozenset({"soridormi.stop"})
 PLANNER_LIBRARY_INTROSPECTION_SUFFIXES = (".get_capabilities", ".skill.list")
+# The long-running social skill's lifecycle tools: Social Cognition alone starts and stops it and
+# the Host runs it (owner decisions 2026-10-25/28); a requested "look at me" stays look_at_person.
+SOCIAL_COGNITION_SKILL_LIFECYCLE_SUFFIXES = (".attention.start", ".attention.status", ".attention.stop")
 # Provider-native plan compilation/execution is a realization detail beneath an
 # already selected semantic Capability. The trusted adapter may call these tools;
 # Planner must not choose or detail-lookup them as user Work.
@@ -117,6 +120,7 @@ def is_planner_step_capability(capability_id: str) -> bool:
     return not normalized.endswith(
         PLANNER_LIBRARY_INTROSPECTION_SUFFIXES
         + PLANNER_PROVIDER_REALIZATION_SUFFIXES
+        + SOCIAL_COGNITION_SKILL_LIFECYCLE_SUFFIXES
     )
 
 class PlannerModelStep(CapabilityIdentityModel):

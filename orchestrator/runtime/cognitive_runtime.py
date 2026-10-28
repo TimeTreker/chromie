@@ -58,6 +58,7 @@ from shared.chromie_runtime.runtime_trace import TraceModule, runtime_tracer
 
 from orchestrator.runtime.situation import build_situation_projection
 from orchestrator.runtime.response_plan import build_social_interaction_response
+from orchestrator.runtime.long_running_social_skill import apply_social_skill_decision, with_social_skill_context
 from orchestrator.runtime import planner_advance_projection
 
 if TYPE_CHECKING:
@@ -642,7 +643,7 @@ class GoalDrivenRuntimeCoordinator:
             meaning_uncertainties=list(work_request.meaning_uncertainties),
             source_turn=work_request.source_turn_provenance,
             evidence_refs=list(evidence_refs or []), communication_needs=list(plan.communication_needs),
-            context=source_context,
+            context=with_social_skill_context(self._social_skill_runtime(), source_context),
         ).model_copy(deep=True)
         try:
             result = await self._observe_workflow_stage(
@@ -673,6 +674,7 @@ class GoalDrivenRuntimeCoordinator:
                 activity_id=act.activity_id, text=act.text, interaction_context=current_interaction,
                 repair_of_activity_ids=act.repair_of_activity_ids,
             )
+        apply_social_skill_decision(self._social_skill_runtime(), result, request=request, session_id=session_id)
         return await self.adapter.build_social_cognition_response(
             plan=plan, request=request, resolution=result, session_id=session_id,
             language=language, context=source_context,
@@ -691,7 +693,8 @@ class GoalDrivenRuntimeCoordinator:
         """
         if self.policy.mode == "off" or not snapshot_is_current():
             return None
-        request = request.model_copy(deep=True)
+        request = request.model_copy(deep=True, update={
+            "context": with_social_skill_context(self._social_skill_runtime(), request.context)})
         metadata = {"semantic_owner": "social_cognition", "trigger": request.trigger,
                     "execution_authority": False}
         logger.info("social_cognition_start sid=%s request_id=%s trigger=%s",
@@ -737,6 +740,7 @@ class GoalDrivenRuntimeCoordinator:
             logger.info("social_cognition_suppressed sid=%s request_id=%s reason=stale_snapshot",
                         session_id, request.request_id)
             return None
+        apply_social_skill_decision(self._social_skill_runtime(), result, request=request, session_id=session_id)
         logger.info(
             "social_cognition_done sid=%s request_id=%s disposition=%s activities=%d "
             "speech=%d capabilities=%d reason=%r",
@@ -749,6 +753,9 @@ class GoalDrivenRuntimeCoordinator:
             result.reason_summary,
         )
         return result, response
+
+    def _social_skill_runtime(self) -> Any:
+        return getattr(self.adapter, "interaction_runtime", None)
 
     def _track_auxiliary_execution_task(
         self, task: asyncio.Task[Any], *, session_id: str | None,

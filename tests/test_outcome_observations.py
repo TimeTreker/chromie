@@ -466,6 +466,27 @@ class OutcomeObservationTests(unittest.TestCase):
             "Why don't scientists trust atoms? Because they make up everything!",
         )
 
+    def test_played_speech_differing_only_by_whitespace_is_one_utterance(self) -> None:
+        summary = self._summary()
+        summary["interaction_response"]["capabilities"] = []
+        summary["interaction_response"]["speech"][0]["text"] = "我今天过得挺开心的！你呢？"
+        summary["execution"]["results"] = []
+        summary["session_state"] = {
+            "workflow_events": [
+                {
+                    "event": "tts_schedule",
+                    "elapsed_ms": 1000.0,
+                    "message": "tts_schedule: order=0 text='我今天过得挺开心的！ 你呢？'",
+                },
+                {"event": "playback_end", "message": "playback_end: order=0 played_tts=1"},
+            ]
+        }
+
+        observations = collect_observations(summary)
+
+        self.assertEqual([item["text"] for item in observations], ["我今天过得挺开心的！你呢？"])
+        self.assertEqual(observations[0]["status"], "completed")
+
     def test_delivered_speech_before_capability_receipt_keeps_actual_chronology(self) -> None:
         summary = self._summary()
         summary["interaction_response"]["capabilities"] = [

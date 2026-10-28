@@ -1049,6 +1049,8 @@ async def run_check(
         invoker = assistant.interaction_runtime.soridormi_invoker
         if invoker is None:
             raise RuntimeError("Soridormi Trusted Capability Runtime invoker is not configured")
+        social_skill = getattr(assistant.interaction_runtime, "long_running_social_skill", None)
+        social_skill_mark = len(getattr(social_skill, "events", []))
 
         status_before_start = time.perf_counter()
         status_before = await _invoke_soridormi_status(invoker)
@@ -1666,6 +1668,8 @@ async def run_check(
                     )
                 errors.extend(safe_idle_errors(status_after))
 
+        if social_skill is not None:
+            await social_skill.settle()  # decisions carried out after this turn's response
         debug_summary = build_debug_summary(
             interpretation=interpretation_projection,
             response=response,
@@ -1695,6 +1699,9 @@ async def run_check(
                 evidence_dir / "cognitive_runtime_events.jsonl"
             ),
             "ambient_perception": ambient_perception,
+            # The long-running social skill's transitions during this turn and its state after it.
+            "social_skill_events": list(getattr(social_skill, "events", []))[social_skill_mark:],
+            **(social_skill.context() if social_skill is not None else {}),
             "status_before": status_before,
             "status_after": status_after,
             "session_state": assistant.sessions.state.get(sid),

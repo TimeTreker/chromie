@@ -185,4 +185,5 @@ def build_interaction_runtime(
             30000,
             int(settings.playback.playback_start_timeout_ms) + 5000,
         ),
+        social_skill_idle_timeout_s=settings.conversation.soft_idle_timeout_sec,
     )

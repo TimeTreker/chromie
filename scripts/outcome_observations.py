@@ -250,6 +250,27 @@ def collect_observations(
             }
         )
 
+    # The long-running social skill is not a capability request: its lifecycle transitions are
+    # the observable facts (started, changed, suspended, resumed, ended, not_run).
+    for event in summary.get("social_skill_events") or []:
+        if not isinstance(event, dict):
+            continue
+        observations.append({
+            "sequence": len(observations), "type": "social_attention.sustained",
+            "domain": "social_attention",
+            "status": str(event.get("event_type") or "").removeprefix("social_skill_"),
+            "interaction_role": "auxiliary_expression", "capability_id": "soridormi.attend_to_person",
+            "args": {key: event[key] for key in ("target_ref", "posture", "reason") if key in event},
+        })
+    skill_state = summary.get("long_running_social_skill")
+    if isinstance(skill_state, dict) and skill_state.get("available") is True:
+        observations.append({
+            "sequence": len(observations), "type": "social_attention.sustained_state",
+            "domain": "social_attention", "status": "active" if skill_state.get("active") else "inactive",
+            "interaction_role": "auxiliary_expression", "capability_id": "soridormi.attend_to_person",
+            "args": {key: skill_state[key] for key in ("target_ref", "posture") if key in skill_state},
+        })
+
     delivered_tts = _completed_tts_playback(summary)
     matched_delivery_indices: set[int] = set()
     capability_count = len(response.get("capabilities") or [])
@@ -261,12 +282,14 @@ def collect_observations(
             continue
         metadata = speech.get("metadata") if isinstance(speech.get("metadata"), dict) else {}
         speech_id = str(speech.get("id") or "")
-        normalized_text = " ".join(text.split()).casefold()
+        # Whitespace never distinguishes speech: a Chinese reply played as "！ 你呢？" is the
+        # act re-cited as "！你呢？" (live 2026-10-29 counted one utterance twice).
+        normalized_text = "".join(text.split()).casefold()
         matching_deliveries = [
             (index, item)
             for index, item in enumerate(delivered_tts)
             if index not in matched_delivery_indices
-            and " ".join(str(item.get("text") or "").split()).casefold()
+            and "".join(str(item.get("text") or "").split()).casefold()
             in normalized_text
         ]
         matched_delivery_indices.update(index for index, _item in matching_deliveries)
