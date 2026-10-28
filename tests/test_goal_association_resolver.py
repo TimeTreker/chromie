@@ -1251,6 +1251,35 @@ class GoalAssociationRepairPreservationTests(unittest.TestCase):
                 if len(criteria) <= 4:
                     self.assertFalse(indices.is_valid([0, 0]))
 
+    def test_requirement_changes_cannot_repeat_in_the_decoder(self):
+        """Live 2026-10-28 (child_bedtime_zh T2): a modify of the one candidate Goal repeated the same
+        requirement change until the output was truncated. The decoder allows one change per
+        changeable Goal, and none for a relationship that may not change requirements."""
+        from jsonschema import Draft202012Validator
+        from agent.app.clients.sglang_protocol import _openai_response_format
+        from agent.app.goal_association_contract import GoalAssociationModelOutput
+        from agent.app.goal_association_schema import goal_association_response_schema
+
+        change = {"target_goal_id": "goal-0", "replace_requirement_indices": [0],
+                  "source_responsibility_refs": ["r1"], "binding_changes": []}
+        for count in (1, 2):
+            with self.subTest(goals=count):
+                schema = goal_association_response_schema(
+                    GoalAssociationModelOutput,
+                    [{"goal_id": f"goal-{index}", "goal": {"description": "x", "success_criteria": ["A"]}}
+                     for index in range(count)],
+                    [], responsibility_refs=["r1"])
+                wire = _openai_response_format(schema)["json_schema"]["schema"]
+                for branch in wire["$defs"]["GoalAssociationModelAssociation"]["oneOf"]:
+                    changes = Draft202012Validator({**branch["properties"]["requirement_changes"],
+                                                    "$defs": wire["$defs"]})
+                    if "modify" in branch["properties"]["relationship"]["enum"]:
+                        self.assertTrue(changes.is_valid([change]))
+                        self.assertFalse(changes.is_valid([change] * (count + 1)))
+                    else:
+                        self.assertFalse(changes.is_valid([change]))
+                        self.assertTrue(changes.is_valid([]))
+
     def test_each_decoded_change_branch_carries_its_whole_required_shape(self):
         """Live 2026-10-26 (adult_umbrella_no_city_zh T5): the native decoder follows a oneOf branch and
         ignores sibling properties, so a requirement change came out without source_responsibility_refs."""

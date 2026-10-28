@@ -239,6 +239,23 @@ def _bound_ga_requirement_indices(schema: dict[str, Any]) -> None:
             indices["maxItems"] = len(values)
 
 
+def _bound_ga_requirement_changes(schema: dict[str, Any]) -> None:
+    """Expose GA's one-change-per-target-Goal rule to the native decoder.
+
+    Live 2026-10-28 (child_bedtime_zh T2, "给我讲个很短的睡前故事吧。"): a modify of the one candidate
+    Goal repeated the same requirement change until the output was truncated. The DTO already
+    rejects repeated targets, and each change branch names one changeable Goal, so the decoder
+    gets at most one change per branch.
+    """
+    definitions = schema.get("$defs", {})
+    branches = [branch for branch in (definitions.get("GoalAssociationModelRequirementChange") or {}).get("oneOf") or []
+                if branch != {"not": {}}]
+    changes = ((definitions.get("GoalAssociationModelAssociation") or {}).get("properties") or {}).get(
+        "requirement_changes")
+    if isinstance(changes, dict) and branches:
+        changes["maxItems"] = min(changes.get("maxItems", len(branches)), len(branches))
+
+
 def _empty_impossible_arrays(schema: dict[str, Any]) -> None:
     """Close arrays whose items no value can satisfy, which the native decoder cannot see.
 
@@ -291,6 +308,9 @@ def _ga_relationship_branches(schema: dict[str, Any]) -> None:
         shape["relationship"] = {**shape["relationship"], "enum": names}
         if required_field:
             shape[required_field] = {**shape[required_field], "minItems": 1}
+        elif "requirement_changes" in shape:
+            # The DTO lets only modify/clarify change Goal requirements.
+            shape["requirement_changes"] = {**shape["requirement_changes"], "maxItems": 0}
         return {"type": "object", "additionalProperties": False, "properties": shape,
                 "required": [*association.get("required", []), *([required_field] if required_field else [])]}
 
@@ -316,6 +336,7 @@ def _openai_response_format(response_format: Any) -> dict[str, Any] | None:
             _complete_ga_change_branches(schema)
             _disjoint_ga_goal_links(schema)
             _bound_ga_requirement_indices(schema)
+            _bound_ga_requirement_changes(schema)
             _empty_impossible_arrays(schema)
             _ga_relationship_branches(schema)
         if schema.get("title") == "FastPlannerWorkAdvanceOutput":

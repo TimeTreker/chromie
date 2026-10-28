@@ -5,6 +5,13 @@ remains available in Git history.
 
 ## Unreleased
 
+### Goal Association cannot repeat a requirement change (2026-10-28)
+
+- "给我讲个很短的睡前故事吧。" stopped the iteration-6 cohort at 112/121: Goal Association wrote the same requirement
+  change for the one candidate Goal until its 2,048-token limit. The DTO already allows one change per target Goal,
+  and changes only for modify or clarify, but the native decoder ignores `uniqueItems` and the array had no bound.
+  The decoder schema now bounds it by the number of changeable Goals and closes it for every other relationship.
+
 ### Never promise a reminder; say what was handed over (owner loop 2, iteration 6, 2026-10-28)
 
 - `chromie.memory.keep` (iteration 5) is removed. It was the one stateful-effect contract in view, and the local

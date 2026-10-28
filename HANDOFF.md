@@ -14,10 +14,10 @@ ordered open work are in [STATUS](docs/STATUS.md).
   revision pinned by `capabilities/soridormi.json` and `release/compatibility.json`. The
   MCP container mounts its `src`, so a `docker restart soridormi-runtime-mcp` loads it and
   resets the scene (user at -90 degrees, 1.5 m).
-- Live Agent: `chromie-agent:latest` = `it6-nokeep-20261028` (`0c3b31655a45`), built from this delivery's source and
+- Live Agent: `chromie-agent:latest` = `ga-bound-20261028` (`3cf7631f98ef`), built from this delivery's source and
   recreated with the quiet-mode timeout overrides; `--verify-agent-source` matched
-  (`.chromie/acceptance/it6-final-20261028/deploy2/agent-source-verify.json`). Previous images: `it6-rare-20261028`
-  (`0c1395419941`, keep as a rare contract, diagnostic), `it5-keep2-20261027` (`3f0b481fd695`).
+  (`.chromie/acceptance/ga-bound-20261028/deploy/agent-source-verify.json`). Previous images: `it6-nokeep-20261028`
+  (`0c3b31655a45`, iteration 6), `it5-keep2-20261027` (`3f0b481fd695`).
   The ASR image carries `voice_cues` (rebuilt and recreated 2026-10-27); the live-text cohort does not use ASR.
 - The host rebooted at 19:35 on 2026-10-26: the Soridormi scene was restarted detached (log
   `.chromie/acceptance/it1-memory-20261026/soridormi-run.log`); CPU turbo came back on (`no_turbo=0`) while the platform
@@ -30,7 +30,8 @@ ordered open work are in [STATUS](docs/STATUS.md).
 - Workflow corpus: freeze 47 (`bdb8db08…`; scripts in `.chromie/acceptance/thirsty-offer-20261021/freeze47/`). Restore it with
   `python -m benchmarks.regression restore-fixtures`; do not untar `frozen.tar.xz` over
   `workflow_scenarios/` (its inner `manifest.json` lacks the storage identity).
-- Evidence (README in each): `.chromie/acceptance/it6-final-20261028/` (owner loop 2 iteration 6: keep-vs-reminder
+- Evidence (README in each): `.chromie/acceptance/ga-bound-20261028/` (GA requirement-change bound: recorded-call
+  replay, `focus/` rerun of `child_bedtime_zh` on the uncommitted source, diagnostic), `it6-final-20261028/` (owner loop 2 iteration 6: keep-vs-reminder
   replays, `focus/` and `focus2/` diagnostic runs, warmth wordings that did not qualify; `cohort/` on da1b6b353 ran
   smoke and core in full and stopped at 112/121 on a truncated GA output, judged by stage with the stop's module
   workflow; bundle `/home/chromie/Downloads/chromie_debug_bundle_20261028_123852.tar.gz`),
@@ -61,7 +62,7 @@ ordered open work are in [STATUS](docs/STATUS.md).
   `playback-race-20261020/`, `answer-source-20261020/`, `gaze-turn-20261020/`, `said-now-20261020/`,
   `decided-activity-20261020/`, `main-03974435e-20261020/`.
   Bundles `~/Downloads/chromie_debug_bundle_2026102*.tar.gz`. Earlier runs: `.chromie/acceptance/everyday-20261016/`.
-- Last gate (this delivery's source, GPU host, 2026-10-28): pytest 4,078 passed + 5 skipped (`xgrammar` not installed), benchmarks 172, legacy Agent tests 20; policies, docs, test ownership, ruff, mypy and runtime-structure ratchets pass. Strict replay was not rerun; its last pass is 6,000/6,000 on freeze 47 (2026-10-23). The gate needs `anthropic==1.15.0` from `requirements-test.txt` (`INSTALL_TEST_DEPS=1`).
+- Last gate (this delivery's source, GPU host, 2026-10-28): pytest 4,079 passed + 5 skipped (`xgrammar` not installed), benchmarks 172, legacy Agent tests 20; policies, docs, test ownership, ruff, mypy and runtime-structure ratchets pass. Strict replay was not rerun; its last pass is 6,000/6,000 on freeze 47 (2026-10-23). The gate needs `anthropic==1.15.0` from `requirements-test.txt` (`INSTALL_TEST_DEPS=1`).
 - `start_chromie.sh --build` reuses the layer cache, takes package downloads from BuildKit
   cache mounts, and recreates only the services whose image changed. The first build
   after this change reruns the cache-mount layers once.

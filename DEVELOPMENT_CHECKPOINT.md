@@ -124,14 +124,24 @@ Evidence and per-run judgments: `.chromie/acceptance/iter8-20261026/`, `iter7-20
   decline unsaid and spoke UMI's "承认我其实还没写完作业" in Chromie's voice), a recall turn whose non-fitting need
   led the second Planner pass to a `chromie.clock.local` placeholder step, an unseen remote decided `unavailable`, a
   dizzy elder asked instead of advised, and a resolved workplace answered "我这就去查" with an empty Plan. Fetches
-  take 185-380 s, compound fetch-and-read turns 355-504 s. Next: bound GA `requirement_changes` by the number of
-  changeable Goals in `agent/app/clients/sglang_protocol.py` (beside `_bound_ga_requirement_indices`), rerun
-  `child_bedtime_zh` and the full cohort; then latency (prefix caching, prompt size, serial UMI and SC ingress),
-  voiceprint speaker identification (owner decisions 2026-10-27), and the standing-attention skill plan
-  (`.chromie/plans/`).
+  take 185-380 s, compound fetch-and-read turns 355-504 s. The GA decoder now allows one requirement change per
+  changeable Goal and none for other relationships (`_bound_ga_requirement_changes` in
+  `agent/app/clients/sglang_protocol.py`); the focused `child_bedtime_zh` rerun passes
+  (`ga-bound-20261028/focus/`, diagnostic). Latency, measured on the iteration-6 cohort (136 turns, quiet mode):
+  medians UMI 12.1 s, ingress Social Cognition 14.1 s, first audio 28.7 s, Planner 24.4 s (concurrent), turn 60.4 s.
+  SGLang reused about 1.5% of prompt tokens: an identical request is reused whole (Social Cognition 8.8 s -> 5.4 s
+  on an idle GPU), but a request sharing only its opening (UMI shares about 84% with the previous call) reuses
+  almost nothing on this hybrid sliding-window model. Decoding dominates the critical path: UMI writes indented
+  JSON (median 906 characters, 255 of them whitespace), and 30 of 76 speech-only turns ran a post-Planner Social
+  Cognition call that added nothing. UMI and ingress Social Cognition stay serial (Social Cognition answers UMI's
+  Responsibilities); one combined generation for all modules was discussed with the owner and set aside (Host
+  gates between stages, deliberate per-module views, lost concurrency). Next: the full cohort on this revision;
+  then the standing-attention Phase 0 design for owner approval (`.chromie/plans/`); then latency (fewer generated
+  tokens, no unneeded wake-ups, partial-prefix reuse) and voiceprint speaker identification (owner decisions
+  2026-10-27).
   Measure the schema size of any Social Cognition schema change before deploying it.
 
-Verification: canonical gate on this delivery's source (2026-10-28): pytest 4,078 passed + 5 skipped
+Verification: canonical gate on this delivery's source (2026-10-28): pytest 4,079 passed + 5 skipped
 (`xgrammar` not installed), benchmarks 172, legacy Agent tests 20, all checks. Workflow replay tests 94/94; strict
 replay not rerun (last 6,000/6,000 on freeze 47, 2026-10-23).
 
