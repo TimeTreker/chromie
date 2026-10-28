@@ -5,6 +5,14 @@ remains available in Git history.
 
 ## Unreleased
 
+### The person speaking is marked by perception (2026-10-28)
+
+- Soridormi's scene observation now marks the person the scenario declares as speaking (`current_speaker`, Soridormi
+  `178f5ec`, now pinned). The Host copies exactly one such mark into trusted target evidence for Social Cognition, the
+  Planner and the Runtime target check; with none or several it stays unavailable. Since 2026-08-17 nothing had
+  produced this evidence, so Social Cognition could not aim a look or gesture at the person. The acceptance harness no
+  longer injects a recorded target.
+
 ### Long-running social skill designed (owner-approved, 2026-10-28)
 
 - Social Cognition orchestrates skills, never motions: a long-running social skill (first `soridormi.attend_to_person`)

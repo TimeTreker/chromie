@@ -6,6 +6,8 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
+from .resource import REQUESTER_REFERENT_ID
+
 
 SituationSourceKind = Literal[
     "evidence",
@@ -259,6 +261,64 @@ class SituationProjection(BaseModel):
             allow_nan=False,
         ).encode("utf-8")
         return hashlib.sha256(encoded).hexdigest()
+
+
+CURRENT_SPEAKER_RELATION = "scene.current_speaker"
+"""Situation relation for the perceived person a perception provider marks as speaking."""
+
+# Request fixtures recorded before the speaker came from perception name the target
+# directly; nothing produces these keys in a live turn.
+_RECORDED_TARGET_KEYS = (
+    "auxiliary_social_target",
+    "social_attention_target",
+    "active_user_target",
+    "perceived_user_target",
+)
+
+
+def trusted_target_evidence(context: Any) -> dict[str, Any]:
+    """The one trusted current person target, or ``{"available": False}``.
+
+    Which perceived person is speaking is a perception fact (owner decision
+    2026-10-28): the provider marks it in its scene observation, Situation carries
+    the mark, and this only copies it as the agreed ``"requester"`` referent, which
+    the provider resolves to the person. A person is never taken as the speaker
+    without that mark, and no mark or several marked people make it unavailable.
+    """
+
+    context = context if isinstance(context, dict) else {}
+    for key in _RECORDED_TARGET_KEYS:
+        value = context.get(key)
+        if not isinstance(value, dict) or not value:
+            continue
+        explicit_source = str(value.get("source") or "").strip()
+        source = (
+            explicit_source
+            if explicit_source in {"live_perception", "conversation_context"}
+            else "live_perception"
+            if "perception" in key or "perceived" in key
+            else "conversation_context"
+        )
+        raw_target = value.get("target")
+        target = dict(raw_target) if isinstance(raw_target, dict) else dict(value)
+        return {"available": True, "source": source, "target": {
+            name: target[name]
+            for name in ("target_ref", "relative_direction", "confidence", "evidence_refs")
+            if name in target
+        }}
+    situation = context.get("situation")
+    rows = situation.get("interpretations") if isinstance(situation, dict) else None
+    marks = [
+        row for row in rows or []
+        if isinstance(row, dict) and row.get("relation") == CURRENT_SPEAKER_RELATION
+        and row.get("epistemic_status") == "established"
+    ]
+    if len({row.get("subject_ref") for row in marks}) != 1:
+        return {"available": False}
+    return {"available": True, "source": "live_perception", "target": {
+        "target_ref": REQUESTER_REFERENT_ID,
+        "evidence_refs": [str(row.get("interpretation_id")) for row in marks],
+    }}
 
 
 class SituationRevisionObservation(BaseModel):

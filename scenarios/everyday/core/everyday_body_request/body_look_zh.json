@@ -67,15 +67,6 @@
     "soridormi.acquire_and_deliver_resource",
     "soridormi.walk_forward"
   ],
-  "trusted_target_context": {
-    "source": "live_perception",
-    "target_ref": "requester",
-    "relative_direction": "front",
-    "confidence": 1.0,
-    "evidence_refs": [
-      "scenario:body_look_zh:current_speaker_front"
-    ]
-  },
   "expected_capabilities": [
     "soridormi.look_at_person"
   ]

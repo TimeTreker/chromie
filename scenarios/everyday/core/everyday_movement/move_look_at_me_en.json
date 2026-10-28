@@ -69,14 +69,5 @@
   "expected_args": [
     "0:duration_s=3.0"
   ],
-  "require_speech": false,
-  "trusted_target_context": {
-    "source": "live_perception",
-    "target_ref": "requester",
-    "relative_direction": "front",
-    "confidence": 1.0,
-    "evidence_refs": [
-      "scenario:move_look_at_me_en:current_speaker_front"
-    ]
-  }
+  "require_speech": false
 }

@@ -39,6 +39,7 @@ from shared.chromie_contracts.plan import (
 )
 from shared.chromie_contracts.planner_response import PlannerResponseProjection
 from shared.chromie_contracts.semantic_task import ResponsePlan, ResponseStage
+from shared.chromie_contracts.situation import trusted_target_evidence
 from shared.chromie_contracts.user_turn import (
     user_turn_prohibits_speech,
 )
@@ -309,40 +310,7 @@ class CanonicalPlanRuntimeAdapter:
     ) -> dict[str, Any]:
         """Project current trusted target semantics without selecting a target."""
 
-        for key in (
-            "auxiliary_social_target",
-            "social_attention_target",
-            "active_user_target",
-            "perceived_user_target",
-        ):
-            value = context.get(key)
-            if not isinstance(value, dict) or not value:
-                continue
-            explicit_source = str(value.get("source") or "").strip()
-            source = (
-                explicit_source
-                if explicit_source in {"live_perception", "conversation_context"}
-                else "live_perception"
-                if "perception" in key or "perceived" in key
-                else "conversation_context"
-            )
-            raw_target = value.get("target")
-            target = dict(raw_target) if isinstance(raw_target, dict) else dict(value)
-            return {
-                "available": True,
-                "source": source,
-                "target": {
-                    name: target[name]
-                    for name in (
-                        "target_ref",
-                        "relative_direction",
-                        "confidence",
-                        "evidence_refs",
-                    )
-                    if name in target
-                },
-            }
-        return {"available": False}
+        return trusted_target_evidence(context)
 
     @staticmethod
     def _attention_target_error(

@@ -14,6 +14,7 @@ from typing import Any
 
 from agent.app.tool_invocation import AsyncToolInvoker
 from shared.chromie_contracts.situation import (
+    CURRENT_SPEAKER_RELATION,
     SituationInterpretation,
     SituationRevisionObservation,
     SituationSourceRef,
@@ -94,6 +95,7 @@ def _validated_sim_scene_observation(
             or not isinstance(distance, (int, float))
             or not math.isfinite(distance)
             or not 0 <= distance <= 60
+            or not isinstance(item.get("current_speaker", False), bool)
         ):
             raise ValueError("mock scene object does not satisfy the scene marker contract")
         seen_refs.add(object_ref)
@@ -117,6 +119,17 @@ def _validated_sim_scene_observation(
             epistemic_status="established",
             source_refs=[observation_id],
         ))
+        if item.get("current_speaker") is True:
+            # Who is speaking is the provider's perception, never a Host assumption
+            # (owner decision 2026-10-28); the trusted person target copies this mark.
+            interpretations.append(SituationInterpretation(
+                interpretation_id=f"{observation_id}:object-{index}:speaker",
+                subject_ref=f"sim-object:{object_ref}",
+                relation=CURRENT_SPEAKER_RELATION,
+                value="speaking with Chromie (simulated)",
+                epistemic_status="established",
+                source_refs=[observation_id],
+            ))
     observation = build_trusted_goal_free_situation_observation(
         context=context,
         turn_id=observation_id,

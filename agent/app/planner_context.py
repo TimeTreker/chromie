@@ -21,7 +21,7 @@ from shared.chromie_contracts.interaction import (
     MEDIA_CAPABILITY_IDS,
     reject_forbidden_low_level_fields,
 )
-from shared.chromie_contracts.situation import CognitiveOpportunity, SituationProjection
+from shared.chromie_contracts.situation import CognitiveOpportunity, SituationProjection, trusted_target_evidence
 from shared.chromie_contracts.tool_result import ToolResultEvidence
 
 
@@ -1200,42 +1200,7 @@ def trusted_target_prompt_context(context: dict[str, Any]) -> dict[str, Any]:
     are intentionally absent from this projection.
     """
 
-    target_evidence: dict[str, Any] = {"available": False}
-    for key in (
-        "auxiliary_social_target",
-        "social_attention_target",
-        "active_user_target",
-        "perceived_user_target",
-    ):
-        value = context.get(key)
-        if not isinstance(value, dict) or not value:
-            continue
-        explicit_source = str(value.get("source") or "").strip()
-        source = (
-            explicit_source
-            if explicit_source in {"live_perception", "conversation_context"}
-            else "live_perception"
-            if "perception" in key or "perceived" in key
-            else "conversation_context"
-        )
-        raw_target = value.get("target")
-        target = dict(raw_target) if isinstance(raw_target, dict) else dict(value)
-        target_evidence = {
-            "available": True,
-            "source": source,
-            "target": {
-                name: target[name]
-                for name in (
-                    "target_ref",
-                    "relative_direction",
-                    "confidence",
-                    "evidence_refs",
-                )
-                if name in target
-            },
-        }
-        break
-    return {"target_evidence": target_evidence}
+    return {"target_evidence": trusted_target_evidence(context)}
 
 
 def trusted_target_ref(context: dict[str, Any]) -> str:

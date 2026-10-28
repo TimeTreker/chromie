@@ -191,6 +191,9 @@
                     },
                     "distance_m": {
                       "type": "number"
+                    },
+                    "current_speaker": {
+                      "type": "boolean"
                     }
                   },
                   "required": [
@@ -4543,6 +4546,6 @@
     },
     "upstream_repository": "https://github.com/TimeTreker/soridormi.git",
     "transport_overlay": "mcp_streamable_http",
-    "upstream_commit": "51a2afa764fb4e72e9fd7581fc75e1f704995e78"
+    "upstream_commit": "178f5ec30b3acd0afbea8d11f149da4e045657b5"
   }
 }

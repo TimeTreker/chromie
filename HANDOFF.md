@@ -10,14 +10,15 @@ ordered open work are in [STATUS](docs/STATUS.md).
 - Checkout `/home/chromie/github/chromie`, branch `main`; the expected resume revision is
   the latest `origin/main` commit containing this file (the 2026-10-20 repair and build
   branches are merged; the owner merged them without a post-merge gate).
-- Soridormi `/home/chromie/github/soridormi` on `main` at `5b39f14` (its branches merged 2026-10-22), which contains `51a2afa`, the
-  revision pinned by `capabilities/soridormi.json` and `release/compatibility.json`. The
+- Soridormi `/home/chromie/github/soridormi` on `main` at `178f5ec` (`claude/current-speaker` fast-forwarded and pushed
+  2026-10-28), the revision pinned by `capabilities/soridormi.json` and `release/compatibility.json`; `observe_scene`
+  marks the scenario's speaking person `current_speaker: true`. The
   MCP container mounts its `src`, so a `docker restart soridormi-runtime-mcp` loads it and
   resets the scene (user at -90 degrees, 1.5 m).
-- Live Agent: `chromie-agent:latest` = `sc-reuse-20261028` (`5d8f7343b600`), built from this delivery's source and
+- Live Agent: `chromie-agent:latest` = `speaker-20261028` (`0fecb541eb29`), built from this delivery's source and
   recreated with the quiet-mode timeout overrides; `--verify-agent-source` matched
-  (`.chromie/acceptance/sc-reuse-20261028/deploy/agent-source-verify.json`). Previous images: `ga-bound-20261028`
-  (`3cf7631f98ef`, GA bound), `it6-nokeep-20261028` (`0c3b31655a45`, iteration 6).
+  (`.chromie/acceptance/speaker-20261028/deploy/agent-source-verify.json`). Previous images: `sc-reuse-20261028`
+  (`5d8f7343b600`, reuse branches), `ga-bound-20261028` (`3cf7631f98ef`, GA bound).
   The ASR image carries `voice_cues` (rebuilt and recreated 2026-10-27); the live-text cohort does not use ASR.
 - The host rebooted at 19:35 on 2026-10-26: the Soridormi scene was restarted detached (log
   `.chromie/acceptance/it1-memory-20261026/soridormi-run.log`); CPU turbo came back on (`no_turbo=0`) while the platform
@@ -30,8 +31,10 @@ ordered open work are in [STATUS](docs/STATUS.md).
 - Workflow corpus: freeze 47 (`bdb8db08…`; scripts in `.chromie/acceptance/thirsty-offer-20261021/freeze47/`). Restore it with
   `python -m benchmarks.regression restore-fixtures`; do not untar `frozen.tar.xz` over
   `workflow_scenarios/` (its inner `manifest.json` lacks the storage identity).
-- Evidence (README in each): `.chromie/acceptance/sc-reuse-20261028/` (reuse branches exclude later questions:
-  deploy, focused rerun and cohort), `ga-bound-20261028/` (GA requirement-change bound: recorded-call replays,
+- Evidence (README in each): `.chromie/acceptance/speaker-20261028/` (current speaker marked by Soridormi: deploy,
+  `focus/` of four look and greeting cases), `sc-reuse-20261028/` (reuse branches exclude later questions: deploy,
+  focused rerun, and `cohort/` on f99c1c1fd, the first complete 121-case cohort: 118/121 automatic, judged by stage;
+  bundle `/home/chromie/Downloads/chromie_debug_bundle_20261028_194930.tar.gz`), `ga-bound-20261028/` (GA requirement-change bound: recorded-call replays,
   `focus/` rerun of `child_bedtime_zh`; `cohort/` on 86715d473 stopped at 48/121 on a reused question, judged by
   stage with the stop's module workflow; latency measurements), `it6-final-20261028/` (owner loop 2 iteration 6: keep-vs-reminder
   replays, `focus/` and `focus2/` diagnostic runs, warmth wordings that did not qualify; `cohort/` on da1b6b353 ran
@@ -64,7 +67,8 @@ ordered open work are in [STATUS](docs/STATUS.md).
   `playback-race-20261020/`, `answer-source-20261020/`, `gaze-turn-20261020/`, `said-now-20261020/`,
   `decided-activity-20261020/`, `main-03974435e-20261020/`.
   Bundles `~/Downloads/chromie_debug_bundle_2026102*.tar.gz`. Earlier runs: `.chromie/acceptance/everyday-20261016/`.
-- Last gate (this delivery's source, GPU host, 2026-10-28): pytest 4,079 passed + 5 skipped (`xgrammar` not installed), benchmarks 172, legacy Agent tests 20; policies, docs, test ownership, ruff, mypy and runtime-structure ratchets pass. Strict replay was not rerun; its last pass is 6,000/6,000 on freeze 47 (2026-10-23). The gate needs `anthropic==1.15.0` from `requirements-test.txt` (`INSTALL_TEST_DEPS=1`).
+- Last gate (this delivery's source, clean worktree, GPU host, 2026-10-28): pytest 4,082 passed + 5 skipped (`xgrammar` not installed; in
+  the main checkout two release-provenance tests read its ignored local files and fail with or without this change), benchmarks 172, legacy Agent tests 20; policies, docs, test ownership, ruff, mypy and runtime-structure ratchets pass. Strict replay was not rerun; its last pass is 6,000/6,000 on freeze 47 (2026-10-23). The gate needs `anthropic==1.15.0` from `requirements-test.txt` (`INSTALL_TEST_DEPS=1`).
 - `start_chromie.sh --build` reuses the layer cache, takes package downloads from BuildKit
   cache mounts, and recreates only the services whose image changed. The first build
   after this change reruns the cache-mount layers once.

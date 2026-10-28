@@ -145,17 +145,24 @@ Evidence and per-run judgments: `.chromie/acceptance/iter8-20261026/`, `iter7-20
   social skill on 2026-10-28 (contract: Social Attention; order: Roadmap item 2): its name, its ends (5 s after
   the person is lost, conversation idle, 10 minutes), Social Cognition alone starting it and switching people,
   and as the first step the current speaker marked by Soridormi's mock perception and copied by the Host into
-  trusted target evidence. Since the legacy runtime's removal (27ff14e72, 2026-08-17) nothing produces that
+  trusted target evidence. Since the legacy runtime's removal (27ff14e72, 2026-08-17) nothing had produced that
   evidence: 293 of 297 Social Cognition calls in the iteration-6 cohort read `target_evidence: {"available":
-  false}` and 3 used a gesture. Delivery-constraint exception (owner-approved): one new architecture term,
+  false}` and 3 used a gesture. That first step is done: Soridormi `178f5ec` marks the scenario's speaking person
+  `current_speaker: true` in `observe_scene`; the Host turns exactly one mark into a Situation interpretation
+  (`scene.current_speaker`) and `trusted_target_evidence` gives `requester` with that interpretation as evidence
+  (two marks or none: unavailable). The fixture-injected target in the acceptance harness is removed; about 30
+  recorded benchmark fixtures still carry their recorded target keys. Focused live runs (four cases): all 8 recorded
+  model calls that carry target evidence read `available: true`, and "转过来看着我。" and "Look at me for three seconds." looked at the
+  person. Delivery-constraint exception (owner-approved): one new architecture term,
   "long-running social skill", defined once in `docs/SOCIAL_ATTENTION_BEHAVIOR_DOMAIN.md`; no new document or
-  environment variable. Next: judge the running cohort (f99c1c1fd); then the marked current speaker; then the
-  rest of Roadmap item 2; then latency (fewer generated tokens, no unneeded wake-ups, partial-prefix reuse) and
+  environment variable. The f99c1c1fd cohort was the first complete one on this line (121/121 attempted, 118
+  automatic; judged smoke 15/15, core 81/95, challenge 6/11; `sc-reuse-20261028/README.md`). Next: the rest of
+  Roadmap item 2 (owner 2026-10-28: build the whole skill before the 18-turn optimization loop); then latency (fewer generated tokens, no unneeded wake-ups, partial-prefix reuse) and
   voiceprint speaker identification (owner decisions 2026-10-27).
   Measure the schema size of any Social Cognition schema change before deploying it.
 
-Verification: canonical gate on this delivery's source (2026-10-28): pytest 4,079 passed + 5 skipped
-(`xgrammar` not installed), benchmarks 172, legacy Agent tests 20, all checks. Workflow replay tests 94/94; strict
+Verification: canonical gate on this delivery's source (2026-10-28, clean worktree): pytest 4,082 passed + 5
+skipped (`xgrammar` not installed), benchmarks 172, legacy Agent tests 20, all checks. Workflow replay tests 94/94; strict
 replay not rerun (last 6,000/6,000 on freeze 47, 2026-10-23).
 
 ## Repairs in force from this Issue

@@ -68,6 +68,31 @@ def test_simulator_observation_reaches_chromie_with_source_ref() -> None:
     assert observation.projection.interpretations[3].source_refs == ["soridormi-scene-7"]
 
 
+@pytest.mark.parametrize("marked", [[], ["user"], ["user", "grandma"]])
+def test_the_trusted_person_target_is_the_speaker_soridormi_marks(marked: list[str]) -> None:
+    """Live 2026-10-28: since the legacy runtime's removal nothing produced trusted target
+    evidence, so 293 of 297 Social Cognition calls read it as unavailable and a look or
+    gesture could not aim at the person. Who is speaking is Soridormi's perception (owner
+    decision 2026-10-28): its mark becomes the one target, an unmarked person never does,
+    and two marked people are no single target."""
+    from shared.chromie_contracts.situation import trusted_target_evidence
+
+    people = [{"object_ref": f"soridormi_mock_{name}", "description": name, "relative_direction": "to Chromie's right",
+               "distance_m": 1.5, **({"current_speaker": True} if name in marked else {})}
+              for name in ("user", "grandma")]
+    observation = asyncio.run(observe_soridormi_sim_scene(SceneInvoker(scene(objects=people)), context={}))
+    assert observation is not None
+    evidence = trusted_target_evidence({"situation": observation.projection.prompt_projection()})
+    if len(marked) == 1:
+        assert evidence == {"available": True, "source": "live_perception", "target": {
+            "target_ref": "requester", "evidence_refs": ["soridormi-scene-7:object-0:speaker"]}}
+    else:
+        assert evidence == {"available": False}
+    with pytest.raises(ValueError, match="scene marker contract"):
+        asyncio.run(observe_soridormi_sim_scene(SceneInvoker(scene(objects=[{**people[0], "current_speaker": "yes"}])),
+                                                context={}))
+
+
 def test_object_value_names_only_what_it_is() -> None:
     """Live 2026-10-21 (multi_thirsty_yes_en): the fused value "bottle of milk, 9.899 meters
     to Chromie's left (simulated)" was copied whole into resource.description, and Soridormi

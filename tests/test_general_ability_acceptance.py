@@ -1349,14 +1349,6 @@ class GeneralAbilityAcceptanceTests(unittest.TestCase):
             namespace.conversation_id,
             "ga-live-multi_goal_look_then_blink",
         )
-        self.assertEqual(
-            namespace.trusted_target_context["target_ref"],
-            "requester",
-        )
-        self.assertEqual(
-            namespace.trusted_target_context["source"],
-            "live_perception",
-        )
         self.assertEqual(args.assertion_scope, "user-outcome")
         self.assertEqual(namespace.expect_capability, [])
         self.assertEqual(

@@ -892,16 +892,14 @@ after retaining successful warm-run evidence.
 The reconstruction design and staged implementation plan are maintained in
 [General Ability Test Reconstruction](GENERAL_ABILITY_TEST_RECONSTRUCTION.md).
 
-A live-text scenario that expects a person-targeted Capability may declare one
-bounded `trusted_target_context` fixture with `source`, `target_ref`, optional
-`relative_direction`, confidence, and retained evidence refs. The runner injects
-that exact fixture as `active_user_target` and writes
-`trusted_target_context.json` beside the case evidence. This qualifies Planner
-grounding and simulator execution against an explicit target setup; it is never
-fabricated from the utterance and does not prove production camera/person-target
-ingress or physical target accuracy. A targeted scenario without such production
-Evidence or a declared fixture must be judged insufficient rather than filled with
-an invented `target_ref`.
+A person-targeted live-text case uses the speaker Soridormi's scene observation
+marks (`current_speaker`), which the Host copies as the trusted `requester` target
+([Social Attention](SOCIAL_ATTENTION_BEHAVIOR_DOMAIN.md#trusted-current-speaker)).
+In simulation the scenario declares who is speaking, so this qualifies Planner
+grounding and simulator execution against that mark; it does not prove production
+speaker localization or physical target accuracy. With no marked speaker the target
+is unavailable and a targeted Capability is not realizable; such a case is judged
+insufficient rather than filled with an invented `target_ref`.
 
 To grow the scenario library, use the authoring helper:
 

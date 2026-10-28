@@ -61,8 +61,8 @@ source-complete. Remaining order:
    [Status open work](docs/STATUS.md#current-open-work).
 2. **Long-running social skill (owner-approved 2026-10-25 and 2026-10-28).** In
    order: Soridormi's mock perception marks the current speaker and the Host projects
-   it as trusted target evidence (this also lets auxiliary looks and gestures aim at
-   the person); Soridormi `attend_to_person` (gaze follow, natural blinking,
+   it as trusted target evidence (done 2026-10-28; auxiliary looks and gestures can aim
+   at the person); Soridormi `attend_to_person` (gaze follow, natural blinking,
    listening and thinking posture, head-resource suspension, stop) with deterministic
    simulator tests; Runtime lifecycle across turns; one optional Social Cognition
    field, its schema size measured before deployment; live-text scenarios and a
