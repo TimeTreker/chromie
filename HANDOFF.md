@@ -16,9 +16,10 @@ ordered open work are in [STATUS](docs/STATUS.md).
   long-running skill `attend_to_person`. The
   MCP container mounts its `src`, so a `docker restart soridormi-runtime-mcp` loads it and
   resets the scene (user at -90 degrees, 1.5 m).
-- Live Agent: `chromie-agent:latest` = `loop1c-20261029` (`b6626baca950`), built from this delivery's source and
+- Live Agent: `chromie-agent:latest` = `loop1d-20261029` (`235b9b6a6bac`), built from the clean b2f3fa959 checkout and
   recreated with the quiet-mode timeout overrides; `--verify-agent-source` matched
-  (`.chromie/acceptance/loop1-20261029/deploy3/agent-source-verify.json`). Previous images: `loop1b-20261029`
+  (`.chromie/acceptance/loop1-20261029/deploy4/agent-source-verify.json`). Previous images: `loop1c-20261029`
+  (`b6626baca950`, before untargeted expression targets could state their defaults), `loop1b-20261029`
   (`29d30095d179`, before the expression-target shape), `loop1-20261029` (`1939c2bfcc12`, memory and hush only),
   `skill3-20261029` (`a4f5904bccfb`, the long-running skill delivery).
   The ASR image carries `voice_cues` (rebuilt and recreated 2026-10-27); the live-text cohort does not use ASR.
