@@ -49,7 +49,8 @@ def test_native_identity_exclusion_preserves_safe_fresh_and_retained_spellings(k
     contrasts += ["".join(chars) for size in range(1, 5)
                   for chars in itertools.product("ab.", repeat=size)]
     for identity in contrasts:
-        assert bool(pattern.fullmatch(identity)) == (identity not in known)
+        # A fresh ID never is, or extends, a retained one (live 2026-10-29: "ack_tired_01,").
+        assert bool(pattern.fullmatch(identity)) == (not any(identity.startswith(item) for item in known))
     for identity in ['fresh"x', 'fresh\\x', 'fresh\nx', 'fresh\x00x']:
         assert not pattern.fullmatch(identity)
     validator = Draft202012Validator(schema)

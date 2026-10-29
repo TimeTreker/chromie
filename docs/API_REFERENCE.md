@@ -505,7 +505,11 @@ confirmation or result obligations with exact Plan/Goal provenance and optional
 result need whose Goal is `unavailable` or `refused`, a Runtime value-decline need,
 and a Runtime value-question input need must be covered by a new verbal act in the same decision (no silence, and an
 earlier acknowledgement cannot cover it) unless an earlier act already addressed it
-or the turn carries a protective silence request. The Host
+or the turn carries a protective silence request. An earlier acknowledgement that
+replied to speech Responsibilities only (for example "辛苦了，快休息一下吧。" for
+"我今天好累啊。") may cover the answer need for those same Responsibilities by its exact
+identity and words: it is that answer, and saying it again as a new act was heard twice
+(live 2026-10-29, 19 of 156 turns with speech). The Host
 joins exact SC acts and immutable Work in `PlannerResponseProjection`; multiple
 acts may share a phase without merging their commitments or coverage. Only an
 explicitly covered answer need for a responding Goal may bind its actual speech

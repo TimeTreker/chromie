@@ -894,7 +894,10 @@ async def test_raw_schema_rejects_nested_identity_violation_before_dto_or_retry(
 
 
 @pytest.mark.parametrize("identity,accepted", [
-    ("", False), ("a", True), ("existing", False), ("existing2", True),
+    ("", False), ("a", True), ("existing", False), ("exist", True), ("existin_", True),
+    # An ID that extends a retained one is that act re-cited, never a new act (live 2026-10-29:
+    # "ack_tired_01," and "ack_sleep_001_repeat" carried the delivered words and played twice).
+    ("existing2", False), ("existing,", False), ("existing_repeat", False),
     ("x" * 23, True), ("x" * 24, False), ("x" * 23 + "y", True),
     ("y" * 24, True), ("y" * 25, False),
     ("failure_acknowledgement_001", False), ("existing" + "0" * 30, False),
@@ -930,7 +933,8 @@ def test_xgrammar_preserves_fresh_ids_after_hexadecimal_prefixes(retained):
         [bytes([i]) for i in range(256)] + [b"STOP"], stop_token_ids=[256],
     )
     compiled = xgrammar.GrammarCompiler(tokenizer).compile_json_schema(json.dumps(fresh))
-    for identity, accepted in [("fresh_zh", True), ("z", True), (retained, False), ("", False)]:
+    for identity, accepted in [("fresh_zh", True), ("z", True), (retained, False), ("", False),
+                               (retained + "_repeat", False), (retained + ",", False)]:
         matcher = xgrammar.GrammarMatcher(compiled)
         assert matcher.accept_string(json.dumps(identity)) is accepted
 
@@ -3613,3 +3617,133 @@ def test_startup_greeting_requires_the_owner_approved_mind():
         _startup_request(context={})
     with pytest.raises(ValueError, match="owner-approved Mind"):
         _startup_request(context={"mind": {"owner_approved": False}})
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("answered", [False, True])
+async def test_work_that_outruns_a_silent_turns_decision_gets_one_more_decision(answered):
+    """Live 2026-10-29: a 2.5 s celebrate finished while SC decided on the scheduled state, the
+    stale decision was dropped and the turn stayed silent. A turn without any reply gets one
+    decision on the newer state; a turn that already has speech keeps the plain drop."""
+    from orchestrator.runtime.cognitive_runtime import CognitiveRuntimePolicy, GoalDrivenRuntimeCoordinator
+    from orchestrator.runtime.interaction_ledger import InteractionLedger
+    from shared.chromie_contracts.core_interpretation import CognitiveWorkRequest
+    from shared.chromie_contracts.plan import CanonicalPlan
+    from shared.chromie_contracts.social_cognition import SocialCognitionResolution
+
+    revision, calls, submitted = [1], [], []
+    ledger = InteractionLedger()
+    if answered:
+        ledger.append(session_id="sid", owner="playback_delivery", domain="vocal",
+                      event_type="speech_playback_completed", state="playback_completed", subject_id="ack",
+                      event_id="ack:done", turn_id="turn", text="嗯，我看看。")
+
+    class ExecutionState:
+        async def planning_state_snapshot(self, goal_ids, turn_id):
+            return {"revision": revision[0]}
+
+        def execution_state_is_current(self, snapshot):
+            return snapshot["revision"] == revision[0]
+
+    class InteractionRuntime:
+        runtime = ExecutionState()
+
+        async def submit_response(self, response, **kwargs):
+            submitted.append(response)
+
+    class Agent:
+        async def resolve_social_cognition(self, session, *, request, **kwargs):
+            calls.append(request)
+            if len(calls) == 1:
+                revision[0] += 1  # the gesture completes while SC decides
+            return SocialCognitionResolution(
+                **response(text="太棒了！", function="acknowledge", source_goal_ids=["goal:1"]), request_id=request.request_id,
+                snapshot_digest=request.snapshot_digest(), model_call_count=1,
+            )
+
+    coordinator = GoalDrivenRuntimeCoordinator(
+        agent_client=Agent(), adapter=SimpleNamespace(interaction_runtime=InteractionRuntime()),
+        policy=CognitiveRuntimePolicy(mode="apply"), interaction_ledger=ledger,
+    )
+    plan = CanonicalPlan(plan_id="plan", planner_tier="fast", disposition="execute", coverage="complete",
+        goal_ids=["goal:1"], steps=[{"step_id": "celebrate", "capability_id": "soridormi.celebrate",
+                                     "source_goal_ids": ["goal:1"]}],
+        goal_outcomes=[{"goal_id": "goal:1", "disposition": "execute", "coverage": "complete",
+                        "step_ids": ["celebrate"]}])
+    work = CognitiveWorkRequest(sid="sid", text="快跟我一起庆祝一下！", context={"user_turn_envelope": {"turn_id": "turn"}},
+        responsibilities=[{"local_ref": "r1", "outcome": "celebrate", "output_mode": "body_action", "confidence": 1.0}])
+    result = await coordinator.start_state_interaction(None, work_request=work, turn_id="turn", plan=plan)
+    assert len(calls) == (1 if answered else 2)
+    assert (result is None) is answered
+    assert [item.text for packet in submitted for item in packet.speech] == ([] if answered else ["太棒了！"])
+
+
+@pytest.mark.parametrize("kind,reusable", [("answer", True), ("result", False)])
+def test_a_reply_to_what_the_person_said_answers_that_speech_responsibility(kind, reusable):
+    """Live 2026-10-29: "我今天好累啊。" was answered at ingress with "辛苦了，快休息一下吧。"
+    (labelled acknowledge). Barred from covering the Planner's answer need for that same speech
+    Responsibility, Social Cognition spoke the same words again as "ack_tired_01," (19 of 156
+    turns with speech). A receipt for Work and a result keep the rule above."""
+    from agent.app.social_cognition import social_cognition_response_schema, validate_social_cognition_output
+    from shared.chromie_contracts.core_interpretation import CognitiveResponsibilityProposal
+    from shared.chromie_contracts.plan import SocialCommunicationNeed
+    from shared.chromie_contracts.social_cognition import SocialCognitionOutput, SocialCognitionResolution
+
+    need = SocialCommunicationNeed(need_id="need:reply", owner="planner", kind=kind, reference_id="plan:reply",
+                                   source_goal_ids=["goal:reply"], source_responsibility_refs=["r1"],
+                                   facts={"role": "complete_response"})
+    said = {"text": "辛苦了，快休息一下吧。", "speech_act": "acknowledge", "metadata": {
+        "communicative_activity_ids": ["ack_tired_01"], "source_responsibility_refs": ["r1"], "addressed_need_ids": []}}
+    current = request(
+        trigger="work_state", source_refs=["plan:reply"], goal_ids=["goal:reply"], communication_needs=[need],
+        source_turn={"turn_id": "turn:tired", "original_text": "我今天好累啊。"},
+        responsibilities=[CognitiveResponsibilityProposal(
+            local_ref="r1", outcome="acknowledge that the person is tired", output_mode="speech",
+            continuity_scope="turn", confidence=1.0)],
+        context={"interaction_context": {"events": [said], "already_spoken": [said], "pending_speech": [],
+                                         "prior_delivered_speech": []}},
+    )
+    acts = social_cognition_response_schema(current, [])["$defs"]["SocialCommunicativeAct"]["oneOf"]
+    reused = [item["properties"]["addressed_need_ids"] for item in acts
+              if item["properties"]["activity_id"].get("const") == "ack_tired_01"]
+    assert any("need:reply" in (item.get("items") or {}).get("enum", []) for item in reused) is reusable
+    output = SocialCognitionOutput.model_validate({
+        "disposition": "communicate", "reason_summary": "Already said.", "need_outcomes": {"need:reply": "covered"},
+        "activities": [{"activity_id": "ack_tired_01", "text": "辛苦了，快休息一下吧。", "function": "acknowledge",
+                        "truth_stage": "context_grounded", "source_responsibility_refs": ["r1"],
+                        "source_goal_ids": ["goal:reply"], "addressed_need_ids": ["need:reply"]}],
+    })
+    host = SocialCognitionResolution(**output.model_dump(), request_id=current.request_id,
+                                     snapshot_digest=current.snapshot_digest(), model_call_count=1)
+    if reusable:
+        validate_social_cognition_output(output, current, [])
+        host.validate_request(current)
+    else:
+        with pytest.raises(ValueError, match="earlier acknowledgement cannot be reused"):
+            validate_social_cognition_output(output, current, [])
+        with pytest.raises(ValueError, match="earlier acknowledgement cannot be reused"):
+            host.validate_request(current)
+
+
+def test_an_expression_target_decides_its_source_before_it_claims_anything():
+    """Live 2026-10-29: a wave decoration wrote the speaker's evidence without a source; the
+    contract allows target claims only with a targeted source, so the turn failed with a 422."""
+    from agent.app.social_cognition import social_cognition_response_schema
+    from shared.chromie_contracts.plan import AuxiliaryActivityTarget
+
+    schema = social_cognition_response_schema(request(), [{
+        "capability_id": "soridormi.wave_hand", "input_schema": {"type": "object"},
+    }])
+    target = {**schema["$defs"]["AuxiliaryActivityTarget"], "$defs": schema["$defs"]}
+    validator = Draft202012Validator(target)
+    for value, accepted in [
+        ({"source": "none"}, True),
+        ({"source": "none", "target_ref": "none", "confidence": 0.0, "evidence_refs": []}, True),
+        ({"source": "live_perception", "target_ref": "requester", "evidence_refs": ["scene:object-1:speaker"]}, True),
+        ({"confidence": 1.0, "evidence_refs": ["scene:object-1:speaker"]}, False),
+        ({"source": "none", "evidence_refs": ["scene:object-1:speaker"]}, False),
+        ({"source": "live_perception"}, False),
+    ]:
+        assert validator.is_valid(value) is accepted, value
+        if accepted:
+            AuxiliaryActivityTarget.model_validate(value)

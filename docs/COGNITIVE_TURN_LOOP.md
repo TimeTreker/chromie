@@ -92,7 +92,10 @@ must author a progress kind, and other acts cannot carry one. When an upstream
 Need specifies delivery order, complete act alternatives admit only Need IDs
 compatible with the authored phase; Need bindings and phase precede wording in
 the decoder. Verbal and nonverbal alternatives preserve the existing requirement
-that wordless interaction includes an actual embodied-expression proposal. These
+that wordless interaction includes an actual embodied-expression proposal. An
+optional expression's target states its source first: an untargeted one claims
+nothing, a targeted one names its `target_ref` (live 2026-10-29: a wave decoration
+wrote the speaker's evidence with no source and the contract failed the turn). These
 constraints do not supply a semantic decision or change SC/Planner ownership.
 GA likewise exposes
 the existing location-type vocabulary directly on UMI-bound location values,
@@ -101,7 +104,11 @@ are insufficient for the maintained SGLang decoder. Host validators retain the
 same meaning and fail closed; they never fill in missing semantic fields.
 SC contract errors return an explicit 422 response, and the independent SC path
 records failures/cancellations in the session workflow as well as successful and
-stale decisions. Startup logging names SC as the communication owner.
+stale decisions. A Work-state decision made stale only by Work progress, on a turn
+that has no reply yet, is decided once more on the newer state (live 2026-10-29: a
+2.5 s celebrate finished while SC decided and the turn ended silent); a turn that
+already has speech keeps the plain drop. Startup logging names SC as the
+communication owner.
 
 GA information-source status uses complete decoder alternatives too: `known`
 requires a source name; `unknown` and `provider_resolved` cannot name a source or

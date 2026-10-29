@@ -557,6 +557,27 @@ def _admitted_turn_clock(request: UserMeaningInterpretationRequest) -> str | Non
     return parsed.isoformat() if parsed.tzinfo is not None else None
 
 
+def _applied_output_stop(request: UserMeaningInterpretationRequest) -> str:
+    """Project the Host's already applied output-stop reflex, so UMI reads only the rest of the turn.
+
+    Live 2026-10-29: "嘘，安静一会儿，我在打电话。" was silenced by the reflex, then interpreted
+    again as a request to keep quiet and planned as stand_idle.
+    """
+    envelope = (request.turn_envelope.model_dump(mode="json") if request.turn_envelope is not None
+                else request.context.get("user_turn_envelope"))
+    reflex = envelope.get("reflex") if isinstance(envelope, dict) else None
+    if not (isinstance(reflex, dict) and envelope.get("admission") == "reflex_and_admit"
+            and reflex.get("action") == "interrupt" and reflex.get("cancellation_scope") == "output_only"):
+        return ""
+    control = {"control": reflex.get("trigger"), "scope": "output_only"}
+    return (
+        "Protective control already applied (trusted Host fact, not a request): "
+        f"{json.dumps(control, separators=(',', ':'))}. Chromie has already gone quiet as asked: the "
+        "deterministic control fulfils the request to stop talking or be quiet, so no Responsibility restates it. "
+        "Interpret only what else the expression asks; zero Responsibilities is valid.\n\n"
+    )
+
+
 def _user_meaning_interpretation_identity_context(mind: Any) -> str:
     identity: dict[str, Any] = {}
     if isinstance(mind, dict):
@@ -681,6 +702,7 @@ class OllamaUserMeaningInterpreter:
             "User Meaning Interpretation owns current-turn WHAT):\n"
             f"{json.dumps(_user_meaning_interpretation_source_turn_provenance(request), ensure_ascii=False, separators=(',', ':'))}\n"
             f"language_hint={request.language or 'auto'}\n\n"
+            f"{_applied_output_stop(request)}"
             f"{clock_context}"
             "Authoritative source tokens (each Responsibility.source_evidence names the first "
             "and last token of the words it depends on):\n"

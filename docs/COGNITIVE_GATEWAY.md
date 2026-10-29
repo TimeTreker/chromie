@@ -334,6 +334,10 @@ immediately and then admits the unchanged whole utterance through the existing
 `reflex_and_admit` envelope. The Host must not discard its
 `residual_semantic_input` or replace it with a normally admitted attention
 envelope. Core retains sole authority over the requested residual meaning.
+User Meaning Interpretation reads the applied stop as a trusted Host fact
+("Protective control already applied") and interprets only the rest, so the stop
+itself is never planned again (live 2026-10-29: "嘘，安静一会儿，我在打电话。" had
+been planned as `stand_idle`).
 After urgent cancellation, the normal hard-idle boundary is evaluated before
 recording the protective receipt, which otherwise refreshes the activity clock.
 Active Goals preserve their conversation through the existing boundary policy.

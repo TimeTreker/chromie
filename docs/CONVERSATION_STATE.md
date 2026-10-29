@@ -99,6 +99,12 @@ ingress. No Capability keeps a requested note for later
 ("帮我记一下，明天要买鸡蛋和面包。" in a new conversation): the 2026-10-27 `chromie.memory.keep` was
 removed because the local Planner model planned every reminder request as a keep and Chromie then
 promised reminders she cannot give (`scenarios/model_limited/`).
+Asking Chromie to remember what the person tells her ("Please remember that I'm allergic
+to peanuts.", "帮我记一下，要买鸡蛋和面包。") is speech for User Meaning Interpretation, not a
+`stateful_effect`: her own memory is not outside state, so she keeps it as a person does
+(`personal_fact` for a fact about the speaker, the conversation for the rest). A reminder
+at a later time stays a future effect (live 2026-10-29: both requests had been answered
+"I can't remember that" while `personal_fact` kept the allergy).
 User Meaning Interpretation remains WHAT-only and never hands planning to a separate
 deep-thinking agent. The one Planner consumes the bounded
 Goal/Situation/Memory/Evidence/current-Work authorities.

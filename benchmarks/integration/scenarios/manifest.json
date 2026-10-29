@@ -1,18 +1,18 @@
 {
   "schema_version": 1,
-  "frozen_on": "2026-10-21",
+  "frozen_on": "2026-10-29",
   "author_model": "gpt-6-astra",
   "reference_kind": "assistant-authored and contract-reviewed, not independent ground truth",
   "independent_review": false,
   "model_ability_evaluated": false,
   "case_sha256": {
-    "workflow-cancellation.json": "1df86223a41c02a7a992ef9aaa9b34ad3b4ea5ca77a9d7211a622785d2abe2c3",
-    "workflow-conditional-dry.json": "a4a7097c94493be043b908da552def3ff7e1ab680375ebeed6e12f08c4ab498b",
-    "workflow-conditional-rain.json": "0374d9bb6fbb73d6c06aca6b55188e53cce3b0daa9a820b6a2b98cc560a2ae2d",
-    "workflow-delayed.json": "d1b40b859c8a48cd8148ce901e976b74ffcbc7a123d7a324bc7da95e00d870f0",
-    "workflow-normal.json": "2d1384b954e1e2fb7dfa67baa4144bab4402d82ad1da5874033d71dc9831ed39"
+    "workflow-cancellation.json": "5fe8b33d063e0096d46423c727dbe04c65e29d1052e9e482078a6c7449090ef6",
+    "workflow-conditional-dry.json": "fae8590fe1921d88a374cff31b56631151ccfdabea7a5d1b8927a6ae121429af",
+    "workflow-conditional-rain.json": "373720a34eb615aadaa0f0168581a0ac7f1c5eea8b3e414bf63863c521a66bec",
+    "workflow-delayed.json": "c964ae0892a4ddc72d64f04dfbb52783da8272e8aca6004114994fe407b83b23",
+    "workflow-normal.json": "9f9de35e99b61ad4bd2456d4dd2b9c47bce2399d1a3756e789f199bb7631d00b"
   },
-  "freeze_revision": 47,
-  "freeze_note": "Need-report understanding repair (2026-10-21). Every UMI request recaptured: a bodily need Chromie could help meet now (\"I'm really thirsty\") asks for that help, so its speech Responsibility addresses the need and asks whether the person wants it (live: multi_thirsty_yes_en acknowledged only, then 'Yes, please.' accepted an offer never made and fetched the first-listed milk). No reply re-authored; every recorded reply keeps its schema validity; inputs, provider outcomes, expectations and splits unchanged; every case reaches its expected verdict; no candidate calls.",
+  "freeze_revision": 48,
+  "freeze_note": "Remembering-is-speech repair (2026-10-29). Every UMI request recaptured (the primary and the deep prompt): asking Chromie to remember what the person tells her is her own memory, so speech, not a stateful_effect; a later reminder stays a future state change (live: \"Please remember that I'm allergic to peanuts.\" and \"帮我记一下，要买鸡蛋和面包。\" were planned unavailable and answered with a memory limitation). Only the UMI system message changed; no reply re-authored; every recorded reply keeps its schema validity; inputs, provider outcomes, expectations and splits unchanged; every case reaches its expected verdict; no candidate calls.",
   "migration": "Work-only contracts and separate SC fixtures; unchanged expectations, complete request recapture."
 }

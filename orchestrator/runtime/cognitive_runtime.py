@@ -418,6 +418,13 @@ class GoalDrivenRuntimeCoordinator:
         if interaction_id is not None:
             await self.adapter.interaction_runtime.runtime.cancel_interaction(interaction_id)
 
+    def _work_outran_unanswered_turn(self, key: str, request_id: str, snapshot: dict[str, Any] | None, sid: str) -> bool:
+        """Only Work progress, not a newer SC decision, made the decision of a turn without any reply stale."""
+        entry, spoken = self._social_turns.get(key), {"speech_scheduled", "speech_playback_started", "speech_playback_completed"}
+        return bool(entry and entry[0] == request_id and snapshot is not None and self.interaction_ledger is not None
+                    and not self.adapter.interaction_runtime.runtime.execution_state_is_current(snapshot)
+                    and not any(event.event_type in spoken for event in self.interaction_ledger.events(sid)))
+
     async def _finish_or_cancel_social_turn(
         self, previous: tuple[str, asyncio.Task[Any], str] | None, *, turn_id: str,
     ) -> None:
@@ -544,30 +551,34 @@ class GoalDrivenRuntimeCoordinator:
             if request.trigger == "goal_state" and prior_result and answer_awaited(prior_result[0], request):
                 logger.info("goal_state_social_waits_for_answer sid=%s turn=%s", sid, turn_id)
                 return prior_result  # the same-turn question stands until the person answers
-            if primary_plan is not None:
-                # Bind optional Work-state reporting to its actual execution
-                # scope. Independent interpretation/greeting does not expire
-                # merely because parallel user Work starts or finishes.
-                execution_snapshot = await self.adapter.interaction_runtime.runtime.planning_state_snapshot(
-                    request.goal_ids, turn_id,
+            for attempt in range(2):
+                if primary_plan is not None:
+                    # Bind optional Work-state reporting to its actual execution
+                    # scope. Independent interpretation/greeting does not expire
+                    # merely because parallel user Work starts or finishes.
+                    execution_snapshot = await self.adapter.interaction_runtime.runtime.planning_state_snapshot(
+                        request.goal_ids, turn_id,
+                    )
+                # Earlier same-turn expression may have held this decision while
+                # Work progressed. Read continuity and the ledger in the same event-
+                # loop turn, preserving the admitted meaning and immutable Plan.
+                social_context, social_history = self._refresh_continuity_context(
+                    context={**work_request.context, "history": list(work_request.history)}, sid=sid,
                 )
-            # Earlier same-turn expression may have held this decision while
-            # Work progressed. Read continuity and the ledger in the same event-
-            # loop turn, preserving the admitted meaning and immutable Plan.
-            social_context, social_history = self._refresh_continuity_context(
-                context={**work_request.context, "history": list(work_request.history)}, sid=sid,
-            )
-            current_request = self._state_social_request(
-                work_request=work_request.model_copy(update={"context": social_context, "history": social_history}),
-                turn_id=turn_id, plan=primary_plan,
-                trigger=trigger, source_refs=source_refs, goal_ids=goal_ids,
-                work_decision_pending=work_decision_pending,
-                communication_needs=communication_needs,
-            )
-            resolved = await self.resolve_social_interaction(
-                session, request=current_request, session_id=sid, snapshot_is_current=current,
-                primary_plan=primary_plan,
-            )
+                current_request = self._state_social_request(
+                    work_request=work_request.model_copy(update={"context": social_context, "history": social_history}),
+                    turn_id=turn_id, plan=primary_plan, trigger=trigger, source_refs=source_refs, goal_ids=goal_ids,
+                    work_decision_pending=work_decision_pending, communication_needs=communication_needs,
+                )
+                resolved = await self.resolve_social_interaction(
+                    session, request=current_request, session_id=sid, snapshot_is_current=current,
+                    primary_plan=primary_plan,
+                )
+                # Work that finishes while SC decides drops that decision; a turn left without any reply decides
+                # once more on the newer state (live 2026-10-29: a 2.5 s celebrate ended the turn in silence).
+                if resolved is not None or attempt or not self._work_outran_unanswered_turn(
+                        key, request.request_id, execution_snapshot, sid):
+                    break
             if resolved is None or not current():
                 return
             result, response = resolved

@@ -18,7 +18,7 @@ owner skips as local-model limits) against
 Soridormi MuJoCo, judge every case, and repair each failure at its earliest
 responsible owner. One invocation and one debug bundle per run; a hard failure in
 the 15-case `must_pass` smoke stage stops `core` and `challenge` (owner rule).
-Evidence and per-run judgments: `.chromie/acceptance/skill-20261028/`, `speaker-20261028/`, `sc-reuse-20261028/`,
+Evidence and per-run judgments: `.chromie/acceptance/loop1-20261029/`, `skill-20261028/`, `speaker-20261028/`, `sc-reuse-20261028/`,
 `ga-bound-20261028/`, `it6-final-20261028/`, `iter8-20261026/`, `iter7-20261026/`, `iter6-20261026/`, `iter5-20261025/`, `iter4-20261025/`, `iter3-20261025/`, `iter2-20261025/`, `iter1-20261025/`, `acc3-20261024/` (stopped at 57/70), `acc2-focused-20261024/`,
 `acc1-20261024/`, `perf2-20261024/` and `perf-4f64f5120-20261024/` (performance mode), `review-fixes-20261023/` (stopped),
 `merge-reads-20261023/`, `span-owned-20261023/`, `main-20cce0dfa-20261023/` (complete cohorts),
@@ -184,13 +184,35 @@ Evidence and per-run judgments: `.chromie/acceptance/skill-20261028/`, `speaker-
   latency (fewer generated tokens, no unneeded wake-ups, partial-prefix reuse) and voiceprint speaker
   identification (owner decisions 2026-10-27).
   Measure the schema size of any Social Cognition schema change before deploying it.
+  Owner loop 3 (2026-10-28: up to 18 turns; my recommendations decide; commit and push each turn), turn 1
+  (`loop1-20261029/README.md`). Its baseline cohort on 1f7954402 completed 124/124 (119 automatic): judged smoke
+  15/15, core 84/98, challenge 6/11; replies played twice, merged in the user-outcome view and so missed by every
+  earlier judgement, were found in 19 of 156 sessions with speech (13/15, 74/98, 4/11 counting them). Earliest
+  boundaries and repairs: UMI's `stateful_effect` covered Chromie's own memory, so "Please remember…" and
+  "帮我记一下…" were planned unavailable while `personal_fact` kept the fact (now speech; a reminder stays a future
+  effect; freeze 48 recaptures 6,500 UMI requests); UMI never saw the applied output stop and planned
+  `stand_idle` for "嘘，安静一会儿，我在打电话。" (now a trusted fact in its turn message); a Work-state Social
+  Cognition decision dropped as stale by a 2.5 s celebrate left the turn silent (one more decision when the turn has
+  no reply); the decoder barred an earlier acknowledgement from covering the answer need of the speech
+  Responsibility it had already answered, so the model wrote the same words under an extended ID (now allowed for
+  speech Responsibilities only, and fresh IDs never extend a retained one; replay of the 19 recorded calls 19/19
+  re-cited); a decoration target with evidence but no source failed a turn with 422 (the target states its source
+  first); two greeting gestures that could not start together lost their decoration provenance (kept now). The
+  harness lets the running skill's own body turn finish (bounded 30 s) before the safe-idle check. Focused live
+  runs (diagnostic): `focus2/` 10/11, `focus4/` 14/15 with no repeated reply; the turn-1 cohort follows.
 
-Verification: canonical gate on this delivery's source (2026-10-29, clean worktree): pytest 4,101 passed + 5
-skipped (`xgrammar` not installed), benchmarks 172, legacy Agent tests 20, all checks. Strict
-replay not rerun (last 6,000/6,000 on freeze 47, 2026-10-23).
+Verification: canonical gate on this delivery's source (2026-10-29, clean worktree): pytest 4,113 passed + 5 skipped (`xgrammar` not installed), benchmarks 172, legacy Agent tests 20; policies, docs, test ownership, ruff, mypy and runtime-structure ratchets pass. Strict replay
+6,000/6,000 on freeze 48 (2026-10-29, final source, 0 model calls).
 
 ## Repairs in force from this Issue
 
+- Asking Chromie to remember what the person tells her is speech for UMI; a reminder stays a future effect
+  (freeze 48). The applied output stop is a trusted fact in UMI's turn message, so it is never planned again.
+- A turn whose Work-state Social Cognition decision was dropped only because Work moved on, and that has no reply
+  yet, gets one decision on the newer state.
+- An earlier acknowledgement that replied to speech Responsibilities only may cover their answer need by exact
+  identity and words; fresh activity IDs never extend a retained one. An expression target states its source
+  first. A request the Runtime never ran keeps its Host-owned provenance.
 - The Planner decoder exposes each permitted disposition/step assignment as a native
   branch: clarify, respond and unavailable carry no steps and execute carries at
   least one. The assignment previously lived only in `allOf`, which native decoders

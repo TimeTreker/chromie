@@ -987,6 +987,11 @@ class PreparedLaneStartTests(unittest.IsolatedAsyncioTestCase):
                 self.assertEqual(effects, ["voice"] if optional else [])
                 self.assertEqual([row.reason_code for row in result.results if row.request_id.startswith("body")],
                     ["coordination_unsupported", "coordination_unsupported"])
+                # A dropped decoration keeps its trust tuple, so acceptance code can tell it from failed
+                # required Work (live 2026-10-29: two greeting gestures read as failed body Work).
+                from scripts.interaction_text_mujoco_check import is_optional_social_decoration_result
+                self.assertEqual([is_optional_social_decoration_result(row) for row in result.results
+                                  if row.request_id.startswith("body")], [optional, optional])
                 self.assertEqual(runtime.scheduler_status().active_count, 0)
                 self.assertEqual(
                     result.status,

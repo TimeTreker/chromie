@@ -182,7 +182,11 @@ regular expression because the serving decoder ignores JSON Schema `not` and doe
 not support negative lookahead. New IDs use JSON-safe text without quotes,
 backslashes or control characters: the native pattern compiler otherwise lets
 wildcards cross encoded JSON string boundaries. Retained IDs remain reusable
-through exact constants. Neither constraint limits expression cardinality.
+through exact constants. A fresh ID also never extends a retained one: once a
+retained ID is written out it can only be closed and reused (live 2026-10-29: in
+19 of 156 turns with speech the model re-cited a delivered act with its exact words
+as "ack_tired_01," or "ack_sleep_001_repeat", and the person heard it twice).
+Neither constraint limits expression cardinality.
 Reusing the same existing ID and words is not new playback; an explicitly
 distinct repeat is a separate act. Duplicate IDs within one result, changed words
 under an old ID, or output truncation fail closed. None permits a partial act,

@@ -45,6 +45,7 @@ from orchestrator.runtime.shutdown_lifecycle import shutdown_voice_assistant
 from orchestrator.runtime.soridormi_scene_perception import refresh_soridormi_ambient_scene_once
 from scripts.evidence_io import write_json as _write_json  # noqa: E402
 from scripts.outcome_observations import observed_capability_args
+from shared.chromie_contracts.social_cognition import SOCIAL_SKILL_CONTEXT_KEY
 DEFAULT_EVIDENCE_ROOT = ROOT / ".chromie" / "acceptance" / "text-mujoco"
 DEFAULT_TEXT = (
     "walk ahead at 0.2 speed for 10 seconds and then nod your head twice, "
@@ -669,6 +670,29 @@ def _configure_environment(args: argparse.Namespace, evidence_dir: Path) -> None
         os.environ["ORCH_COGNITIVE_EVIDENCE_ENABLED"] = "0"
     if args.soridormi_mcp_url:
         os.environ["SORIDORMI_MCP_URL"] = args.soridormi_mcp_url
+
+
+# Soridormi's GAZE_TURN_MAX_DURATION_S (20 s) plus margin: the longest body turn the running
+# long-running social skill makes toward its person.
+SOCIAL_SKILL_TURN_SETTLE_S = 30.0
+
+
+async def _settled_soridormi_status(invoker: Any, social_skill: Any) -> dict[str, Any]:
+    """The post-turn status; Work left running still fails the safe-idle check.
+
+    While the long-running social skill runs, its own body turn toward a person beyond the
+    head's range is that skill's ongoing behaviour, not leftover Work: it may finish first
+    (live 2026-10-29: attention started at the end of a celebrate turn and was still turning).
+    """
+
+    status = await _invoke_soridormi_status(invoker)
+    deadline = time.monotonic() + SOCIAL_SKILL_TURN_SETTLE_S
+    while (status.get("active_task") is not None and social_skill is not None
+           and social_skill.context().get(SOCIAL_SKILL_CONTEXT_KEY, {}).get("active") is True
+           and time.monotonic() < deadline):
+        await asyncio.sleep(1.0)
+        status = await _invoke_soridormi_status(invoker)
+    return status
 
 
 async def _invoke_soridormi_status(invoker: Any) -> dict[str, Any]:
@@ -1646,10 +1670,12 @@ async def run_check(
 
         # An admitted turn may fail after provisional work or another runtime
         # transition. Final state evidence must not depend on semantic success.
+        if social_skill is not None:
+            await social_skill.settle()  # decisions carried out after this turn's response
         if not args.preview_only:
             try:
                 status_after_start = time.perf_counter()
-                status_after = await _invoke_soridormi_status(invoker)
+                status_after = await _settled_soridormi_status(invoker, social_skill)
             except Exception as exc:
                 errors.append(f"post-run Soridormi status probe failed: {_exception_text(exc)}")
                 _write_json(
@@ -1668,8 +1694,6 @@ async def run_check(
                     )
                 errors.extend(safe_idle_errors(status_after))
 
-        if social_skill is not None:
-            await social_skill.settle()  # decisions carried out after this turn's response
         debug_summary = build_debug_summary(
             interpretation=interpretation_projection,
             response=response,

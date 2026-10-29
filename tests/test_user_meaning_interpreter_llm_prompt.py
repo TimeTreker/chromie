@@ -690,6 +690,23 @@ class UserMeaningInterpreterPromptTests(unittest.TestCase):
 
 
 
+    def test_an_applied_output_stop_is_a_host_fact_umi_does_not_restate(self) -> None:
+        # Live 2026-10-29: the reflex silenced "嘘，安静一会儿，我在打电话。" and UMI then
+        # read "keep quiet" as a body action, planned as stand_idle.
+        text = "嘘，安静一会儿，我在打电话。"
+        reflex = {"action": "interrupt", "trigger": "stop_command", "cancellation_scope": "output_only"}
+        for admission, applied in (("reflex_and_admit", True), ("admit", False)):
+            payload = self._interpreter().build_interpretation_payload(
+                UserMeaningInterpretationRequest(text=text, language="zh-CN", context={"user_turn_envelope": {
+                    "turn_id": "turn-hush", "original_input": {"text": text}, "admission": admission,
+                    "reflex": reflex if applied else {"action": "continue"},
+                }})
+            )
+            _, user_text, _ = _payload_message_texts(payload)
+            self.assertEqual("Protective control already applied" in user_text, applied)
+            if applied:
+                self.assertIn('{"control":"stop_command","scope":"output_only"}', user_text)
+
     def test_primary_schema_closes_source_token_refs(self) -> None:
         text = "今天晚上重庆热不热"
         schema = self._interpreter().build_interpretation_payload(

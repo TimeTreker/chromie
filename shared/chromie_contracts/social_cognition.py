@@ -372,6 +372,39 @@ def earlier_acknowledgement_ids(context: Any) -> set[str]:
     return found
 
 
+def earlier_speech_replies(request: "SocialCognitionRequest") -> dict[str, set[str]]:
+    """Earlier acknowledgements that replied to speech Responsibilities only, with the refs they cited.
+
+    Replying to what the person said ("辛苦了，快休息一下吧。" for "我今天好累啊。") is the whole
+    answer to that speech Responsibility, not a receipt said before an answer existed. Live
+    2026-10-29: barred from covering the Planner's answer need for it, the same words were
+    spoken again as a new act in 19 of 156 turns with speech.
+    """
+
+    speech_refs = {item.local_ref for item in request.responsibilities if item.output_mode == "speech"}
+    acknowledgements = earlier_acknowledgement_ids(request.context)
+    interaction = request.context.get("interaction_context")
+    replies: dict[str, set[str]] = {}
+    for key in ("events", "already_spoken", "pending_speech"):
+        for row in (interaction or {}).get(key, []) if isinstance(interaction, dict) else []:
+            metadata = row.get("metadata") if isinstance(row, dict) else None
+            if not isinstance(metadata, dict):
+                continue
+            cited = {str(ref) for ref in metadata.get("source_responsibility_refs") or []}
+            if cited and cited <= speech_refs:
+                for identity in metadata.get("communicative_activity_ids") or []:
+                    if str(identity).strip() in acknowledgements:
+                        replies.setdefault(str(identity).strip(), set()).update(cited)
+    return replies
+
+
+def acknowledgement_answers(need: Any, identity: str, replies: dict[str, set[str]]) -> bool:
+    """Whether an earlier acknowledgement may cover this answer need (see earlier_speech_replies)."""
+
+    return need.kind == "answer" and bool(need.source_responsibility_refs) and set(
+        need.source_responsibility_refs) <= replies.get(identity, set())
+
+
 def completed_work_need_ids(request: "SocialCognitionRequest") -> set[str]:
     """Needs that report Work Evidence; only words written with that Evidence can cover them.
 
@@ -562,6 +595,7 @@ class SocialCognitionResolution(SocialCognitionOutput):
         earlier_bindings_all = earlier_act_need_bindings(request.context)
         earlier_bindings = earlier_bindings_all if evidence_need_ids else {}
         acknowledgements = earlier_acknowledgement_ids(request.context)
+        speech_replies = earlier_speech_replies(request)
         situation = request.situation
         if (self.memory_candidates or self.self_memory_candidates) and (
             request.trigger != "situation" or situation is None
@@ -617,7 +651,8 @@ class SocialCognitionResolution(SocialCognitionOutput):
                 if need.kind in {"input", "confirmation"} and act.function != "ask":
                     raise ValueError("an input or confirmation need requires a question")
                 if (need.kind in {"answer", "result"} and act.activity_id in acknowledgements
-                        and need_id not in earlier_bindings_all.get(act.activity_id, set())):
+                        and need_id not in earlier_bindings_all.get(act.activity_id, set())
+                        and not acknowledgement_answers(need, act.activity_id, speech_replies)):
                     raise ValueError("an earlier acknowledgement cannot be reused as an answer or result")
                 if need.delivery_phase is not None and act.delivery_phase != need.delivery_phase:
                     raise ValueError("communication changed an upstream delivery-order requirement")

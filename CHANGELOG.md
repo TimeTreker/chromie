@@ -5,6 +5,21 @@ remains available in Git history.
 
 ## Unreleased
 
+### Optimization loop turn 1: remembering, hush, silent turns, repeated replies (2026-10-29)
+
+- Asking Chromie to remember what the person tells her is ordinary speech, not a stateful effect: "Please remember
+  that I'm allergic to peanuts." and "帮我记一下，要买鸡蛋和面包。" were answered "I can't remember that". A reminder
+  stays a future effect. The workflow corpus is re-frozen (freeze 48) for the new UMI prompt.
+- User Meaning Interpretation sees the applied output stop as a trusted fact, so "嘘，安静一会儿，我在打电话。" is no
+  longer planned as `stand_idle`.
+- A turn left without any reply because a fast gesture finished while Social Cognition decided gets one more
+  decision ("我考了满分！快跟我一起庆祝一下！" celebrated in silence).
+- Chromie no longer says the same reply twice: an acknowledgement that answered a speech Responsibility may cover
+  the Planner's answer need for it, and a new activity ID cannot extend a delivered one (19 of 156 turns with speech
+  had played a reply twice). An expression target states its source first, and a decoration the Runtime never ran
+  keeps its provenance.
+- The acceptance harness lets the long-running social skill's own body turn finish before its safe-idle check.
+
 ### Long-running social skill implemented (2026-10-29)
 
 - Soridormi `a49a87f` (now pinned) adds `attend_to_person`, the first long-running social skill: it keeps the head on

@@ -27,7 +27,8 @@ from shared.chromie_contracts.social_cognition import (
     SocialCognitionRequest,
     SocialCognitionResolution, social_skill_decision_error, social_skill_options,
     SocialStartupGreetingOutput, SocialStartupGreetingRequest, SocialStartupGreetingResolution,
-    asks_about_uncertain_meaning, completed_work_need_ids, earlier_acknowledgement_ids, must_say_now_need_ids,
+    acknowledgement_answers, asks_about_uncertain_meaning, completed_work_need_ids, earlier_acknowledgement_ids,
+    earlier_speech_replies, must_say_now_need_ids,
     need_asks_uncertain_meaning, pre_evidence_act_violation,
     uncertain_task_responsibility_refs, value_review_responsibility_refs, value_withheld_need_ids,
 )
@@ -267,6 +268,7 @@ def _constrain_social_activity_identity(
     known: dict[str, set[str]] = {}
     known_need_bindings: dict[str, set[str]] = {}
     acknowledgements = earlier_acknowledgement_ids(request.context)
+    speech_replies = earlier_speech_replies(request)
     prior_ids: set[str] = set()
     meaning_questions: set[str] = set()
     uncertain_refs = uncertain_task_responsibility_refs(request)
@@ -293,19 +295,23 @@ def _constrain_social_activity_identity(
                     if key == "prior_delivered_speech":
                         prior_ids.add(identity)
 
-    def fresh_identity_suffix(excluded: list[str], remaining: int) -> str | None:
+    def fresh_identity_suffix(excluded: list[str], remaining: int, *, allow_empty: bool = True) -> str | None:
         # The serving decoder ignores `not: {enum: ...}` and does not support
-        # negative lookahead. This finite-prefix complement excludes exactly
-        # the retained identities. Keep new IDs within JSON-safe lexical text:
-        # this decoder applies patterns to encoded strings without escaping
+        # negative lookahead. This finite-prefix complement excludes the retained
+        # identities and every ID that extends one: written out, a retained ID can
+        # only be closed and reused (live 2026-10-29: all 19 repeated replies of a
+        # cohort re-cited an act as "ack_tired_01," or "ack_sleep_001_repeat" with
+        # its exact words, and it played twice). Keep new IDs within JSON-safe lexical
+        # text: this decoder applies patterns to encoded strings without escaping
         # wildcard matches. Retained IDs remain reusable through exact consts.
+        if "" in excluded:
+            return None
         if remaining == 0:
-            return "" if "" not in excluded else None
-        heads = sorted({value[0] for value in excluded if value})
+            return "" if allow_empty else None
+        heads = sorted({value[0] for value in excluded})
         safe_character = r'[^"\\\x00-\x1f]'
         if not heads:
-            minimum = 1 if "" in excluded else 0
-            return safe_character + f"{{{minimum},{remaining}}}"
+            return safe_character + f"{{{0 if allow_empty else 1},{remaining}}}"
         # Keep the hexadecimal escape last: XGrammar consumes a following
         # hexadecimal head (for example 'a' in act_001) as part of \x1f,
         # widening the excluded control range to \x1fa and blocking fresh IDs.
@@ -316,7 +322,7 @@ def _constrain_social_activity_identity(
             ], remaining - 1)
             if suffix is not None:
                 alternatives.append(re.escape(head) + suffix)
-        if "" not in excluded:
+        if allow_empty:
             alternatives.append("")
         return "(" + "|".join(alternatives) + ")"
 
@@ -326,8 +332,8 @@ def _constrain_social_activity_identity(
     # keywords. Compile the existing 1..24 bound into that same regex; retained
     # identities keep their separate exact-reuse branches, including longer IDs.
     fresh_suffix = fresh_identity_suffix([
-        "", *(identity for identity in safe_known if len(identity) <= 24),
-    ], 24)
+        identity for identity in safe_known if len(identity) <= 24
+    ], 24, allow_empty=False)
     fresh_pattern = "^" + fresh_suffix + "$" if known and fresh_suffix is not None else None
     contract = schema["$defs"]["SocialCommunicativeAct"]
     branches = []
@@ -365,7 +371,8 @@ def _constrain_social_activity_identity(
             # A fresh act may still report a result ("Here you are!" after a handover).
             unbound = completed_work_need_ids(request) - known_need_bindings.get(identity, set())
             if identity in acknowledgements:
-                unbound |= {need.need_id for need in request.communication_needs if need.kind in {"answer", "result"}}
+                unbound |= {need.need_id for need in request.communication_needs if need.kind in {"answer", "result"}
+                            and not acknowledgement_answers(need, identity, speech_replies)}
             # A question is asked after its need exists, except the ingress question about meaning
             # UMI left uncertain (live 2026-10-28, elder_glasses_zh: after the fetch failed, the earlier
             # "这是谁的老花镜呀？" was reused for "where are the glasses?" and the contract rejected it).
@@ -651,6 +658,21 @@ def social_cognition_response_schema(
             ]))
             branches.append(branch)
         schema["$defs"]["AuxiliaryPlanActivity"] = {"oneOf": branches}
+        # A target's source decides its shape first, as the contract does: an untargeted
+        # expression claims nothing, a targeted one names its target (live 2026-10-29: a wave
+        # decoration wrote the speaker's evidence with no source and the turn failed, 422).
+        target = schema["$defs"]["AuxiliaryActivityTarget"]
+        claims = {key: value for key, value in target["properties"].items() if key != "source"}
+        targeted_sources = [value for value in target["properties"]["source"]["enum"] if value != "none"]
+        schema["$defs"]["AuxiliaryActivityTarget"] = {"oneOf": [
+            {"type": "object", "additionalProperties": False, "required": ["source"],
+             "properties": {"source": {"type": "string", "const": "none"},
+                            "target_ref": {"type": "string", "const": "none"},
+                            "relative_direction": {"type": "null"}, "confidence": claims["confidence"],
+                            "evidence_refs": {"type": "array", "maxItems": 0}}},
+            {"type": "object", "additionalProperties": False, "required": ["source", "target_ref"],
+             "properties": {"source": {"type": "string", "enum": targeted_sources}, **claims}},
+        ]}
     else:
         act["auxiliary_activities"]["maxItems"] = 0
         act["text"]["minLength"] = 1
@@ -1035,6 +1057,7 @@ def validate_social_cognition_output(
     # which of them the ledger records as a question about meaning UMI left uncertain.
     previous_need_bindings: dict[str, set[str]] = {}
     acknowledgements = earlier_acknowledgement_ids(request.context)
+    speech_replies = earlier_speech_replies(request)
     meaning_questions: set[str] = set()
     uncertain_refs = uncertain_task_responsibility_refs(request)
     for key in ("events", "already_spoken", "pending_speech"):
@@ -1163,7 +1186,8 @@ def validate_social_cognition_output(
                     and need_id not in previous_need_bindings[act.activity_id]):
                 raise ValueError("words said before Work Evidence cannot report it")
             if (need.kind in {"answer", "result"} and act.activity_id in acknowledgements
-                    and need_id not in previous_need_bindings.get(act.activity_id, set())):
+                    and need_id not in previous_need_bindings.get(act.activity_id, set())
+                    and not acknowledgement_answers(need, act.activity_id, speech_replies)):
                 raise ValueError("an earlier acknowledgement cannot be reused as an answer or result")
 
 

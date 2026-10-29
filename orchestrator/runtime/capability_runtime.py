@@ -118,8 +118,8 @@ _RESULT_AUTHORITY_METADATA_KEYS = (
     "parallel_with_activity",
     # These four fields form the Runtime's exact trust tuple for optional
     # Social Cognition decoration.  Retain the Host-validated request values on
-    # terminal evidence so downstream audit and acceptance code can distinguish
-    # a dropped decoration from failed required embodied work.
+    # terminal evidence, including a request that never ran, so downstream audit and
+    # acceptance code can distinguish a dropped decoration from failed required work.
     "execution_role",
     "source",
     "auxiliary_plan_activity",
@@ -1861,7 +1861,7 @@ class CapabilityRuntime:
             started_at=trace.started_at,
             finished_at=finished_at,
         )
-        return result, trace
+        return CapabilityRuntime._bind_result_authority(request, result), trace
 
     async def _run_provider_group(
         self,

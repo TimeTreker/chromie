@@ -1425,3 +1425,21 @@ async def test_a_case_waits_for_the_result_reentries_it_started() -> None:
         await settle_case_follow_up_work(assistant, before, timeout_s=0.05)
     for task in list(assistant.active_cognitive_runtime_tasks):
         task.cancel()
+
+
+@pytest.mark.parametrize("skill_active", [True, False])
+def test_the_running_social_skills_own_body_turn_settles_before_the_idle_check(skill_active):
+    """Live 2026-10-29: attention started at the end of a celebrate turn and its body turn toward
+    the person was still running when the harness read the status. Only a running long-running
+    social skill earns the bounded wait; any other leftover activity is judged at once."""
+    from scripts.interaction_text_mujoco_check import _settled_soridormi_status
+
+    turning = {"safe_idle": False, "active_task": {"skill_id": "look_at_person", "purpose": "turn_toward_gaze_target"}}
+    idle = {"safe_idle": True, "active_task": None}
+    probe = AsyncMock(side_effect=[turning, turning, idle])
+    skill = SimpleNamespace(context=lambda: {"long_running_social_skill": {"active": skill_active}})
+    with (patch("scripts.interaction_text_mujoco_check._invoke_soridormi_status", probe),
+          patch("scripts.interaction_text_mujoco_check.asyncio.sleep", AsyncMock())):
+        status = asyncio.run(_settled_soridormi_status(object(), skill))
+    assert status == (idle if skill_active else turning)
+    assert probe.await_count == (3 if skill_active else 1)
