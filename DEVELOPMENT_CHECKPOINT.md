@@ -18,7 +18,7 @@ owner skips as local-model limits) against
 Soridormi MuJoCo, judge every case, and repair each failure at its earliest
 responsible owner. One invocation and one debug bundle per run; a hard failure in
 the 15-case `must_pass` smoke stage stops `core` and `challenge` (owner rule).
-Evidence and per-run judgments: `.chromie/acceptance/loop1-20261029/`, `skill-20261028/`, `speaker-20261028/`, `sc-reuse-20261028/`,
+Evidence and per-run judgments: `.chromie/acceptance/loop2-20261029/`, `loop1-20261029/`, `skill-20261028/`, `speaker-20261028/`, `sc-reuse-20261028/`,
 `ga-bound-20261028/`, `it6-final-20261028/`, `iter8-20261026/`, `iter7-20261026/`, `iter6-20261026/`, `iter5-20261025/`, `iter4-20261025/`, `iter3-20261025/`, `iter2-20261025/`, `iter1-20261025/`, `acc3-20261024/` (stopped at 57/70), `acc2-focused-20261024/`,
 `acc1-20261024/`, `perf2-20261024/` and `perf-4f64f5120-20261024/` (performance mode), `review-fixes-20261023/` (stopped),
 `merge-reads-20261023/`, `span-owned-20261023/`, `main-20cce0dfa-20261023/` (complete cohorts),
@@ -199,10 +199,17 @@ Evidence and per-run judgments: `.chromie/acceptance/loop1-20261029/`, `skill-20
   re-cited); a decoration target with evidence but no source failed a turn with 422 (the target states its source
   first); two greeting gestures that could not start together lost their decoration provenance (kept now). The
   harness lets the running skill's own body turn finish (bounded 30 s) before the safe-idle check. Focused live
-  runs (diagnostic): `focus2/` 10/11, `focus4/` 14/15 with no repeated reply; the turn-1 cohort follows.
+  runs (diagnostic): `focus2/` 10/11, `focus4/` 14/15 with no repeated reply. Turn 2 (`loop2-20261029/README.md`):
+  the turn-1 cohort (68d97c9e7) judged smoke 15/15 with no repeated reply in 48 sessions with speech, core 24/25
+  before it stopped at 41/124: a `deliberate` ingress decision while the skill ran carried the `null` its branch
+  requires, but the running state's top-level `social_skill` offered no `null`, so the raw Schema rejected it (422;
+  a gap of the skill delivery). The top-level field now always offers `null` and the deciding branches drop it
+  while the skill runs. A projection of cited Situation subjects into the answer need was replayed and reverted
+  (no gain on the water question, a lost memory answer).
 
-Verification: canonical gate on this delivery's source (2026-10-29, clean worktree): pytest 4,113 passed + 5 skipped (`xgrammar` not installed), benchmarks 172, legacy Agent tests 20; policies, docs, test ownership, ruff, mypy and runtime-structure ratchets pass. Strict replay
-6,000/6,000 on freeze 48 (2026-10-29, final source, 0 model calls).
+Verification: canonical gate on this delivery's source (2026-10-29, clean worktree): pytest 4,113 passed + 5 skipped (`xgrammar` not installed), benchmarks 172, legacy Agent tests 20; policies, docs, test ownership, ruff, mypy and runtime-structure ratchets pass. Live compile of the
+600 running-state Social Cognition schema shapes: 600/600. Strict replay 6,000/6,000 on freeze 48 (2026-10-29,
+turn-1 source; this delivery changes no UMI, GA or Planner request).
 
 ## Repairs in force from this Issue
 
@@ -210,6 +217,8 @@ Verification: canonical gate on this delivery's source (2026-10-29, clean worktr
   (freeze 48). The applied output stop is a trusted fact in UMI's turn message, so it is never planned again.
 - A turn whose Work-state Social Cognition decision was dropped only because Work moved on, and that has no reply
   yet, gets one decision on the newer state.
+- `deliberate` leaves `social_skill` empty in every state; while the skill runs, deciding responses keep, change or
+  stop it.
 - An earlier acknowledgement that replied to speech Responsibilities only may cover their answer need by exact
   identity and words; fresh activity IDs never extend a retained one. An expression target states its source
   first. A request the Runtime never ran keeps its Host-owned provenance.

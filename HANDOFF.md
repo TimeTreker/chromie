@@ -16,12 +16,11 @@ ordered open work are in [STATUS](docs/STATUS.md).
   long-running skill `attend_to_person`. The
   MCP container mounts its `src`, so a `docker restart soridormi-runtime-mcp` loads it and
   resets the scene (user at -90 degrees, 1.5 m).
-- Live Agent: `chromie-agent:latest` = `loop1d-20261029` (`235b9b6a6bac`), built from the clean b2f3fa959 checkout and
+- Live Agent: `chromie-agent:latest` = `loop2-20261029` (`69452792de50`), built from this delivery's source and
   recreated with the quiet-mode timeout overrides; `--verify-agent-source` matched
-  (`.chromie/acceptance/loop1-20261029/deploy4/agent-source-verify.json`). Previous images: `loop1c-20261029`
-  (`b6626baca950`, before untargeted expression targets could state their defaults), `loop1b-20261029`
-  (`29d30095d179`, before the expression-target shape), `loop1-20261029` (`1939c2bfcc12`, memory and hush only),
-  `skill3-20261029` (`a4f5904bccfb`, the long-running skill delivery).
+  (`.chromie/acceptance/loop2-20261029/deploy/agent-source-verify.json`). Previous images: `loop1d-20261029`
+  (`235b9b6a6bac`, turn 1), `loop1c-20261029` (`b6626baca950`), `loop1b-20261029` (`29d30095d179`),
+  `loop1-20261029` (`1939c2bfcc12`), `skill3-20261029` (`a4f5904bccfb`, the long-running skill delivery).
   The ASR image carries `voice_cues` (rebuilt and recreated 2026-10-27); the live-text cohort does not use ASR.
 - The host rebooted at 19:35 on 2026-10-26: the Soridormi scene was restarted detached (log
   `.chromie/acceptance/it1-memory-20261026/soridormi-run.log`); CPU turbo came back on (`no_turbo=0`) while the platform
@@ -34,7 +33,10 @@ ordered open work are in [STATUS](docs/STATUS.md).
 - Workflow corpus: freeze 48 (`35403e5d…`; script in `.chromie/acceptance/loop1-20261029/freeze48/`). Restore it with
   `python -m benchmarks.regression restore-fixtures`; do not untar `frozen.tar.xz` over
   `workflow_scenarios/` (its inner `manifest.json` lacks the storage identity).
-- Evidence (README in each): `.chromie/acceptance/loop1-20261029/` (owner loop 3 turn 1: `cohort/` on 1f7954402,
+- Evidence (README in each): `.chromie/acceptance/loop2-20261029/` (turn 2: `cohort/` on 68d97c9e7 stopped at
+  41/124 on a deliberation the running skill's schema rejected; bundle
+  `/home/chromie/Downloads/chromie_debug_bundle_20261029_102516.tar.gz`; the cited-observation replay),
+  `loop1-20261029/` (owner loop 3 turn 1: `cohort/` on 1f7954402,
   124/124, 119 automatic, judged by stage with repeated playback counted; bundle
   `/home/chromie/Downloads/chromie_debug_bundle_20261029_054321.tar.gz`; UMI and Social Cognition replays in
   `replays/`; freeze 48; `focus2/` and `focus4/` diagnostic runs), `skill-20261028/` (long-running social skill: deploys, live
@@ -77,7 +79,7 @@ ordered open work are in [STATUS](docs/STATUS.md).
   `decided-activity-20261020/`, `main-03974435e-20261020/`.
   Bundles `~/Downloads/chromie_debug_bundle_2026102*.tar.gz`. Earlier runs: `.chromie/acceptance/everyday-20261016/`.
 - Last gate (this delivery's source, clean worktree, GPU host, 2026-10-29): pytest 4,113 passed + 5 skipped (`xgrammar` not installed), benchmarks 172, legacy Agent tests 20; policies, docs, test ownership, ruff, mypy and runtime-structure ratchets pass. Strict replay 6,000/6,000 on
-  freeze 48 (2026-10-29, final source, 0 model calls). The gate needs `anthropic==1.15.0` from `requirements-test.txt` (`INSTALL_TEST_DEPS=1`).
+  freeze 48 (turn-1 source). The gate needs `anthropic==1.15.0` from `requirements-test.txt` (`INSTALL_TEST_DEPS=1`).
   Soridormi `a49a87f` in a throwaway `soridormi-runtime-mcp` container: 875 passed, 5 failed (environmental, as on
   `178f5ec`), governance and body-concurrency validation pass.
 - `start_chromie.sh --build` reuses the layer cache, takes package downloads from BuildKit

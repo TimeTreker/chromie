@@ -62,7 +62,10 @@ repairs and owner decisions in force.
    stop reaches UMI as a trusted fact; a turn left silent because Work outran Social Cognition gets one more
    decision; a reply to a speech Responsibility is re-cited instead of spoken again; an expression target states
    its source first; a decoration the Runtime never ran keeps its provenance. Focused live runs pass the targeted
-   cases (diagnostic); the turn-1 cohort follows. Still open from earlier loops: the streaming Planner decides
+   cases (diagnostic). Its cohort (68d97c9e7) ran smoke 15/15 with no repeated reply and stopped at 41/124: a
+   deliberation while the skill ran failed its own schema (turn 2 fixes it: deliberation leaves the skill
+   decision empty). A cited-observation projection for the water question was replayed and not shipped (the
+   original answers correctly in a new lifetime; a memory citation lost its answer). Still open from earlier loops: the streaming Planner decides
    work with an assumed place for an unstated workplace; a note kept across conversations waits in
    `scenarios/model_limited/`.
 2. Invention and Evidence fidelity: `cap_what_can_you_do_zh` claims chatting, research and planning (a trusted

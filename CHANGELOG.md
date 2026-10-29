@@ -5,6 +5,12 @@ remains available in Git history.
 
 ## Unreleased
 
+### Optimization loop turn 2: deliberation while the social skill runs (2026-10-29)
+
+- While the long-running social skill ran, a Social Cognition deliberation (which decides nothing about the skill)
+  was rejected by its own response schema and failed the turn ("And tomorrow?", 422). Deliberation now leaves the
+  skill decision empty in every state; deciding responses still keep, change or stop it.
+
 ### Optimization loop turn 1: remembering, hush, silent turns, repeated replies (2026-10-29)
 
 - Asking Chromie to remember what the person tells her is ordinary speech, not a stateful effect: "Please remember

@@ -563,8 +563,9 @@ def social_cognition_response_schema(
     schema["$defs"].pop("LongRunningSocialSkillDecision", None)
     skill_branches = social_skill_decision_branches(request)
     if skill_branches:
-        running = social_skill_options(request.context)["can_stop"]
-        schema["properties"]["social_skill"] = {"anyOf": [*([] if running else [{"type": "null"}]), *skill_branches]}
+        # Null is no decision: deliberation decides nothing, and while the skill runs the
+        # deciding dispositions drop it below (keep leaves the run as it is).
+        schema["properties"]["social_skill"] = {"anyOf": [{"type": "null"}, *skill_branches]}
         schema["required"].append("social_skill")
     else:
         schema["properties"].pop("social_skill", None)
@@ -903,7 +904,11 @@ def social_cognition_response_schema(
                 properties["personal_fact"] = copy.deepcopy(UNSTATED_PERSONAL_FACT)
             if "social_skill" in properties:
                 properties["social_skill"] = {"type": "null"}
-        else:
+        elif "social_skill" in properties and social_skill_options(request.context)["can_stop"]:
+            # Live 2026-10-29: the running skill offered no null at the top level while
+            # deliberation forced it, and the raw Schema rejected a valid deliberation.
+            properties["social_skill"] = {"anyOf": properties["social_skill"]["anyOf"][1:]}
+        if disposition != "deliberate":
             properties["need_outcomes"]["required"] = need_ids
             if disposition == "silence":
                 properties["need_outcomes"]["properties"] = {

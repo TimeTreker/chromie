@@ -81,7 +81,11 @@ def test_the_decoder_offers_exact_branches_only_while_the_skill_is_offered() -> 
     offered = social_cognition_response_schema(request(context=_context(active=True)), [])
     field = offered["properties"]["social_skill"]
     assert "social_skill" in offered["required"]
-    keep, attend, stop = field["anyOf"]
+    null, keep, attend, stop = field["anyOf"]
+    assert null == {"type": "null"}  # no decision: only deliberation keeps it while the skill runs
+    communicate = next(branch for branch in offered["oneOf"]
+                       if branch["properties"]["disposition"]["const"] == "communicate")
+    assert communicate["properties"]["social_skill"] == {"anyOf": [keep, attend, stop]}
     assert keep["properties"] == {"action": {"type": "string", "const": "keep"}}
     assert attend["properties"]["target_ref"] == {"type": "string", "const": "requester"}
     assert attend["properties"]["posture"]["enum"] == ["listening", "thinking"]
@@ -106,11 +110,15 @@ def test_while_it_runs_keep_is_the_one_way_to_leave_it_as_it_is() -> None:
     running = _context(active=True)
     running["long_running_social_skill"].update(target_ref="requester", posture="listening")
     schema = social_cognition_response_schema(request(context=running), [])
-    attend = schema["properties"]["social_skill"]["anyOf"][1]
+    attend = schema["properties"]["social_skill"]["anyOf"][2]
     assert attend["properties"]["posture"]["enum"] == ["thinking"]
     validator = Draft202012Validator(schema)
     assert list(validator.iter_errors({**response(), "social_skill": ATTEND}))
     assert list(validator.iter_errors({**response(), "social_skill": None}))
+    # Live 2026-10-29: a deliberation while the skill ran was rejected by the raw Schema (422).
+    deliberation = {**response(), "disposition": "deliberate", "activities": [], "need_outcomes": {},
+                    "social_skill": None}
+    assert not list(validator.iter_errors(deliberation))
     assert not list(validator.iter_errors({**response(), "social_skill": {"action": "keep"}}))
     assert not list(validator.iter_errors({**response(), "social_skill": {**ATTEND, "posture": "thinking"}}))
 

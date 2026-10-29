@@ -103,10 +103,12 @@ Implementation (2026-10-28):
 - `SocialCognitionOutput.social_skill` is `null`, `attend` (`soridormi.attend_to_person`, the
   `target_ref` trusted live perception shows, posture `listening` or `thinking`), `keep` or
   `stop`. The decoder offers only the branches `social_skill_options` allows. While the skill
-  runs it offers `keep` (leave it as it is), another posture or person, and `stop`, never `null`
-  or the run as it already is (live 2026-10-29: restating the run cost about 23 generated tokens
-  per call, and without a short steady choice the model alternated postures). With nothing to
-  decide, the field is absent, and `deliberate` forces `null`. The Agent validator and the Host
+  runs a communicating or silent decision offers `keep` (leave it as it is), another posture or
+  person, and `stop`, never `null` or the run as it already is (live 2026-10-29: restating the run
+  cost about 23 generated tokens per call, and without a short steady choice the model alternated
+  postures). With nothing to decide, the field is absent, and `deliberate` forces `null` in every
+  state (the running state had offered no `null` at the top level, and a deliberation failed the
+  raw Schema, 422). The Agent validator and the Host
   provenance check apply the same rule; `keep`, and an unchanged attend from another provider,
   record nothing.
 - The Host carries out a decision after the response that holds it, without delaying it. The
