@@ -57,7 +57,10 @@ from shared.chromie_runtime.runtime_trace import TraceModule, runtime_tracer
 
 
 from orchestrator.runtime.situation import build_situation_projection
-from orchestrator.runtime.response_plan import build_social_interaction_response
+from orchestrator.runtime.response_plan import (
+    build_social_interaction_response, covered_social_response_goals,
+    initial_social_response_needs, social_response_answered_refs,
+)
 from orchestrator.runtime.long_running_social_skill import apply_social_skill_decision, with_social_skill_context
 from orchestrator.runtime import planner_advance_projection
 
@@ -494,6 +497,8 @@ class GoalDrivenRuntimeCoordinator:
         resolved_source_refs = list(source_refs or ([plan.plan_id] if plan is not None else [turn_id]))
         resolved_goal_ids = list(goal_ids or (list(plan.goal_ids) if plan is not None else []))
         request_identity = "|".join([resolved_trigger, *resolved_source_refs, *resolved_goal_ids, turn_id])
+        if communication_needs is None and resolved_trigger == "interpretation":
+            communication_needs = initial_social_response_needs(work_request, turn_id)
         return SocialCognitionRequest(
             request_id="sc:" + hashlib.sha256(request_identity.encode("utf-8")).hexdigest(),
             trigger=resolved_trigger,
@@ -1560,53 +1565,29 @@ class GoalDrivenRuntimeCoordinator:
         interaction: InteractionResponse,
         sid: str,
     ) -> list[dict[str, Any]]:
-        """Close newly materialized speech Goals after their SC act was heard.
-
-        Initial Social Cognition may finish concurrently with Goal Association, so
-        its response carries Responsibility refs before canonical Goal IDs exist.
-        Once GA has committed those IDs, this is the deterministic join already
-        used by Planner.  SC's ``respond`` act remains the semantic completion
-        decision; delivered playback remains the factual completion evidence.
-        """
-
+        """Bind fresh speech Goals to SC-covered, delivered source refs."""
         if (
             self.communicative_goal_completion_apply is None
             or interaction.metadata.get("presentation_already_dispatched") is not True
             or not self._is_direct_spoken_association(association)
         ):
             return []
-        goal_ids_by_responsibility = planner_advance_projection.goal_ids_by_responsibility(association)
         results: list[dict[str, Any]] = []
-        for speech in interaction.speech:
-            metadata = speech.metadata if isinstance(speech.metadata, dict) else {}
-            if (
-                str(metadata.get("wording_owner") or "") != "social_cognition"
-                or str(metadata.get("speech_act") or "") != "respond"
-                or metadata.get("communication_completion_goal_ids")
-            ):
-                continue
-            goal_ids = list(
-                dict.fromkeys(
-                    goal_id
-                    for responsibility_ref in metadata.get(
-                        "source_responsibility_refs", []
-                    )
-                    for goal_id in goal_ids_by_responsibility.get(
-                        responsibility_ref, []
-                    )
-                )
-            )
-            if not goal_ids:
-                continue
+        for goal_id, speeches in covered_social_response_goals(association, interaction).items():
             results.extend(
                 self.communicative_goal_completion_apply(
                     sid,
-                    goal_ids,
+                    [goal_id],
                     metadata={
                         "source": "social_cognition_communicative_completion",
                         "delivery_role": "response",
-                        "speech_event_id": speech.id,
-                        "evidence_refs": list(metadata.get("evidence_refs") or []),
+                        "speech_event_id": speeches[0].id,
+                        "evidence_refs": list(dict.fromkeys(
+                            ref for item in speeches for ref in [
+                                f"communicative_delivery:{item.id}",
+                                *(item.metadata.get("evidence_refs") or []),
+                            ]
+                        )),
                     },
                 )
             )
@@ -3486,17 +3467,10 @@ class GoalDrivenRuntimeCoordinator:
             and run.interaction.metadata.get("presentation_already_dispatched") is True
             and any(speech.text.strip() for speech in run.interaction.speech)
         )
-        # Only speech that answered every Responsibility completes the turn; an
-        # acknowledgement does not (live 2026-10-12: "Got it." before a value review,
-        # then a failed Plan was suppressed and the person heard nothing more).
-        resolution = (run.interaction.metadata.get("social_cognition_resolution")
-                      if run.interaction is not None else None) or {}
-        answered_refs = {
-            str(ref)
-            for activity in resolution.get("activities") or []
-            if isinstance(activity, dict) and activity.get("function") not in {"acknowledge", "nonverbal"}
-            for ref in activity.get("source_responsibility_refs") or []
-        }
+        # Each Responsibility needs its primary answer coverage when supplied;
+        # a receipt may finish a requested receipt, never an unanswered question.
+        # An act's broader source scope cannot override explicit pending Needs.
+        answered_refs = social_response_answered_refs(run.interaction) if run.interaction is not None else set()
         conversational_only = bool(run.work_request.responsibilities) and all(
             item.output_mode == "speech" and item.local_ref in answered_refs
             for item in run.work_request.responsibilities

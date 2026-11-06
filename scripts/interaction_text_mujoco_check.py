@@ -1329,7 +1329,7 @@ async def run_check(
         )
         assistant.session_log(
             sid,
-            "text_check_user_meaning_interpretation_done: responsibilities=%s confidence=%.2f unresolved=%s interpretation_ms=%.1f",
+            "cognitive_core_done: responsibilities=%s confidence=%.2f unresolved=%s interpretation_ms=%.1f",
             len(core_interpretation.responsibilities),
             core_interpretation.confidence,
             len(core_interpretation.meaning_uncertainties),

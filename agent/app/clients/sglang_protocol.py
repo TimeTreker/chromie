@@ -25,12 +25,17 @@ def sglang_priority(
 def candidate_compatible_schema(
     schema: dict[str, Any],
 ) -> tuple[dict[str, Any], list[str]]:
-    """Remove only decoder hints that canonical Chromie validation re-enforces."""
+    """Remove decoder hints once per shared node; Host keeps their validation."""
 
     translated = copy.deepcopy(schema)
     removed: list[str] = []
+    seen: set[int] = set()
 
     def visit(node: Any, path: str) -> None:
+        if isinstance(node, (dict, list)):
+            if id(node) in seen:
+                return
+            seen.add(id(node))
         if isinstance(node, dict):
             if "uniqueItems" in node:
                 node.pop("uniqueItems", None)
@@ -45,8 +50,13 @@ def candidate_compatible_schema(
     return translated, removed
 
 
-def _stream_decoder_constraints(node: Any) -> None:
+def _stream_decoder_constraints(node: Any, *, _seen: set[int] | None = None) -> None:
     """Preserve the existing XGrammar streaming omissions; Host keeps authority."""
+    seen = set() if _seen is None else _seen
+    if isinstance(node, (dict, list)):
+        if id(node) in seen:
+            return
+        seen.add(id(node))
     if isinstance(node, dict):
         membership = node.get("allOf")
         if node.get("type") == "array" and isinstance(membership, list) and membership and all(
@@ -75,10 +85,10 @@ def _stream_decoder_constraints(node: Any) -> None:
                         and float(bound).is_integer()):
                     node.pop(key, None)
         for value in node.values():
-            _stream_decoder_constraints(value)
+            _stream_decoder_constraints(value, _seen=seen)
     elif isinstance(node, list):
         for value in node:
-            _stream_decoder_constraints(value)
+            _stream_decoder_constraints(value, _seen=seen)
 
 
 def _share_stream_source_spans(schema: dict[str, Any]) -> None:

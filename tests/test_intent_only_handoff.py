@@ -431,7 +431,8 @@ async def test_unmet_need_searches_library_then_plans_once(fault):
     first_schema = model.packets[0][1]["response_format"]
     for shape in need_first_shapes(first_schema):
         assert next(iter(shape["properties"])) == "ability_needs"
-        assert shape["properties"]["ability_needs"]["items"]["properties"]["closest_loaded"]["enum"] == ["none"]
+        reference = shape["properties"]["ability_needs"]["$ref"]
+        assert first_schema["$defs"][reference.rsplit("/", 1)[1]]["items"]["properties"]["closest_loaded"]["enum"] == ["none"]
     assert "test.turn" in model.packets[0][0]
     assert "rotation_degrees" not in model.packets[0][0]
     if fault in {"no_match", "unloaded_cite"}:

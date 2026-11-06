@@ -69,7 +69,12 @@ PLANNER_STABLE_MIND_MAX_CHARS = 8000
 
 CAPABILITY_NEED_PROMPT = (
     "You have complete contracts for the loaded common Capabilities and an index of the "
-    "available library. Before authoring Work, write ability_needs: each distinct ability the "
+    "available library. First separate needed Work abilities from ordinary speech that Social "
+    "Cognition itself realizes. Account for that speech with complete_response when due, "
+    "but give it no ability_needs entry, including when it is a sibling of physical Work. "
+    "A Responsibility is not an ability count: several Responsibilities can need the same "
+    "ability, and conditional Work can need several different abilities. Before authoring "
+    "Work, write ability_needs: each distinct ability the "
     "accepted Responsibilities require, exactly once. For each entry: need = the ability itself "
     "in short English (for example \"read the current local time\"), not the user's words. It "
     "names the requested result, including anything to be made or changed and any manner or path "
@@ -81,8 +86,8 @@ CAPABILITY_NEED_PROMPT = (
     "related, similar-looking or partial effect: a manner, path or concurrent effect the contract "
     "does not state leaves it partial. Do not list other candidates for the same need. "
     "Capability IDs are not interchangeable merely because they share output_mode, effect class, "
-    "provider, or body lane, and an index entry is not loaded. Speech that Social Cognition "
-    "realizes is not an ability need. If every entry fits, author the complete Work with those "
+    "provider, or body lane, and an index entry is not loaded. If every entry fits, "
+    "author the complete Work with those "
     "Capabilities. If any entry does not fit, the Host stops reading after ability_needs, "
     "searches the full catalog for it, and asks you once more with the matching contracts. If "
     "the Host keeps reading, no usable library contract matched: author the honest outcome for "
@@ -585,7 +590,7 @@ def _canonical_work_prompt(
         )
 
     sections.append(
-        "\n" + PLANNER_WORK_AUTHORITY_PROMPT + CAPABILITY_NEED_PROMPT +
+        "\n" + PLANNER_WORK_AUTHORITY_PROMPT +
         "Capability library index JSON:\n" + required_json(context.get("capability_index", []), None, label="Capability index") +
         "Loaded capability details JSON:\n" + json.dumps(context.get("capability_details_loaded", [])) +
         "\nTrusted admitted clock JSON:\n" + json.dumps(
@@ -708,6 +713,7 @@ def _canonical_work_prompt(
     )
     sections.append(future_readiness_contract(goals))
     sections.append(cancellation_reporting_contract(context, goals.cancellation_reentry_goal_ids))
+    sections.append("\n" + CAPABILITY_NEED_PROMPT)
     return "".join(sections)
 
 
@@ -1037,7 +1043,7 @@ def fast_advance_layered_prompt(
         + (PROVIDER_SOURCE_PROMPT if provider_sources else "")
         + (FAST_SITUATION_SOURCE_PROMPT if observed_sources else "")
         + (FAST_PERCEIVED_ANSWER_PROMPT if perceived_answers else "")
-        + (UNRESOLVED_MEANING_PROMPT if request.meaning_uncertainties else "") + CAPABILITY_NEED_PROMPT
+        + (UNRESOLVED_MEANING_PROMPT if request.meaning_uncertainties else "")
         + "\nOwner-approved Chromie identity JSON:\n" + bounded_identity_json(context)
         + "\nOwner-approved Personality Expression JSON:\n" + bounded_personality_json(context)
         + "\nOwner-approved Stable Mind JSON:\n" + bounded_stable_mind_json(context, max_chars=PLANNER_STABLE_MIND_MAX_CHARS)
@@ -1046,6 +1052,7 @@ def fast_advance_layered_prompt(
         + trusted_target_evidence_prompt_section(context)
         + "\nTrusted source facts JSON:\n" + required_json(facts, None, label="Fast complete Work source facts")
         + "\n" + immutable_source_turn_prompt(request, what_authority="UMI Responsibilities")
+        + "\n" + CAPABILITY_NEED_PROMPT
     )
     return LayeredPrompt.promote(rendered, operating_contract=(contract,))
 

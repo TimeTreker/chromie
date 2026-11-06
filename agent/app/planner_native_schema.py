@@ -294,3 +294,30 @@ def reentry_assignment_states(
                 fields["new_work"] = {**fields["new_work"], "maxItems": 0}
             states.append(state)
     return states
+
+
+def _responsibility_refs_first(node: Any, *, _seen: set[int] | None = None) -> None:
+    """Each Activity names the Responsibilities it serves before its Capability and args.
+
+    The model then writes a shared read for every Responsibility it serves instead of
+    binding it to the one whose words it was writing (live 2026-10-15: one weather read
+    for "will it rain" and "should I take an umbrella" was bound to the first only, and
+    Host rejected the turn). Order only; the offered values are unchanged.
+    Native alternatives reuse subtree objects; order each once per pass.
+    """
+    seen = set() if _seen is None else _seen
+    if isinstance(node, (dict, list)):
+        if id(node) in seen:
+            return
+        seen.add(id(node))
+    if isinstance(node, dict):
+        properties = node.get("properties")
+        if isinstance(properties, dict) and "role" in properties and "source_responsibility_refs" in properties:
+            first = ("role", "source_responsibility_refs")
+            node["properties"] = {**{name: properties[name] for name in first},
+                                  **{name: value for name, value in properties.items() if name not in first}}
+        for value in node.values():
+            _responsibility_refs_first(value, _seen=seen)
+    elif isinstance(node, list):
+        for value in node:
+            _responsibility_refs_first(value, _seen=seen)

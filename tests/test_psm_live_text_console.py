@@ -147,15 +147,15 @@ def test_feedback_default_targets_latest_delivered_activity() -> None:
     assert console._latest_delivered_activity_id(assistant, "sid-test") == "activity-3"
 
 
-@pytest.mark.parametrize("failed_turn", [False, True])
+@pytest.mark.parametrize("failed_turn", [False, True, "terminal_failure"])
 def test_client_contains_only_dialogue_and_reuses_one_host(
     monkeypatch: pytest.MonkeyPatch,
     capsys: pytest.CaptureFixture[str],
-    failed_turn: bool,
+    failed_turn: bool | str,
 ) -> None:
     history: list[dict[str, str]] = []
     received: list[tuple[str, str]] = []
-    sessions: dict[str, dict[str, bool]] = {}
+    sessions: dict[str, dict[str, object]] = {}
     constructed: list[object] = []
     closed: list[bool] = []
     logger = logging.getLogger("chromie-orchestrator")
@@ -185,9 +185,12 @@ def test_client_contains_only_dialogue_and_reuses_one_host(
             # must still receive each new reply exactly once.
             history[:] = [{"role": "assistant", "sid": sid, "text": f"reply {sid}"}]
             await asyncio.sleep(0.06)
-            if failed_turn:
+            if failed_turn is True:
                 raise RuntimeError("retained test failure")
             sessions[sid]["done_logged"] = True
+            sessions[sid]["workflow_report"] = {
+                "termination_state": "failed" if failed_turn else "complete",
+            }
 
     async def shutdown(*_args: object, **_kwargs: object) -> None:
         closed.append(True)
@@ -231,7 +234,9 @@ def test_client_contains_only_dialogue_and_reuses_one_host(
                     )
                     assert client.returncode == 0, stderr.decode()
                     assert stdout.decode() == f"Chromie> {reply}\n"
-                    assert stderr == b""
+                    assert stderr == (
+                        b"[Host] Turn failed. See the Host terminal for diagnostics.\n" if failed_turn else b""
+                    )
                     assert len(constructed) == 1
                     assert not closed
             finally:
@@ -252,7 +257,7 @@ def test_client_contains_only_dialogue_and_reuses_one_host(
     assert "startup diagnostic" in backend.err
     assert "worker diagnostic" in backend.err
     assert "shutdown diagnostic" in backend.err
-    if failed_turn:
+    if failed_turn is True:
         assert "retained test failure" in backend.out + backend.err
         assert "Traceback" in backend.err
 

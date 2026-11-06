@@ -1,18 +1,18 @@
 {
   "schema_version": 1,
-  "frozen_on": "2026-10-29",
+  "frozen_on": "2026-11-07",
   "author_model": "gpt-6-astra",
   "reference_kind": "assistant-authored and contract-reviewed, not independent ground truth",
   "independent_review": false,
   "model_ability_evaluated": false,
   "case_sha256": {
-    "workflow-cancellation.json": "5fe8b33d063e0096d46423c727dbe04c65e29d1052e9e482078a6c7449090ef6",
-    "workflow-conditional-dry.json": "fae8590fe1921d88a374cff31b56631151ccfdabea7a5d1b8927a6ae121429af",
-    "workflow-conditional-rain.json": "373720a34eb615aadaa0f0168581a0ac7f1c5eea8b3e414bf63863c521a66bec",
-    "workflow-delayed.json": "c964ae0892a4ddc72d64f04dfbb52783da8272e8aca6004114994fe407b83b23",
-    "workflow-normal.json": "9f9de35e99b61ad4bd2456d4dd2b9c47bce2399d1a3756e789f199bb7631d00b"
+    "workflow-cancellation.json": "0aa57205aaae9c2208168ae5daaceca287a7b32a07d751ffe694c4beb25e5139",
+    "workflow-conditional-dry.json": "918ef0c9e0f550b0896128b9f958ac355b57122ae66f8e87aa56791857e63b97",
+    "workflow-conditional-rain.json": "a0f93705ff259e0b426a552bb1d866f9ee33f3ff036dd6946110009503a74a85",
+    "workflow-delayed.json": "2d796fc0bcbe44545b2db9d593f1f46a2b8e4b4cb66540876d2f7c56c69bf25f",
+    "workflow-normal.json": "da62460020661c94abc490f2ae3c3e5d383fd81d95bc6bfeed71843313703380"
   },
-  "freeze_revision": 48,
-  "freeze_note": "Remembering-is-speech repair (2026-10-29). Every UMI request recaptured (the primary and the deep prompt): asking Chromie to remember what the person tells her is her own memory, so speech, not a stateful_effect; a later reminder stays a future state change (live: \"Please remember that I'm allergic to peanuts.\" and \"帮我记一下，要买鸡蛋和面包。\" were planned unavailable and answered with a memory limitation). Only the UMI system message changed; no reply re-authored; every recorded reply keeps its schema validity; inputs, provider outcomes, expectations and splits unchanged; every case reaches its expected verdict; no candidate calls.",
+  "freeze_revision": 49,
+  "freeze_note": "Explicit request-only recapture from actual workflow after Planner ability-needs guidance ordering/clarity and lossless shared-definition change. All 6000 authored replies, inputs, provider outcomes, expectations, splits and reference metadata are unchanged; all reach original expected verdicts. Only reviewed fast-role prompt delta and Schema reference factoring allowed; UMI/GA/transport/options unchanged. Strict replay still requires exact packets. No candidate/native model calls; non-independent implementation review.",
   "migration": "Work-only contracts and separate SC fixtures; unchanged expectations, complete request recapture."
 }

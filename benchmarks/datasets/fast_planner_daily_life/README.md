@@ -39,6 +39,8 @@ and bounded lookup. Its duplicate Schema reconstruction has been removed. All
 204 references pass the current mechanical checker and all nine adapter tests
 pass; retired semantic coverage remains unqualified. Existing JSON,
 source turns, contexts, target Plans, expectations, splits and digests were preserved.
+The fixture adapter follows shared Schema definitions when reading loaded Capability
+IDs. Corpus inputs, reference decisions and expected outcomes remain unchanged.
 
 ## Validation and reviewed migration
 

@@ -1375,6 +1375,14 @@ scheduled/completed delivery and rejects changed wording under that identity. A 
 may carry the same words. Started speech remains pending; interrupted or partially played
 speech is retained as such and cannot certify the whole utterance or close its speech Goal.
 All chunks must complete, including playback that finishes before Activity registration.
+For resolved speech-only Responsibilities needing continuity, with no pending speech
+value review, Host projects existing WHAT into UMI-owned answer Needs before Goal IDs
+exist. SC's primary result owns covered/pending; an act's function or broader source
+refs do not replace that accounting. Once GA supplies fresh speech Goal IDs, Host joins
+their complete source sets to fully delivered covered acts. Several acts may complete
+one Goal, and separate Goals remain independent. Explicit pending answers cannot hide
+a later cognition failure. Unresolved meaning questions retain their existing reply
+semantics; receipts do not complete task Work, information Goals or withheld answers.
 Playback start remains a separate action-start barrier for a Planner-required
 pre-action need or a confirmation prompt (never for optional speech); voice-resource release alone is
 not complete-delivery evidence. Deferred delivery preserves the original speech owner

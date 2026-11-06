@@ -19,7 +19,7 @@ from shared.chromie_contracts.plan import (
     PERCEIVED_ANSWER_SOURCE,
 )
 
-from .planner_native_schema import REENTRY_DECISION_STATE_MAX_GOALS, reentry_assignment_states
+from .planner_native_schema import REENTRY_DECISION_STATE_MAX_GOALS, reentry_assignment_states, _responsibility_refs_first
 from .planner_validation import _capability_acquires_information
 from .planner_fast_validation import fast_capability_acquires_information
 from .planner_grounding import (
@@ -2685,27 +2685,6 @@ def fast_streaming_advance_response_schema(
     return compiled
 
 
-def _responsibility_refs_first(node: Any) -> None:
-    """Each Activity names the Responsibilities it serves before its Capability and args.
-
-    The model then writes a shared read for every Responsibility it serves instead of
-    binding it to the one whose words it was writing (live 2026-10-15: one weather read
-    for "will it rain" and "should I take an umbrella" was bound to the first only, and
-    Host rejected the turn). Order only; the offered values are unchanged.
-    """
-    if isinstance(node, dict):
-        properties = node.get("properties")
-        if isinstance(properties, dict) and "role" in properties and "source_responsibility_refs" in properties:
-            first = ("role", "source_responsibility_refs")
-            node["properties"] = {**{name: properties[name] for name in first},
-                                  **{name: value for name, value in properties.items() if name not in first}}
-        for value in node.values():
-            _responsibility_refs_first(value)
-    elif isinstance(node, list):
-        for value in node:
-            _responsibility_refs_first(value)
-
-
 _AFTER_ACTIVITIES = frozenset({
     "disposition", "coverage", "covered_responsibility_refs", "confidence", "unresolved", "reason_summary",
 })
@@ -2981,6 +2960,8 @@ def need_first_response_schema(schema: dict[str, Any], loaded_capability_ids: li
 
     Native decoders follow the exposed oneOf/anyOf shapes, so each shape carries the
     field first. closest_loaded names only Capabilities loaded for this decision.
+    Share its contract: copying it into every Work alternative multiplies the
+    decoder grammar without adding a decision or a constraint.
     """
     needs = {
         "type": "array", "maxItems": ABILITY_NEEDS_MAX,
@@ -2996,6 +2977,7 @@ def need_first_response_schema(schema: dict[str, Any], loaded_capability_ids: li
         },
     }
     result = copy.deepcopy(schema)
+    result.setdefault("$defs", {})["PlannerAbilityNeeds"] = needs
 
     def attach(node: Any, *, root: bool = False) -> None:
         if isinstance(node, list):
@@ -3006,7 +2988,7 @@ def need_first_response_schema(schema: dict[str, Any], loaded_capability_ids: li
             return
         closed = isinstance(node.get("properties"), dict) and node.get("additionalProperties") is False
         if root or closed:
-            node["properties"] = {"ability_needs": copy.deepcopy(needs), **node.get("properties", {})}
+            node["properties"] = {"ability_needs": {"$ref": "#/$defs/PlannerAbilityNeeds"}, **node.get("properties", {})}
             node["required"] = ["ability_needs", *[name for name in node.get("required", []) if name != "ability_needs"]]
         # Exposed Work shapes live only under combinators, never inside property schemas.
         for key in ("oneOf", "anyOf", "allOf", "then", "else"):

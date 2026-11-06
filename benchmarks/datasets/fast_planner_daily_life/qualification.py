@@ -274,6 +274,8 @@ def _ability_need_capability_ids(schema: Any) -> list[str] | None:
     for shape in (schema, *[item for key in ("oneOf", "anyOf") for item in schema.get(key) or []]):
         needs = (shape.get("properties") or {}).get("ability_needs") if isinstance(shape, dict) else None
         if isinstance(needs, dict):
+            if "$ref" in needs:
+                needs = schema["$defs"][needs["$ref"].removeprefix("#/$defs/")]
             ids = needs["items"]["properties"]["closest_loaded"]["enum"]
             return [item for item in ids if item != "none"]
     return None

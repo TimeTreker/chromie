@@ -42,6 +42,27 @@ from scripts.general_ability_acceptance import (
 from scripts.interaction_text_mujoco_check import build_parser as build_text_check_parser
 
 
+def test_social_response_timing_reads_the_real_session_tracker_handoff(tmp_path):
+    from orchestrator.runtime.session import SessionTracker
+
+    with patch("orchestrator.runtime.session.now_ms", return_value=1000.0):
+        tracker = SessionTracker(event_log_path=tmp_path / "sessions.jsonl",
+                                 resource_sampling_mode="off")
+        sid = tracker.create()
+    with patch("orchestrator.runtime.session.now_ms", return_value=1500.0):
+        tracker.log(sid, "cognitive_core_done: responsibilities=1 interpretation_ms=400")
+    tracker.state[sid]["cognitive_workflow_stages"] = [{
+        "stage": "social_cognition", "status": "accepted",
+        "started_elapsed_ms": 700.0, "finished_elapsed_ms": 1100.0, "duration_ms": 400.0,
+        "output": {"semantic_owner": "social_cognition", "disposition": "communicate",
+                   "activities": [{"text": "Hello."}]},
+    }]
+    evidence = _social_response_timing_evidence({"session_state": tracker.state[sid]})
+    assert evidence["raw"]["user_meaning_interpretation_done_elapsed_ms"] == 500.0
+    assert evidence["derived"]["umi_handoff_to_sc_commitment_ms"] == 600.0
+    assert evidence["derived"]["sc_decision_ms"] == 400.0
+
+
 @pytest.fixture(autouse=True)
 def isolate_unit_tests_from_saved_deployment(monkeypatch):
     monkeypatch.setattr("scripts.general_ability_acceptance._live_model_binding", lambda path: {})
@@ -194,7 +215,7 @@ def test_identity_delivery_requires_goal_completion_without_planner_work(
             "started_elapsed_ms": 0, "finished_elapsed_ms": decision_ms,
             "duration_ms": decision_ms,
         }], "workflow_events": [
-            {"event": "text_check_user_meaning_interpretation_done", "elapsed_ms": 0},
+            {"event": "cognitive_core_done", "elapsed_ms": 0},
             {"event": "playback_start", "elapsed_ms": decision_ms + 100},
         ]},
     }
@@ -652,7 +673,7 @@ class GeneralAbilityAcceptanceTests(unittest.TestCase):
                 "workflow_events": [
                     {"event": "session_start", "elapsed_ms": 0.0},
                     {
-                        "event": "text_check_user_meaning_interpretation_done",
+                        "event": "cognitive_core_done",
                         "elapsed_ms": 500.0,
                     },
                     {"event": "tts_schedule", "elapsed_ms": 1102.0},
@@ -743,7 +764,7 @@ class GeneralAbilityAcceptanceTests(unittest.TestCase):
                 "workflow_events": [
                     {"event": "session_start", "elapsed_ms": 0.266},
                     {
-                        "event": "text_check_user_meaning_interpretation_done",
+                        "event": "cognitive_core_done",
                         "elapsed_ms": 1299.678,
                     },
                     {"event": "tts_schedule", "elapsed_ms": 2366.437},

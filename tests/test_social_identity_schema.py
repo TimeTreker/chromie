@@ -44,6 +44,8 @@ def test_native_identity_exclusion_preserves_safe_fresh_and_retained_spellings(k
     ]}})
     schema = social_cognition_response_schema(current, [])
     fresh = schema["$defs"]["SocialCommunicativeAct"]["oneOf"][0]["properties"]["activity_id"]
+    if "$ref" in fresh:
+        fresh = schema["$defs"][fresh["$ref"].rsplit("/", 1)[-1]]
     pattern = re.compile(fresh["pattern"])
     contrasts = known + ["fresh", "rain_info_002", "[new]", "另一条"]
     contrasts += ["".join(chars) for size in range(1, 5)
@@ -106,3 +108,43 @@ def test_reused_delivery_cannot_replace_words_in_history():
     with pytest.raises(ValueError, match="wording cannot change"):
         state.record_assistant_turn("sid", "Different.", metadata=_delivered_metadata())
     assert [row["text"] for row in state.get_history()] == ["Original."]
+
+
+@pytest.mark.parametrize('retained_count', [1, 8, 32])
+@pytest.mark.parametrize('terminal_failure', [False, True])
+def test_history_identity_grammar_is_shared_without_weakening_result_delivery(retained_count, terminal_failure):
+    import copy
+    from shared.chromie_contracts.core_interpretation import CognitiveResponsibilityProposal
+    from shared.chromie_contracts.social_cognition import SocialCommunicationNeed
+
+    ids = [f'prior_activity_{i:03d}' for i in range(retained_count)]
+    need = SocialCommunicationNeed(need_id='need:result', owner='runtime' if terminal_failure else 'planner',
+        kind='result' if terminal_failure else 'answer', reference_id='work:result',
+        source_responsibility_refs=['r1'], delivery_phase='immediate',
+        facts={'status': 'failed', 'required_result_update': True} if terminal_failure else {})
+    current = request(goal_ids=[], communication_needs=[need],
+        responsibilities=[CognitiveResponsibilityProposal(local_ref='r1',outcome='Report the requested lookup result.',
+            output_mode='information',continuity_scope='goal',confidence=1)],
+        context={'interaction_context': {'prior_delivered_speech': [
+            {'text':'Earlier response.', 'metadata':{'communicative_activity_ids':[identity]}} for identity in ids]}})
+    schema=social_cognition_response_schema(current, [])
+    patterns=[]
+    def visit(value):
+        if isinstance(value,dict):
+            if 'pattern' in value:patterns.append(value['pattern'])
+            for child in value.values():visit(child)
+        elif isinstance(value,list):
+            for child in value:visit(child)
+    visit(schema)
+    assert len(patterns)==1
+    raw=response(activity_id='new_response',text='The lookup did not complete.' if terminal_failure else 'The result is available.',
+        function='inform',source_goal_ids=[],source_responsibility_refs=['r1'],delivery_phase='immediate',addressed_need_ids=[need.need_id])
+    raw['need_outcomes']={need.need_id:'covered'}
+    validator=Draft202012Validator(schema)
+    validator.validate(raw)
+    for identity in [ids[0],ids[0]+'_repeat']:
+        invalid=copy.deepcopy(raw);invalid['activities'][0]['activity_id']=identity
+        assert not validator.is_valid(invalid)
+    if terminal_failure:
+        assert not validator.is_valid({'disposition':'silence','activities':[], 'reason_summary':'Already acknowledged.',
+            'need_outcomes':{need.need_id:'pending'}})

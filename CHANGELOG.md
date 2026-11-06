@@ -5,6 +5,18 @@ remains available in Git history.
 
 ## Unreleased
 
+### Context-budget and workflow qualification repairs (2026-11-07)
+
+- Share repeated Social Cognition identity and Planner ability-needs contracts; verify full SC
+  requests with serving tokens, retain explicit failure notices, and avoid repeated traversal of
+  shared Schema objects. Keep model, context/output limits and deadlines unchanged.
+- Join primary SC coverage with fully delivered speech Goals, preserve grouped/pending answers,
+  and remove conflicting pending-review ingress guidance. Distinguish ordinary speech from Work
+  in Planner need-first search; correct prefix cancellation and handoff timing evidence.
+- Explicit workflow request freeze49 preserves authored references and exact replay matching.
+  Canonical checks pass, but the 124-case target and original food workflow remain unqualified.
+  Ten total iterations reached; later unqualified UMI prompt candidates were reverted.
+
 ### Optimization loop turn 2: deliberation while the social skill runs (2026-10-29)
 
 - While the long-running social skill ran, a Social Cognition deliberation (which decides nothing about the skill)

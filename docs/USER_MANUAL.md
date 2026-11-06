@@ -313,7 +313,11 @@ runtime logs. In a second terminal, run the lightweight conversation client:
 python scripts/chromie_psm_live_text_console.py
 ```
 
-The client shows only `you>` prompts and `Chromie>` replies. It sends your text to
+The client shows `you>` prompts and `Chromie>` replies. A failed Host turn also prints
+`[Host] Turn failed. See the Host terminal for diagnostics.` on the client's diagnostic
+output, including when failure-notification generation itself fails. This is Host
+status, not Chromie speech; detailed diagnostics remain in the first terminal.
+It sends your text to
 the running Host over a private local socket; it does not start another Host or
 configure robot access. Microphone, VAD, and ASR are bypassed; text startup does not
 wait for ASR readiness. Replies are forwarded

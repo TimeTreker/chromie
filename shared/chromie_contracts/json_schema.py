@@ -117,21 +117,27 @@ def require_json_schema(value: Any, schema: dict[str, Any], *, path: str) -> Non
         raise ValueError(errors[0])
 
 
-def expose_intersection_shapes(node: Any) -> None:
+def expose_intersection_shapes(node: Any, *, _seen: set[int] | None = None) -> None:
     """Keep object and array constraints visible before decoder intersections.
 
     The single alternative repeats existing shape constraints, so all original
     conditions remain authoritative. This does not add decoder support for
     cross-field conditions; DTO and Host validation still enforce those.
+    Native alternatives share Python objects; transform each object once per pass.
     """
+    seen = set() if _seen is None else _seen
+    if isinstance(node, (dict, list)):
+        if id(node) in seen:
+            return
+        seen.add(id(node))
     if isinstance(node, list):
         for value in node:
-            expose_intersection_shapes(value)
+            expose_intersection_shapes(value, _seen=seen)
     elif isinstance(node, dict):
         # Visit existing children first; the redundant branch must not recurse
         # into another copy of itself.
         for value in list(node.values()):
-            expose_intersection_shapes(value)
+            expose_intersection_shapes(value, _seen=seen)
         # JSON Schema defaults absent items to accepting every item. XGrammar
         # treats a bounded refinement without items as a closed empty tuple.
         # Spell out the equivalent default before exposing the intersection.

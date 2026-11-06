@@ -2318,3 +2318,57 @@ def test_one_activity_for_every_work_responsibility_serves_them_all():
     assert not validator.is_valid(output(["r1"]))
     assert validator.is_valid(output(["r1", "r2"]))
 
+
+@pytest.mark.asyncio
+async def test_need_first_ability_guidance_reaches_the_actual_model_packet():
+    from agent.app.planner_prompt import CAPABILITY_NEED_PROMPT
+
+    model = _StreamingModel([_wire_output(_valid_output())])
+    frames = [frame async for frame in PlannerResolver(model, _Catalog()).stream_advance(_request())]
+    assert isinstance(frames[-1], FastPlannerStreamTerminal)
+    rendered = str(model.last_prompt).rstrip()
+    assert rendered.endswith(CAPABILITY_NEED_PROMPT.rstrip())
+    assert rendered.count(CAPABILITY_NEED_PROMPT.rstrip()) == 1
+
+
+@pytest.mark.parametrize("count", [0, 1, 2, 4])
+def test_need_first_guidance_keeps_composable_ability_counts_representable(count):
+    from agent.app.planner_schema import need_first_response_schema
+
+    schema = need_first_response_schema({
+        "type": "object", "additionalProperties": False, "properties": {}, "required": [],
+    }, [f"capability:{i}" for i in range(4)])
+    output = {"ability_needs": [{
+        "need": f"establish distinct outcome {i}", "closest_loaded": f"capability:{i}",
+        "closest_loaded_does": f"establish distinct outcome {i}", "fits": True,
+    } for i in range(count)]}
+    Draft202012Validator(schema).validate(output)
+
+
+@pytest.mark.parametrize("branch_count", [1, 4, 100])
+def test_need_first_alternatives_share_the_complete_ability_contract(branch_count):
+    from copy import deepcopy
+    from agent.app.planner_schema import need_first_response_schema
+
+    original = {"oneOf": [{
+        "type": "object", "additionalProperties": False,
+        "properties": {"lane": {"const": str(i)}}, "required": ["lane"],
+    } for i in range(branch_count)]}
+    before = deepcopy(original)
+    schema = need_first_response_schema(original, ["test.read"])
+    assert original == before
+    assert json.dumps(schema).count('"closest_loaded_does":') == 1
+    validator = Draft202012Validator(schema)
+    need = {"need": "read a current fact", "closest_loaded": "test.read",
+            "closest_loaded_does": "Read a fact", "fits": True}
+    for lane in range(branch_count):
+        for needs in ([], [need], [need] * 4):
+            validator.validate({"lane": str(lane), "ability_needs": needs})
+    for output in (
+        {"lane": "0"},
+        {"lane": "0", "ability_needs": [need] * 5},
+        {"lane": "0", "ability_needs": [{**need, "closest_loaded": "unloaded"}]},
+        {"lane": "0", "ability_needs": [{**need, "fits": "true"}]},
+    ):
+        assert not validator.is_valid(output)
+

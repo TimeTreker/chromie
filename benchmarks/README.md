@@ -256,6 +256,10 @@ the runner never invokes the authoring module. Manifests bind case/part hashes.
 Updating a prompt/contract requires explicit request/reference review and a new
 freeze. Keep failed captures and preceding identities; never fit expected semantic
 answers to observed behavior. Runtime assertions remain separate from model answers.
+The current request freeze (49) recaptures Planner packets after the ability-needs
+guidance and shared-Schema changes. All 6,000 authored replies, user inputs, provider
+outcomes, expectations and splits are retained. Capture uses the original reference
+replies with no candidate model; strict replay still requires exact request matching.
 The #60 contract amendment required explicitly refrozen GI packets, while the original
 five semantic replies stayed unchanged. The 6,000 expansion retains original captures,
 reference/wiring corrections and failing baselines; see the audit for each revision.

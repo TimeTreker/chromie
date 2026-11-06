@@ -143,6 +143,8 @@ class TurnLocalAgent:
     def __init__(self) -> None:
         self.social_requests = []
         self.goal_association_calls = 0
+        self.response_function = "respond"
+        self.covers_need = True
 
     async def resolve_social_cognition(self, session, *, request, timeout_ms):
         del session, timeout_ms
@@ -154,16 +156,18 @@ class TurnLocalAgent:
             activities=[{
                 "activity_id": "sc:turn-local:0",
                 "text": "Got it.",
-                "function": "respond",
+                "function": self.response_function,
                 "truth_stage": "context_grounded",
                 "delivery_phase": "immediate",
                 "source_goal_ids": [],
                 "source_responsibility_refs": ["r1"],
                 "evidence_refs": [],
-                "addressed_need_ids": [],
+                "addressed_need_ids": [need.need_id for need in request.communication_needs]
+                if self.covers_need else [],
             }],
             reason_summary="Complete the turn-local conversational responsibility.",
-            need_outcomes={},
+            need_outcomes={need.need_id: "covered" if self.covers_need else "pending"
+                           for need in request.communication_needs},
             model_call_count=1,
         )
 
@@ -229,15 +233,21 @@ async def test_turn_local_interaction_returns_social_response_without_goal_or_pl
 
 
 @pytest.mark.asyncio
-async def test_delivered_direct_social_response_closes_materialized_interaction_goal() -> None:
+@pytest.mark.parametrize("function", ["respond", "acknowledge", "inform", "ask"])
+@pytest.mark.parametrize("covered", [True, False])
+async def test_delivered_direct_social_response_closes_materialized_interaction_goal(
+    function, covered,
+) -> None:
     class Agent(TurnLocalAgent):
         async def resolve_goal_association(self, *args, **kwargs):
             del args, kwargs
             return new_goal_association("goal-direct-social")
 
     state = ConversationStateManager(base_conversation_id="direct-social")
+    agent = Agent()
+    agent.response_function, agent.covers_need = function, covered
     coordinator = GoalDrivenRuntimeCoordinator(
-        agent_client=Agent(),
+        agent_client=agent,
         adapter=RecordingPlannerAdapter(FakeRuntime()),
         policy=CognitiveRuntimePolicy(mode="apply"),
         goal_state_apply=state.apply_goal_association_resolution,
@@ -273,11 +283,155 @@ async def test_delivered_direct_social_response_closes_materialized_interaction_
     assert result.status == "applied", result.fallback_reason
     assert result.interaction_response is not None
     assert result.interaction_response.speech[0].text == "Got it."
+    assert len(agent.social_requests[0].communication_needs) == 1
+    if not covered:
+        assert [item["goal_id"] for item in state.active_goal_snapshots()] == ["goal-direct-social"]
+        assert result.metadata["direct_social_completion_results"] == []
+        return
     assert state.active_goal_snapshots() == []
     recent = state.recent_goal_snapshots()
     assert [item["goal_id"] for item in recent] == ["goal-direct-social"]
     assert recent[0]["responsibility_status"] == "satisfied"
     assert result.metadata["direct_social_completion_results"][0]["changed"] is True
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("grouped,covered,split_acts", [
+    (True, [], False),
+    (True, ["r1"], False),
+    (True, ["r2"], False),
+    (True, ["r1", "r2"], False),
+    (True, ["r1", "r2"], True),
+    (False, ["r1"], False),
+    (False, ["r1", "r2"], True),
+])
+async def test_social_completion_preserves_all_contributions_to_each_goal(
+    grouped, covered, split_acts,
+) -> None:
+    class Agent(TurnLocalAgent):
+        async def resolve_goal_association(self, *args, **kwargs):
+            association = new_goal_association("goal-shared" if grouped else "goal-r1")
+            if grouped:
+                association.new_goals[0].source_responsibility_refs = ["r1", "r2"]
+            else:
+                second = new_goal_association("goal-r2").new_goals[0]
+                second.source_responsibility_refs = ["r2"]
+                association.new_goals.append(second)
+            return association
+
+        async def resolve_social_cognition(self, session, *, request, **kwargs):
+            groups = [[ref] for ref in covered] if split_acts else [covered]
+            words = {"r1": "Hello.", "r2": "Why did the math book look sad? Too many problems!"}
+            return SocialCognitionResolution(
+                request_id=request.request_id, snapshot_digest=request.snapshot_digest(),
+                disposition="communicate", activities=[{
+                    "activity_id": f"social-{index}",
+                    "text": " ".join(words[ref] for ref in refs) if refs else "Let me think.",
+                    "function": "respond" if refs else "acknowledge",
+                    "truth_stage": "context_grounded",
+                    "source_responsibility_refs": refs or ["r1", "r2"],
+                    "addressed_need_ids": [need.need_id for need in request.communication_needs
+                                           if set(need.source_responsibility_refs) <= set(refs)],
+                } for index, refs in enumerate(groups)],
+                need_outcomes={need.need_id: "covered" if set(need.source_responsibility_refs)
+                               <= set(covered) else "pending" for need in request.communication_needs},
+                reason_summary="Fixture explicitly declares partial or complete coverage.",
+                model_call_count=1,
+            )
+
+    state = ConversationStateManager(base_conversation_id="social-contributions")
+    coordinator = GoalDrivenRuntimeCoordinator(
+        agent_client=Agent(), adapter=RecordingPlannerAdapter(FakeRuntime()),
+        policy=CognitiveRuntimePolicy(mode="apply"),
+        goal_state_apply=state.apply_goal_association_resolution,
+        communicative_goal_completion_apply=state.reconcile_communicative_goal_completion,
+    )
+    core, envelope = admitted_core(
+        "Greet me and tell a joke.", sid="social-contributions", language="en-US",
+        responsibilities=[{
+            "local_ref": f"r{index}", "outcome": outcome, "output_mode": "speech",
+            "continuity_scope": "turn", "confidence": 1.0,
+        } for index, outcome in [(1, "Greet the user."), (2, "Tell a joke.")]],
+    )
+    result = await coordinator.resolve(
+        object(), text="Greet me and tell a joke.", sid="social-contributions",
+        core_interpretation=core, turn_envelope=envelope,
+        context={"history": []}, history=[], language="en-US",
+    )
+    assert result.status == "applied", result.fallback_reason
+    expected_open = ({"goal-shared"} if set(covered) != {"r1", "r2"} else set()) if grouped else {
+        f"goal-{ref}" for ref in {"r1", "r2"} - set(covered)
+    }
+    assert {item["goal_id"] for item in state.active_goal_snapshots()} == expected_open
+    completions = result.metadata["direct_social_completion_results"]
+    assert len(completions) == (1 - len(expected_open) if grouped else 2 - len(expected_open))
+    assert all(item["changed"] for item in completions), "Each Goal is reconciled once."
+
+
+@pytest.mark.parametrize("mode,review,uncertain,expected", [
+    ("speech", False, False, ["r1"]),
+    ("speech", False, True, []),
+    ("speech", True, False, []),
+    ("body_action", False, False, []),
+    ("information", False, False, []),
+])
+def test_initial_response_needs_do_not_complete_unresolved_or_reviewed_work(
+    mode, review, uncertain, expected,
+) -> None:
+    request = CognitiveWorkRequest(
+        sid="coverage-scope", text="A user request.",
+        responsibilities=[{
+            "local_ref": "r1", "outcome": "Requested outcome.",
+            "output_mode": mode, "continuity_scope": "goal",
+            "value_review": review, "confidence": 1.0,
+        }],
+        cognitive_requests=[{
+            "authority": "goal_association", "responsibility_refs": ["r1"],
+            "reason_summary": "Inspect continuity.",
+        }],
+        meaning_uncertainties=[{
+            "local_ref": "u1", "kind": "other", "description": "Unresolved meaning.",
+            "responsibility_refs": ["r1"],
+        }] if uncertain else [],
+    )
+    coordinator = GoalDrivenRuntimeCoordinator(
+        agent_client=TurnLocalAgent(), adapter=RecordingPlannerAdapter(FakeRuntime()),
+        policy=CognitiveRuntimePolicy(mode="apply"),
+    )
+    social = coordinator._state_social_request(work_request=request, turn_id="coverage-turn")
+    assert [ref for need in social.communication_needs
+            for ref in need.source_responsibility_refs] == expected
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("status,delivered", [("failed", True), ("cancelled", True), ("completed", False)])
+async def test_incomplete_social_delivery_cannot_close_a_goal(status, delivered) -> None:
+    from types import SimpleNamespace
+
+    class Runtime(FakeRuntime):
+        async def wait_dispatch(self, dispatch):
+            return SimpleNamespace(status=status, results=[])
+
+        async def record_social_delivery(self, *args, **kwargs):
+            return delivered
+
+    coordinator = GoalDrivenRuntimeCoordinator(
+        agent_client=TurnLocalAgent(), adapter=RecordingPlannerAdapter(Runtime()),
+        policy=CognitiveRuntimePolicy(mode="apply"),
+    )
+    request = CognitiveWorkRequest(
+        sid="incomplete-social", text="Hello.",
+        responsibilities=[{
+            "local_ref": "r1", "outcome": "Acknowledge greeting.",
+            "output_mode": "speech", "continuity_scope": "turn", "confidence": 1.0,
+        }], cognitive_requests=[{
+            "authority": "goal_association", "responsibility_refs": ["r1"],
+            "reason_summary": "Inspect continuity.",
+        }],
+    )
+    task = coordinator.start_state_interaction(object(), work_request=request, turn_id="incomplete-turn")
+    with pytest.raises(RuntimeError, match="social_interaction_delivery_failed"):
+        await task
 
 
 def test_umi_cognitive_requests_are_required_but_only_non_standing_authorities() -> None:
@@ -363,10 +517,10 @@ async def test_goal_scoped_meaning_does_not_wake_planner_without_model_request()
                     "source_goal_ids": [],
                     "source_responsibility_refs": ["r1"],
                     "evidence_refs": [],
-                    "addressed_need_ids": [],
+                    "addressed_need_ids": [need.need_id for need in request.communication_needs],
                 }],
                 reason_summary="Acknowledge the understood request without claiming completion.",
-                need_outcomes={},
+                need_outcomes={need.need_id: "covered" for need in request.communication_needs},
                 model_call_count=1,
             )
 
@@ -472,6 +626,114 @@ def test_runtime_preserves_all_model_requested_planner_refs_regardless_lifetime(
     ) == ["r1", "r2"]
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("function", ["respond", "inform", "ask"])
+@pytest.mark.parametrize("complete", [False, True])
+async def test_pending_primary_answer_never_hides_late_cognition_failure(function, complete):
+    from tests.cognitive_runtime_test_support import ScriptedClient
+
+    class Agent(ScriptedClient):
+        def __init__(self):
+            super().__init__(association=GoalAssociationResolution(
+                turn_id="partial-failure", resolution_status="fail_closed", confidence=0,
+                reason_summary="Invalid association.", metadata={
+                    "status": "model_contract_failed", "failure_class": "structured_output_validation",
+                    "failure_domain": "model_contract", "architecture_attribution": "goal_association",
+                    "retryable": False,
+                },
+            ), fast_plans=[])
+
+        async def resolve_social_cognition(self, session, *, request, **kwargs):
+            if request.trigger != "interpretation":
+                result = await super().resolve_social_cognition(session, request=request, **kwargs)
+                return result.model_copy(update={"activities": [
+                    act.model_copy(update={"text": "I couldn't finish the remaining request."})
+                    for act in result.activities
+                ]})
+            return SocialCognitionResolution(
+                request_id=request.request_id, snapshot_digest=request.snapshot_digest(),
+                disposition="communicate", activities=[{
+                    "activity_id": "partial-reply", "function": function,
+                    "text": "Hello. Why did the math book look sad? Too many problems!" if complete
+                    else "Hello. Which kind of joke would you like?" if function == "ask" else "Hello.",
+                    "truth_stage": "context_grounded", "source_responsibility_refs": ["r1", "r2"],
+                    "addressed_need_ids": [need.need_id for need in request.communication_needs
+                                           if complete or need.source_responsibility_refs == ["r1"]],
+                }], need_outcomes={need.need_id: "covered" if complete
+                                   or need.source_responsibility_refs == ["r1"] else "pending"
+                                   for need in request.communication_needs},
+                reason_summary="Explicit coverage, independent of broader activity scope.", model_call_count=1,
+            )
+
+    core, envelope = admitted_core(
+        "Greet me and tell a joke.", sid="partial-failure", language="en-US",
+        responsibilities=[{
+            "local_ref": f"r{index}", "outcome": outcome, "output_mode": "speech",
+            "continuity_scope": "turn", "confidence": 1.0,
+        } for index, outcome in [(1, "Greet the user."), (2, "Tell a joke.")]],
+    )
+    coordinator = GoalDrivenRuntimeCoordinator(
+        agent_client=Agent(), adapter=RecordingPlannerAdapter(FakeRuntime()),
+        policy=CognitiveRuntimePolicy(mode="apply"),
+    )
+    result = await coordinator.resolve(
+        object(), text="Greet me and tell a joke.", sid="partial-failure",
+        core_interpretation=core, turn_envelope=envelope,
+        context={"history": []}, history=[], language="en-US",
+    )
+    if complete:
+        assert result.status == "applied"
+        assert result.metadata["optional_cognition_failure_after_delivered_interaction"] is True
+    else:
+        assert result.status == "error"
+        assert "optional_cognition_failure_after_delivered_interaction" not in result.metadata
+        assert result.metadata["failure_stage"] == "goal_association"
+        assert "couldn't finish" in result.interaction_response.speech[0].text
+
+
+@pytest.mark.asyncio
+async def test_delivered_meaning_question_still_contains_optional_ga_failure():
+    from tests.cognitive_runtime_test_support import ScriptedClient
+
+    class Agent(ScriptedClient):
+        async def resolve_social_cognition(self, session, *, request, **kwargs):
+            assert request.communication_needs == [], "Unresolved meaning has no answer coverage to certify."
+            return SocialCognitionResolution(
+                request_id=request.request_id, snapshot_digest=request.snapshot_digest(),
+                disposition="communicate", activities=[{
+                    "activity_id": "meaning-question", "text": "What are you referring to?",
+                    "function": "ask", "truth_stage": "context_grounded",
+                    "source_responsibility_refs": ["r1"],
+                }], need_outcomes={}, reason_summary="Ask about the supplied meaning uncertainty.",
+                model_call_count=1,
+            )
+
+    agent = Agent(association=GoalAssociationResolution(
+        turn_id="meaning-question", resolution_status="fail_closed", confidence=0, metadata={
+            "status": "model_contract_failed", "failure_class": "structured_output_validation",
+            "failure_domain": "model_contract", "architecture_attribution": "goal_association",
+            "retryable": False,
+        },
+    ), fast_plans=[])
+    core, envelope = admitted_core(
+        "Tell me about that.", sid="meaning-question", language="en-US",
+        responsibilities=[{"local_ref": "r1", "outcome": "Respond about the referenced topic.",
+                           "output_mode": "speech", "continuity_scope": "turn", "confidence": 1.0}],
+        meaning_uncertainties=["The topic referred to by that is unknown."],
+    )
+    coordinator = GoalDrivenRuntimeCoordinator(
+        agent_client=agent, adapter=RecordingPlannerAdapter(FakeRuntime()),
+        policy=CognitiveRuntimePolicy(mode="apply"),
+    )
+    result = await coordinator.resolve(
+        object(), text="Tell me about that.", sid="meaning-question", core_interpretation=core,
+        turn_envelope=envelope, context={"history": []}, history=[], language="en-US",
+    )
+    assert result.status == "applied", result.fallback_reason
+    assert result.metadata["optional_cognition_failure_after_delivered_interaction"] is True
+    assert result.interaction_response.speech[0].text == "What are you referring to?"
+
+
+@pytest.mark.asyncio
 async def test_late_ga_failure_cannot_turn_delivered_joke_into_user_visible_failure() -> None:
     class Agent:
         def __init__(self) -> None:
@@ -493,10 +755,10 @@ async def test_late_ga_failure_cannot_turn_delivered_joke_into_user_visible_fail
                     "source_goal_ids": [],
                     "source_responsibility_refs": ["r1"],
                     "evidence_refs": [],
-                    "addressed_need_ids": [],
+                    "addressed_need_ids": [need.need_id for need in request.communication_needs],
                 }],
                 reason_summary="Fulfill the requested conversational joke.",
-                need_outcomes={},
+                need_outcomes={need.need_id: "covered" for need in request.communication_needs},
                 model_call_count=1,
             )
 
@@ -581,10 +843,12 @@ async def test_late_fast_planner_failure_cannot_invalidate_delivered_conversatio
                     "source_goal_ids": [],
                     "source_responsibility_refs": ["r1"],
                     "evidence_refs": [],
-                    "addressed_need_ids": [],
+                    "addressed_need_ids": [need.need_id for need in request.communication_needs]
+                    if delivered == "respond" else [],
                 }],
                 reason_summary="Answer the current identity question.",
-                need_outcomes={},
+                need_outcomes={need.need_id: "covered" if delivered == "respond" else "pending"
+                               for need in request.communication_needs},
                 model_call_count=1,
             )
 
@@ -687,7 +951,9 @@ async def test_late_sc_request_failure_preserves_delivered_conversation_but_not_
                         "truth_stage": "context_grounded" if speech_only else "pre_evidence",
                         "progress_kind": None if speech_only else "acknowledge_work",
                         "source_responsibility_refs": ["r1"],
-                    }], need_outcomes={}, reason_summary="Initial interaction.", model_call_count=1,
+                        "addressed_need_ids": [need.need_id for need in request.communication_needs],
+                    }], need_outcomes={need.need_id: "covered" for need in request.communication_needs},
+                    reason_summary="Initial interaction.", model_call_count=1,
                 )
             if self.social_calls == 2:
                 raise error_type("Agent Social Cognition HTTP 422: raw Schema rejected")
@@ -787,7 +1053,9 @@ async def test_silent_goal_update_keeps_delivered_initial_response_on_late_work_
                         "truth_stage": "context_grounded" if speech_only else "pre_evidence",
                         "progress_kind": None if speech_only else "acknowledge_work",
                         "source_responsibility_refs": ["r1"],
-                    }], need_outcomes={}, reason_summary="Initial interaction.", model_call_count=1,
+                        "addressed_need_ids": [need.need_id for need in request.communication_needs],
+                    }], need_outcomes={need.need_id: "covered" for need in request.communication_needs},
+                    reason_summary="Initial interaction.", model_call_count=1,
                 )
             if request.trigger == "goal_state":
                 self.state_seen.set()

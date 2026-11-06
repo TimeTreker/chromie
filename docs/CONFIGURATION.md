@@ -778,8 +778,14 @@ safety margin. For SGLang model-client calls, an estimated overflow is checked w
 count must fit both the request context and server limit, including output and margin.
 An unavailable or malformed tokenizer result fails closed; an actual overflow sends no
 generation request. This is tokenizer computation, not another LLM decision or semantic
-retry. Ordinary estimates that fit do not add a tokenizer round trip. UMI retains its
-own existing conservative preflight. After inference, the following are
+retry. Social Cognition primary and delegated calls always verify the complete assembled
+request with the serving tokenizer, including when the character estimate fits; their
+dynamic identity grammars can defeat that estimate. Other ordinary estimates that fit
+do not add a tokenizer round trip. Social Cognition serializes its complete snapshot
+and output contract losslessly; transport admission owns their combined token budget,
+not independent per-section character ceilings. Its repeated fresh-activity identity
+constraints share one definition without weakening reuse, delivery or Host validation.
+UMI retains its own existing conservative preflight. After inference, the following are
 untrusted hard failures:
 
 - `done_reason=length` or another explicit generation-limit reason;

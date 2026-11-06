@@ -226,8 +226,10 @@ SOCIAL_COGNITION_AUTHORITY_PROMPT = (
     "addressed_need_ids. If an exact current-turn pending or delivered act already satisfies "
     "that need, return its unchanged activity_id and identical text with the need "
     "binding: Runtime reuses that delivery rather than speaking it twice, and still "
-    "waits for playback completion. An acknowledgement alone does not cover an "
-    "answer need. Nonverbal acts cannot cover verbal needs. Silence returns no acts "
+    "waits for playback completion. Cover the supplied Responsibility, not merely receipt "
+    "of it: acknowledging a reported experience can complete its conversational receipt, "
+    "but receiving a question does not answer it or complete task Work. "
+    "Nonverbal acts cannot cover verbal needs. Silence returns no acts "
     "and leaves needs pending; never mark a need covered while omitting its verbal "
     "act merely because no additional playback is useful. Acknowledging "
     "a person's reported experience is context_grounded; pre_evidence and progress_kind "
@@ -337,17 +339,32 @@ def _constrain_social_activity_identity(
     fresh_pattern = "^" + fresh_suffix + "$" if known and fresh_suffix is not None else None
     contract = schema["$defs"]["SocialCommunicativeAct"]
     branches = []
+    fresh_contracts: dict[str, str] = {}
     for branch in contract.get("oneOf", [contract]):
         fresh = copy.deepcopy(branch)
         fresh_id = fresh["properties"].get("activity_id")
         if isinstance(fresh_id, dict):
-            fresh["properties"]["activity_id"] = {
+            identity_contract = {
                 "type": "string",
                 "minLength": 1,
                 "maxLength": min(int(fresh_id.get("maxLength", 160)), 24),
                 **({"not": {"enum": sorted(known)}} if known else {}),
                 **({"pattern": fresh_pattern} if fresh_pattern else {}),
             }
+            if fresh_pattern:
+                # Phase/function branches and mandatory result prefixes share the
+                # exact ID grammar. Inlining the history-dependent regex in each
+                # copy exhausted SC's context, including its failure notification.
+                encoded = json.dumps(identity_contract, separators=(",", ":"))
+                if encoded not in fresh_contracts:
+                    name = f"SocialFreshActivityIdentity{len(fresh_contracts)}"
+                    fresh_contracts[encoded] = name
+                    schema["$defs"][name] = identity_contract
+                fresh["properties"]["activity_id"] = {
+                    "$ref": f"#/$defs/{fresh_contracts[encoded]}",
+                }
+            else:
+                fresh["properties"]["activity_id"] = identity_contract
         variants = [fresh]
         for identity, messages in known.items():
             if identity in prior_ids or len(messages) != 1:
@@ -1444,7 +1461,8 @@ def _social_current_turn_output_guard(request: SocialCognitionRequest) -> str:
 
     if request.trigger != "interpretation" or not request.responsibilities:
         return ""
-    if any(item.output_mode != "speech" for item in request.responsibilities):
+    waiting_for_review = bool(value_review_responsibility_refs(request)) and not request.communication_needs
+    if waiting_for_review or any(item.output_mode != "speech" for item in request.responsibilities):
         return (
             "\nCurrent-turn output guard: this is interpretation ingress for task Work "
             "that Planner/Runtime has not established yet. If you speak now, acknowledge "
@@ -1454,6 +1472,9 @@ def _social_current_turn_output_guard(request: SocialCognitionRequest) -> str:
             "'Mm, let me see.' or '嗯，我看看。'. "
             "Wording like 'I'll do/get/bring it' is a future-Work commitment, not an "
             "acknowledgement."
+            + (" This whole turn is waiting for Value Judgment, including requested future speech. "
+               "A sibling report may be received, but citing that sibling does not authorize a promise "
+               "to carry out the reviewed request." if waiting_for_review else "")
             + (" A meaning uncertainty is listed for this Work: you may instead ask the one "
                "question that settles it." if uncertain_task_responsibility_refs(request) else "")
             + "\n"
@@ -1676,7 +1697,7 @@ def social_cognition_prompt(
         + required_json(opportunity, max_chars=2048, label="Social Cognition interaction opportunity")
         + terminal_result_notice
         + "\nTrusted interaction snapshot:\n"
-        + required_json(packet, max_chars=num_ctx * 3, label="Social Cognition complete snapshot")
+        + required_json(packet, max_chars=None, label="Social Cognition complete snapshot")
     )
 
 
@@ -1794,7 +1815,7 @@ class SocialCognitionResolver:
         schema = social_cognition_response_schema(request, candidates, deep=deep)
         raw = await model.generate(
             prompt + "\nRequired output contract JSON:\n" + required_json(
-                schema, max_chars=self.num_ctx * 3, label="Social Cognition output contract",
+                schema, max_chars=None, label="Social Cognition output contract",
             ) + "\n" + SOCIAL_COGNITION_WORK_STATE_PROMPT
             + _social_current_turn_output_guard(request) + _social_value_judgment_guard(request)
             + _social_language_guard(request) + _social_memory_guard(request) + _social_voice_guard(request)

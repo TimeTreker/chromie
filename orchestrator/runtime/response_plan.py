@@ -5,11 +5,106 @@ from dataclasses import dataclass
 from typing import Any, Iterable
 
 from shared.chromie_contracts.interaction import InteractionResponse, InteractionSpeech
-from shared.chromie_contracts.plan import validate_communicative_activity_identity
+from shared.chromie_contracts.core_interpretation import CognitiveWorkRequest
+from shared.chromie_contracts.goal import GoalAssociationResolution
+from shared.chromie_contracts.plan import (
+    SocialCommunicationNeed, communication_need_id, validate_communicative_activity_identity,
+)
 from shared.chromie_contracts.social_cognition import SocialCognitionRequest, SocialCognitionResolution
 from shared.chromie_contracts.user_turn import user_turn_prohibits_speech
 
 from shared.chromie_contracts.semantic_task import ResponsePlan, ResponseStage
+
+
+def initial_social_response_needs(
+    work_request: CognitiveWorkRequest, turn_id: str,
+) -> list[SocialCommunicationNeed]:
+    """Project resolved speech WHAT; SC alone decides whether its reply covers it."""
+    if not (
+        work_request.responsibilities
+        and all(item.output_mode == "speech" and not item.value_review
+                for item in work_request.responsibilities)
+        and any(item.authority in {"goal_association", "planner"}
+                for item in work_request.cognitive_requests)
+    ):
+        return []
+    unresolved_refs = {
+        ref for uncertainty in work_request.meaning_uncertainties
+        for ref in uncertainty.responsibility_refs
+    }
+    return [SocialCommunicationNeed(
+        need_id=communication_need_id(turn_id, item.local_ref),
+        owner="user_meaning_interpretation", kind="answer",
+        reference_id=turn_id, source_responsibility_refs=[item.local_ref],
+    ) for item in work_request.responsibilities if item.local_ref not in unresolved_refs]
+
+
+def covered_social_response_refs(interaction: InteractionResponse) -> dict[str, set[str]]:
+    """Join primary SC coverage with its exact, completely delivered speech.
+
+    Ingress may finish before GA commits Goal IDs. Keep the Responsibility refs
+    until that join; wording and coverage remain the primary SC decision.
+    """
+    if interaction.metadata.get("presentation_already_dispatched") is not True:
+        return {}
+    request = interaction.metadata.get("social_cognition_request") or {}
+    resolution = interaction.metadata.get("social_cognition_resolution") or {}
+    outcomes = resolution.get("need_outcomes") or {}
+    needs = {
+        need["need_id"]: set(need.get("source_responsibility_refs") or [])
+        for need in request.get("communication_needs") or []
+        if need.get("owner") == "user_meaning_interpretation"
+        and need.get("kind") == "answer"
+        and outcomes.get(need.get("need_id")) == "covered"
+    }
+    return {
+        speech.id: set().union(*(needs.get(need_id, set())
+                                for need_id in speech.metadata.get("addressed_need_ids") or []))
+        & set(speech.metadata.get("source_responsibility_refs") or [])
+        for speech in interaction.speech
+        if speech.text.strip() and speech.metadata.get("wording_owner") == "social_cognition"
+    }
+
+
+def covered_social_response_goals(
+    association: GoalAssociationResolution, interaction: InteractionResponse,
+) -> dict[str, list[InteractionSpeech]]:
+    """Join each Goal's complete source set to its delivered SC coverage proof."""
+    coverage = covered_social_response_refs(interaction)
+    speeches = [item for item in interaction.speech
+                if item.id in coverage and not item.metadata.get("communication_completion_goal_ids")]
+    covered_refs = set().union(*(coverage[item.id] for item in speeches))
+    return {
+        goal.goal_id: [item for item in speeches
+                       if coverage[item.id] & set(goal.source_responsibility_refs)]
+        for goal in association.new_goals
+        if goal.source_responsibility_refs
+        and goal.metadata.get("output_mode") == "speech"
+        and set(goal.source_responsibility_refs) <= covered_refs
+    }
+
+
+def social_response_answered_refs(interaction: InteractionResponse) -> set[str]:
+    """Explicit answer accounting overrides an act's broader aboutness scope."""
+    if interaction.metadata.get("presentation_already_dispatched") is not True:
+        return set()
+    request = interaction.metadata.get("social_cognition_request") or {}
+    resolution = interaction.metadata.get("social_cognition_resolution") or {}
+    accounted_refs = {
+        ref for need in request.get("communication_needs") or []
+        if need.get("owner") == "user_meaning_interpretation" and need.get("kind") == "answer"
+        for ref in need.get("source_responsibility_refs") or []
+    }
+    reply_refs = {
+        ref for act in resolution.get("activities") or []
+        if act.get("function") not in {"acknowledge", "nonverbal"}
+        for ref in act.get("source_responsibility_refs") or []
+    }
+    # Preserve existing replies/questions outside this primary answer scope;
+    # their act type never overrides an explicit pending answer within it.
+    return (reply_refs - accounted_refs) | set().union(
+        *covered_social_response_refs(interaction).values()
+    )
 
 
 _PROCESS_COMMITMENTS = {"none", "heard", "evaluating"}

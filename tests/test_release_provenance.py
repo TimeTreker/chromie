@@ -71,7 +71,7 @@ class ReleaseProvenanceTests(unittest.TestCase):
         self.assertEqual(gemma["quantization"], "fp8_online")
 
     def test_declared_images_cover_default_tts_base_and_sglang_runtime(self) -> None:
-        env = source_environment(ROOT)
+        env = {**parse_env(ROOT / ".env.common"), **parse_env(ROOT / "env/profiles/default.env")}
         images = declared_images(ROOT, env)
         self.assertIn(env["TTS_CANDIDATE_CUDA_IMAGE"], images)
         self.assertIn(env["ASR_CUDA_IMAGE"], images)
@@ -107,9 +107,22 @@ class ReleaseProvenanceTests(unittest.TestCase):
             errors = model_lock_errors(ROOT)
         self.assertTrue(any("role_models" in error and "unlocked:role" in error for error in errors), errors)
 
-        env = {**source_environment(ROOT), "TTS_COSYVOICE_OLLAMA_MODEL": "unlocked:compact"}
-        errors = model_lock_errors(ROOT, env)
-        self.assertTrue(any("unlocked:compact" in error for error in errors), errors)
+        common = parse_env(ROOT / ".env.common")
+        for provider, profile in (("ollama", "default.env"), ("sglang", "rtx5090.env")):
+            for compact in ("0", "1"):
+                with self.subTest(provider=provider, compact=compact):
+                    env = {
+                        **common, **parse_env(ROOT / "env/profiles" / profile),
+                        "AGENT_LLM_PROVIDER": provider,
+                        "CHROMIE_TTS_BACKEND": "cosyvoice3",
+                        "TTS_COSYVOICE_COMPACT_COGNITION": compact,
+                        "TTS_COSYVOICE_OLLAMA_MODEL": "unlocked:compact",
+                    }
+                    errors = model_lock_errors(ROOT, env)
+                    self.assertEqual(
+                        any("unlocked:compact" in error for error in errors),
+                        provider == "ollama" and compact == "1", errors,
+                    )
 
     def test_maintained_asr_profiles_are_multilingual(self) -> None:
         for profile in sorted((ROOT / "env" / "profiles").glob("*.env")):

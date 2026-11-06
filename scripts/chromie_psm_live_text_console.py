@@ -2,7 +2,7 @@
 """Dialogue-only terminal client for the Host started with start_chromie.sh --text-console.
 
 The --serve entrypoint runs that Host in the startup terminal, where all diagnostics
-remain. The default entrypoint connects locally and displays only dialogue.
+remain. The default entrypoint connects locally and displays dialogue plus terminal Host failure status.
 
 - Plain terminal text is injected at the maintained post-ASR text boundary through
   ``VoiceAssistant.handle_routed_text(..., channel='text')``.
@@ -118,8 +118,8 @@ class _DialogueConnection:
         if target is not None:
             self._send(target, {"reply": text})
 
-    def turn_done(self, writer: asyncio.StreamWriter) -> None:
-        self._send(writer, {"done": True})
+    def turn_done(self, writer: asyncio.StreamWriter, *, status: str = "complete") -> None:
+        self._send(writer, {"done": True, **({"status": "failed"} if status == "failed" else {})})
 
     async def read_text(self) -> str:
         while True:
@@ -233,7 +233,9 @@ def _run_client(root: Path) -> None:
                         print(f"{prefix}Chromie> {response['reply']}", flush=True)
                         if interactive and accepting_input:
                             print("you> ", end="", flush=True)
-                    elif response == {"done": True}:
+                    elif response in ({"done": True}, {"done": True, "status": "failed"}):
+                        if response.get("status") == "failed":
+                            print("[Host] Turn failed. See the Host terminal for diagnostics.", file=sys.stderr, flush=True)
                         pending_turns -= 1
                         if pending_turns < 0:
                             raise ValueError("Unexpected dialogue completion")
@@ -346,7 +348,7 @@ async def _wait_for_session_done(
 
 async def _run_text_turn(
     assistant: Any, text: str, sid: str, timeout_s: float, say: Callable[[str], None]
-) -> None:
+) -> str:
     from orchestrator.runtime.input_session_runtime import input_session_runtime_for  # noqa: PLC0415
 
     history = _history_snapshot(assistant)
@@ -371,6 +373,8 @@ async def _run_text_turn(
                 # The Host's protective reflex owns cancellation evidence.
                 pass
         await _wait_for_session_done(assistant, sid, timeout_s, publish)
+        report = (assistant.sessions.state.get(sid) or {}).get("workflow_report") or {}
+        return str(report.get("termination_state") or "complete")
     finally:
         publish()
 
@@ -533,8 +537,9 @@ async def _run_console(root: Path, args: argparse.Namespace, listener: socket.so
         text: str, sid: str, writer: asyncio.StreamWriter
     ) -> None:
         started = time.perf_counter()
+        status = "failed"
         try:
-            await _run_text_turn(
+            status = await _run_text_turn(
                 assistant, text, sid, args.timeout_s,
                 lambda reply: dialogue.reply(reply, writer=writer),
             )
@@ -542,7 +547,7 @@ async def _run_console(root: Path, args: argparse.Namespace, listener: socket.so
             logging.getLogger(__name__).exception("Text turn failed: sid=%s", sid)
             print(f"[text][error] {type(exc).__name__}: {exc}")
         finally:
-            dialogue.turn_done(writer)
+            dialogue.turn_done(writer, status=status)
             elapsed_ms = (time.perf_counter() - started) * 1000.0
             logging.getLogger(__name__).info(
                 "Text turn completed in %.0f ms: sid=%s", elapsed_ms, sid

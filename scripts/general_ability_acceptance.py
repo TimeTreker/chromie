@@ -538,7 +538,7 @@ def _social_response_timing_evidence(summary: dict[str, Any]) -> dict[str, Any]:
         top_timings.get("user_meaning_interpretation_ms")
     )
     session_start = first_event("session_start")
-    interpretation_done = first_event("text_check_user_meaning_interpretation_done")
+    interpretation_done = first_event("cognitive_core_done")
     tts_schedule = first_event("tts_schedule", not_before=social_finish)
     first_provider_pcm = first_event(
         "tts_first_provider_pcm",

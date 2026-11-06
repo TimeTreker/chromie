@@ -3,6 +3,8 @@ from __future__ import annotations
 import asyncio
 import os
 import unittest
+
+import pytest
 from unittest.mock import AsyncMock, Mock, patch
 
 from agent.app.cognitive_core.user_meaning_interpreter.model_interpreter import OllamaUserMeaningInterpreter
@@ -18,6 +20,54 @@ from agent.app.clients.sglang_protocol import (
 from agent.app.inference_compute import CognitionComputeClass
 from agent.app.settings import Settings
 from orchestrator.runtime.presentation_compute_lease import PresentationComputeLease
+
+
+@pytest.mark.parametrize("stage", ["responsibility_order", "stream_constraints", "intersections", "unique_items"])
+def test_schema_passes_visit_shared_nodes_once_without_changing_the_wire(stage):
+    import json
+    from collections import Counter
+    from jsonschema import Draft202012Validator
+    from agent.app.planner_native_schema import _responsibility_refs_first
+    from agent.app.clients.sglang_protocol import _stream_decoder_constraints
+    from shared.chromie_contracts.json_schema import expose_intersection_shapes
+
+    visits = []
+
+    class ObservedSchema(dict):
+        def values(self):
+            visits.append(id(self))
+            return super().values()
+
+        def items(self):
+            visits.append(id(self))
+            return super().items()
+
+    leaf = ObservedSchema(type="array", minItems=1, maxItems=1, uniqueItems=True,
+                          allOf=[{"contains": {"enum": ["r1"]}}])
+    activity = ObservedSchema(type="object", properties={
+        "payload": leaf, "source_responsibility_refs": {"type": "array"},
+        "role": {"enum": ["capability"]},
+    })
+    shared = {"allOf": [activity] * 32}
+    independent = json.loads(json.dumps(shared))
+
+    def apply(schema):
+        if stage == "unique_items":
+            return candidate_compatible_schema(schema)[0]
+        transform = {"responsibility_order": _responsibility_refs_first,
+                     "stream_constraints": _stream_decoder_constraints,
+                     "intersections": expose_intersection_shapes}[stage]
+        transform(schema)
+        return schema
+
+    expected = apply(independent)
+    visits.clear()
+    actual = apply(shared)
+    assert max(Counter(visits).values()) <= 2  # One copy and one transform, at most.
+    assert json.dumps(actual) == json.dumps(expected)
+    validator = Draft202012Validator(actual)
+    assert validator.is_valid({"role": "capability", "payload": ["r1"]})
+    assert not validator.is_valid({"role": "capability", "payload": ["different"]})
 
 
 class SGLangProtocolTests(unittest.TestCase):
@@ -207,11 +257,12 @@ class SGLangProtocolTests(unittest.TestCase):
         for shape in shapes:
             self.assertEqual(next(iter(shape["properties"])), "ability_needs")
             self.assertIn("ability_needs", shape["required"])
-            closest = shape["properties"]["ability_needs"]["items"]["properties"]["closest_loaded"]
+            reference = shape["properties"]["ability_needs"]["$ref"]
+            closest = wire["$defs"][reference.rsplit("/", 1)[1]]["items"]["properties"]["closest_loaded"]
             self.assertEqual(closest["enum"], ["resource.deliver", "none"])
         need = {"need": "bring water to the person", "closest_loaded": "resource.deliver",
                 "closest_loaded_does": "Deliver a resource", "fits": True}
-        item_schema = shapes[0]["properties"]["ability_needs"]
+        item_schema = {"$defs": wire["$defs"], **shapes[0]["properties"]["ability_needs"]}
         for value, expected in (([need], True), ([{**need, "closest_loaded": "invented"}], False), ([need] * 5, False)):
             self.assertEqual(Draft202012Validator(item_schema).is_valid(value), expected)
 
@@ -544,10 +595,12 @@ class SGLangStreamEvidenceTests(unittest.IsolatedAsyncioTestCase):
                     self.assertEqual(record["error"]["failure_class"], "timeout" if mode == "timeout" else "output_truncated")
 
     async def test_each_stream_exit_retains_one_exact_request_and_partial_output(self) -> None:
+        import hashlib
         import json
         import httpx
+        from agent.app.clients.sglang_client import _PREFIX_CACHE_TRACKER
 
-        for mode in ("stop", "length", "eof", "timeout", "cancel"):
+        for mode in ("stop", "length", "eof", "timeout", "cancel", "close"):
             with self.subTest(mode=mode):
                 class StreamResponse:
                     status_code = 200
@@ -584,12 +637,19 @@ class SGLangStreamEvidenceTests(unittest.IsolatedAsyncioTestCase):
                     )]
 
                 with patch("agent.app.clients.sglang_client.httpx.AsyncClient", return_value=client_context), \
-                     patch("agent.app.clients.sglang_client.log_llm_call_evidence") as evidence:
+                     patch("agent.app.clients.sglang_client.log_llm_call_evidence") as evidence, \
+                     patch.object(_PREFIX_CACHE_TRACKER, "begin", wraps=_PREFIX_CACHE_TRACKER.begin) as probe_start, \
+                     patch.object(_PREFIX_CACHE_TRACKER, "finish", wraps=_PREFIX_CACHE_TRACKER.finish) as probe_finish:
                     if mode == "stop":
                         try:
                             raise ValueError("caller already handling an unrelated error")
                         except ValueError:
                             self.assertEqual(await consume(), ["<terminal_plan>{"])
+                    elif mode == "close":
+                        stream = client.generate_stream("exact prompt", response_format="text",
+                                                        turn_id="turn-evidence", attempt=1)
+                        self.assertEqual(await anext(stream), "<terminal_plan>{")
+                        await stream.aclose()
                     else:
                         expected = asyncio.CancelledError if mode == "cancel" else SGLangGenerationError
                         with self.assertRaises(expected):
@@ -600,10 +660,21 @@ class SGLangStreamEvidenceTests(unittest.IsolatedAsyncioTestCase):
                 self.assertEqual(record["response"]["choices"][0]["message"]["content"], "<terminal_plan>{")
                 self.assertEqual(record["correlations"], {"turn_id": "turn-evidence", "attempt": 1})
                 self.assertEqual(record["status"], "accepted" if mode == "stop" else
-                                 "cancelled" if mode == "cancel" else "failed")
+                                 "cancelled" if mode in {"cancel", "close"} else "failed")
                 self.assertEqual(record["error"] is None, mode == "stop")
+                contract_digest = "sha256:" + hashlib.sha256(json.dumps({
+                    "options": client._effective_options(None),
+                    "response_format": record["request"].get("response_format"),
+                    "stream": True, "provider": "sglang",
+                }, ensure_ascii=False, sort_keys=True, separators=(",", ":"), default=str).encode()).hexdigest()
+                self.assertEqual(probe_start.call_args.kwargs["request_contract_digest"], contract_digest)
+                probe_finish.assert_called_once()
+                self.assertEqual(probe_finish.call_args.kwargs["status"], "completed" if mode == "stop" else
+                                 "cancelled" if mode in {"cancel", "close"} else "failed")
                 if mode == "length":
                     self.assertEqual(record["error"]["failure_class"], "output_truncated")
+                if mode == "close":
+                    self.assertEqual(record["error"]["error_type"], "GeneratorExit")
 
 
 class SGLangUserMeaningInterpreterWarmTests(unittest.IsolatedAsyncioTestCase):
@@ -714,3 +785,25 @@ class PresentationComputeLeaseTests(unittest.IsolatedAsyncioTestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+@pytest.mark.parametrize('purpose', ['social_cognition', 'social_cognition_deep'])
+@pytest.mark.asyncio
+async def test_actual_sc_overflow_is_rejected_even_when_character_estimate_fits(purpose):
+    import httpx
+
+    transport = AsyncMock()
+    transport.__aenter__.return_value = transport
+    async def post(url, **kwargs):
+        data = ({'count': 973, 'tokens': [1] * 973, 'max_model_len': 1024}
+                if url.endswith('/tokenize') else
+                {'choices': [{'message': {'content': 'ok'}, 'finish_reason': 'stop'}]})
+        return httpx.Response(200, json=data, request=httpx.Request('POST', url))
+    transport.post.side_effect = post
+    client = SGLangClient('http://model.invalid/v1', 'fixed', purpose=purpose, timeout_ms=1000,
+        service_settings=Settings(llm_prompt_chars_per_token_estimate=2, llm_context_safety_margin_tokens=20))
+    with patch('agent.app.clients.sglang_client.httpx.AsyncClient', return_value=transport):
+        with pytest.raises(SGLangGenerationError) as caught:
+            await client.generate('short', system='short', options={'num_ctx': 1024, 'num_predict': 32})
+    assert caught.value.failure_class == 'prompt_budget_exceeded'
+    assert [c.args[0] for c in transport.post.call_args_list] == ['http://model.invalid/v1/tokenize']

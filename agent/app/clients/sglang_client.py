@@ -133,11 +133,12 @@ class SGLangClient(OllamaClient):
         for diagnostic in diagnostics:
             if diagnostic is not blocking:
                 self._log_budget_diagnostic(diagnostic.level, diagnostic.render())
-        if blocking is not None:
-            # A character estimate is a screening bound, not the model's token
-            # count. Verify the same chat content with the serving tokenizer,
-            # whose counting endpoint does not stream. Leave generation unchanged;
-            # this performs no generation or semantic retry.
+        if blocking is not None or self.purpose in {"social_cognition", "social_cognition_deep"}:
+            # SC carries dynamic history-dependent grammars. Character estimates
+            # can undercount them too: verify the complete assembled request for
+            # both primary and delegated SC, not just estimated overflows. This
+            # counts tokens without generation, omission, or semantic retry.
+            budget_fields = blocking.fields if blocking is not None else {}
             try:
                 async with httpx.AsyncClient(
                     timeout=httpx.Timeout(self.timeout_ms / 1000.0), trust_env=False,
@@ -165,7 +166,7 @@ class SGLangClient(OllamaClient):
             required = count + int(payload.get("max_tokens") or 0) + self.context_safety_margin_tokens
             logger.info(
                 "sglang_prompt_budget_verified purpose=%s model=%s estimated=%s actual=%s required=%s limit=%s",
-                self.purpose, self.model, blocking.fields.get("estimated_prompt_tokens"),
+                self.purpose, self.model, budget_fields.get("estimated_prompt_tokens"),
                 count, required, effective_limit,
             )
             if required <= effective_limit:
@@ -179,7 +180,11 @@ class SGLangClient(OllamaClient):
                 details={
                     "purpose": self.purpose,
                     "model": self.model,
-                    **blocking.fields,
+                    **budget_fields,
+                    "reason": "tokenized_prompt_plus_output_exceeds_num_ctx",
+                    "num_ctx": configured_limit,
+                    "reserved_output_tokens": int(payload.get("max_tokens") or 0),
+                    "safety_margin_tokens": self.context_safety_margin_tokens,
                     "actual_prompt_tokens": count,
                     "actual_required_context_tokens": required,
                     "effective_context_limit": effective_limit,
@@ -323,7 +328,8 @@ class SGLangClient(OllamaClient):
             json.dumps(
                 {
                     "options": request_options,
-                    "response_format": response_format,
+                    # Fingerprint the provider contract after shared definitions.
+                    "response_format": payload.get("response_format"),
                     "stream": True,
                     "provider": "sglang",
                 },
@@ -457,7 +463,7 @@ class SGLangClient(OllamaClient):
                     ],
                 },
                 status=("accepted" if status == "completed" else
-                        "cancelled" if isinstance(active_error, asyncio.CancelledError) else "failed"),
+                        "cancelled" if isinstance(active_error, (asyncio.CancelledError, GeneratorExit)) else "failed"),
                 error=({
                     "error_type": type(active_error).__name__,
                     "message": str(active_error),
@@ -471,7 +477,7 @@ class SGLangClient(OllamaClient):
                 call_id,
                 status=(
                     "cancelled"
-                    if isinstance(active_error, asyncio.CancelledError)
+                    if isinstance(active_error, (asyncio.CancelledError, GeneratorExit))
                     else status
                 ),
                 error_type=(type(active_error).__name__ if active_error else None),

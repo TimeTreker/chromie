@@ -834,6 +834,8 @@ def test_native_identity_choices_preserve_reuse_and_explicit_repetition(ledger_k
     }]}})
     schema = social_cognition_response_schema(current, [])
     fresh_contract = schema["$defs"]["SocialCommunicativeAct"]["oneOf"][0]["properties"]["activity_id"]
+    if "$ref" in fresh_contract:
+        fresh_contract = schema["$defs"][fresh_contract["$ref"].rsplit("/", 1)[-1]]
     assert fresh_contract["maxLength"] == 24
     assert fresh_contract["not"]["enum"] == ["existing"]
     assert "maxItems" not in schema["properties"]["activities"]
@@ -911,6 +913,8 @@ def test_native_fresh_identity_pattern_enforces_length_without_decoder_length_ke
     }]}})
     schema = social_cognition_response_schema(current, [])
     fresh = schema["$defs"]["SocialCommunicativeAct"]["oneOf"][0]["properties"]["activity_id"]
+    if "$ref" in fresh:
+        fresh = schema["$defs"][fresh["$ref"].rsplit("/", 1)[-1]]
     # The native decoder honors the regex but can ignore sibling min/maxLength.
     # Its accepted language must still exclude empty, long and reserved new IDs.
     assert bool(re.fullmatch(fresh["pattern"], identity)) is accepted
@@ -929,6 +933,8 @@ def test_xgrammar_preserves_fresh_ids_after_hexadecimal_prefixes(retained):
     }]}})
     schema = social_cognition_response_schema(current, [])
     fresh = schema["$defs"]["SocialCommunicativeAct"]["oneOf"][0]["properties"]["activity_id"]
+    if "$ref" in fresh:
+        fresh = schema["$defs"][fresh["$ref"].rsplit("/", 1)[-1]]
     tokenizer = xgrammar.TokenizerInfo(
         [bytes([i]) for i in range(256)] + [b"STOP"], stop_token_ids=[256],
     )
@@ -3473,6 +3479,32 @@ def test_a_turn_waiting_for_value_judgment_answers_no_sibling_directly():
     ack["need_outcomes"] = {}
     assert Draft202012Validator(schema).is_valid(ack)
     validate_social_cognition_output(SocialCognitionOutput.model_validate(ack), current, [])
+
+
+@pytest.mark.parametrize("scope", ["turn", "goal"])
+@pytest.mark.parametrize("sibling", [False, True])
+def test_reviewed_speech_ingress_uses_precommitment_guard_in_actual_model_packet(scope, sibling):
+    """A speech-shaped future effect must not select the ordinary direct-answer guard."""
+    current = _value_review_turn(True)
+    reviewed = current.responsibilities[0].model_copy(update={"continuity_scope": scope})
+    responsibilities = [reviewed]
+    if sibling:
+        responsibilities.append(reviewed.model_copy(update={
+            "local_ref": "r2", "outcome": "acknowledge the person's report",
+            "value_review": False, "continuity_scope": "turn",
+        }))
+    current = current.model_copy(update={"responsibilities": responsibilities})
+    raw = response(activity_id="receipt", text="Let me think about that.", function="acknowledge",
+                   source_goal_ids=[], source_responsibility_refs=["r2" if sibling else "r1"])
+    raw["need_outcomes"] = {}
+    model = Model(raw)
+    resolution = asyncio.run(SocialCognitionResolver(model, Catalog()).resolve(current))
+    assert resolution.model_call_count == 1
+    prompt = model.calls[0][0]
+    assert "This whole turn is waiting for Value Judgment" in prompt
+    assert "including requested future speech" in prompt
+    assert "citing that sibling does not authorize a promise" in prompt
+    assert "this is direct conversational speech" not in prompt
 
 
 def test_withheld_answer_stays_pending_and_its_value_question_is_asked_now():
