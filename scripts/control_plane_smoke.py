@@ -148,10 +148,8 @@ def run(base_url: str, *, timeout_s: float) -> dict[str, Any]:
             f"{len(interpretation.responsibilities)}"
         )
     responsibility = interpretation.responsibilities[0]
-    if responsibility.output_mode != "speech":
-        raise AssertionError(
-            "greeting Responsibility must remain immediate ordinary speech"
-        )
+    if not responsibility.outcome.strip():
+        raise AssertionError("greeting must retain complete human meaning")
     planner_request = build_fast_plan_request(interpretation)
     status, plan_payload = _post_json(
         f"{base_url.rstrip('/')}/plan",

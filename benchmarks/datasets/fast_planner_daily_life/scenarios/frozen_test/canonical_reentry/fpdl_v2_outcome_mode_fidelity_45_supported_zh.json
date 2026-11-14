@@ -103,7 +103,6 @@
           "confidence": 0.99,
           "local_ref": "r1",
           "outcome": "愉快地回应用户的好奇，但不编造好奇对象。",
-          "output_mode": "speech",
           "schema_version": 1,
           "source_evidence": {
             "source_end_token_ref": "t999",

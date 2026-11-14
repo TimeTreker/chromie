@@ -288,7 +288,7 @@ def test_situation_digest_opportunity_cannot_reenter_with_different_projection()
                 CognitiveResponsibilityProposal(
                     local_ref="resp-look",
                     outcome="Look again.",
-                    output_mode="stateful_effect",
+
                     confidence=1.0,
                 )
             ],
@@ -331,7 +331,7 @@ def test_due_time_condition_runtime_cycle_reenters_same_planner_without_evidence
                             "local_ref": "resp-reminder",
                             "outcome": "Remind the user at the requested time.",
                             "bindings": {},
-                            "output_mode": "stateful_effect",
+
                             "confidence": 1.0,
                         }
                     ],

@@ -36,7 +36,9 @@ from orchestrator.runtime.planner_reentry import (
 from orchestrator.runtime.session import (
     now_ms,
     record_session_workflow_stage,
+    record_stale_planning_submission,
 )
+from orchestrator.runtime.capability_runtime import StalePlanningSubmissionError
 from shared.chromie_contracts.core_interpretation import (
     CognitiveResponsibilityProposal,
     CognitiveWorkRequest,
@@ -193,6 +195,9 @@ async def reenter_cognition_for_terminal_capability(
             opportunity=opportunity,
             session_id=session_id,
         )
+    except StalePlanningSubmissionError as exc:
+        record_stale_planning_submission(host, session_id, evidence=exc.evidence())
+        return
     except Exception as exc:
         host.session_log(
             session_id,
@@ -468,34 +473,38 @@ async def reenter_cognition_for_provider_state(
         "provider_id": event.provider_id,
         "state": dict(provider_state),
     }
-    planner_response = await host._planner_state_reentry_response(
-        source_response=response,
-        canonical_plan=canonical_plan,
-        user_request=user_request,
-        language=str(metadata.get("language") or "en-US"),
-        goal_ids=goal_ids,
-        evidence_goal_ids=[],
-        evidence_refs=[],
-        session_id=session_id,
-        phase="situation_revision_reentry",
-        context_updates={
-            "situation": situation_observation.projection.prompt_projection(),
-            "situation_revision_observation": situation_observation.model_dump(
-                mode="json"
-            ),
-            "trusted_provider_state_event": bounded_event,
-            "provider_state_reentry": {
-                "source_goal_ids": goal_ids,
-                "situation_source_refs": list(
-                    situation_observation.source_refs
+    try:
+        planner_response = await host._planner_state_reentry_response(
+            source_response=response,
+            canonical_plan=canonical_plan,
+            user_request=user_request,
+            language=str(metadata.get("language") or "en-US"),
+            goal_ids=goal_ids,
+            evidence_goal_ids=[],
+            evidence_refs=[],
+            session_id=session_id,
+            phase="situation_revision_reentry",
+            context_updates={
+                "situation": situation_observation.projection.prompt_projection(),
+                "situation_revision_observation": situation_observation.model_dump(
+                    mode="json"
                 ),
-                "planner_authority": "planner",
+                "trusted_provider_state_event": bounded_event,
+                "provider_state_reentry": {
+                    "source_goal_ids": goal_ids,
+                    "situation_source_refs": list(
+                        situation_observation.source_refs
+                    ),
+                    "planner_authority": "planner",
+                },
+                "cognitive_opportunity": opportunity.prompt_projection(),
             },
-            "cognitive_opportunity": opportunity.prompt_projection(),
-        },
-        fast_workflow_stage="fast_planner_situation_revision_reentry",
-        response_source="fast_planner_situation_revision_reentry",
-    )
+            fast_workflow_stage="fast_planner_situation_revision_reentry",
+            response_source="fast_planner_situation_revision_reentry",
+        )
+    except StalePlanningSubmissionError as exc:
+        record_stale_planning_submission(host, session_id, evidence=exc.evidence())
+        return
     if planner_response is None:
         return
     await host._apply_planner_reentry_response(
@@ -583,34 +592,38 @@ async def revalidate_restored_goals_from_provider_state(host: Any) -> None:
             reason_codes=["restored_goal_fresh_provider_state"],
             recommended_cognition="fast",
         )
-        planner_response = await host._planner_state_reentry_response(
-            source_response=None,
-            canonical_plan=None,
-            user_request=user_request,
-            language=str(candidate.get("language") or "auto"),
-            goal_ids=[goal_id],
-            evidence_goal_ids=[],
-            evidence_refs=[],
-            session_id=None,
-            phase="restored_provider_state_revalidation",
-            context_updates={
-                "trusted_provider_state_event": {
-                    "source_ref": source_ref,
-                    "source": "restart_provider_revalidation",
-                    "capabilities": provider_state,
+        try:
+            planner_response = await host._planner_state_reentry_response(
+                source_response=None,
+                canonical_plan=None,
+                user_request=user_request,
+                language=str(candidate.get("language") or "auto"),
+                goal_ids=[goal_id],
+                evidence_goal_ids=[],
+                evidence_refs=[],
+                session_id=None,
+                phase="restored_provider_state_revalidation",
+                context_updates={
+                    "trusted_provider_state_event": {
+                        "source_ref": source_ref,
+                        "source": "restart_provider_revalidation",
+                        "capabilities": provider_state,
+                    },
+                    "provider_state_reentry": {
+                        "source_goal_ids": [goal_id],
+                        "state_refs": [source_ref],
+                        "planner_authority": "planner",
+                        "restored_goal": True,
+                    },
+                    "cognitive_opportunity": opportunity.prompt_projection(),
                 },
-                "provider_state_reentry": {
-                    "source_goal_ids": [goal_id],
-                    "state_refs": [source_ref],
-                    "planner_authority": "planner",
-                    "restored_goal": True,
-                },
-                "cognitive_opportunity": opportunity.prompt_projection(),
-            },
-            fast_workflow_stage="fast_planner_restored_provider_state_reentry",
-            response_source="fast_planner_restored_provider_state_reentry",
-            responsibilities_override=responsibilities,
-        )
+                fast_workflow_stage="fast_planner_restored_provider_state_reentry",
+                response_source="fast_planner_restored_provider_state_reentry",
+                responsibilities_override=responsibilities,
+            )
+        except StalePlanningSubmissionError as exc:
+            record_stale_planning_submission(host, None, evidence=exc.evidence())
+            continue
         if planner_response is None:
             continue
         completed = host.conversation_state.complete_runtime_revalidation(
@@ -639,44 +652,50 @@ async def apply_planner_reentry_response(
     Confirmation-requiring Work is not auto-authorized by an internal event.
     """
 
-    if not response.capabilities:
-        return await host._execute_cognitive_outcome_response(
-            response,
-            session_id=session_id,
-            detached_delivery=True,
-        )
-    confirmation_ids = await host.interaction_runtime.confirmation_request_ids(response)
-    if confirmation_ids:
-        confirmation_session_id = str(
-            session_id
-            or response.metadata.get("parent_interaction_id")
-            or response.interaction_id
-        )
-        staged = await host._stage_interaction_confirmation(
-            response,
-            confirmation_session_id,
-            language=str(response.metadata.get("language") or "auto"),
-            reset_playback=False,
-        )
-        if staged:
-            host.session_log(
-                confirmation_session_id,
-                "planner_reentry_confirmation_staged: requests=%s",
-                ",".join(sorted(confirmation_ids)),
+    try:
+        if response.metadata.get("planning_commit") is not None:
+            await host.interaction_runtime.runtime.validate_planning_submission(response)
+        if not response.capabilities:
+            return await host._execute_cognitive_outcome_response(
+                response,
+                session_id=session_id,
+                detached_delivery=True,
             )
-            return "planner_reentry_confirmation_staged"
-        return "planner_reentry_confirmation_required"
-    await host.interaction_runtime.runtime.record_planning_submission(
-        response, lambda: host.conversation_state.record_interaction_response(session_id, response),
-    )
-    await host._dispatch_detached_interaction(
-        response,
-        session_id,
-        confirmed_request_ids=None,
-        reset_playback=False,
-        mark_session_done=False,
-    )
-    return "planner_reentry_dispatched"
+        confirmation_ids = await host.interaction_runtime.confirmation_request_ids(response)
+        if confirmation_ids:
+            confirmation_session_id = str(
+                session_id
+                or response.metadata.get("parent_interaction_id")
+                or response.interaction_id
+            )
+            staged = await host._stage_interaction_confirmation(
+                response,
+                confirmation_session_id,
+                language=str(response.metadata.get("language") or "auto"),
+                reset_playback=False,
+            )
+            if staged:
+                host.session_log(
+                    confirmation_session_id,
+                    "planner_reentry_confirmation_staged: requests=%s",
+                    ",".join(sorted(confirmation_ids)),
+                )
+                return "planner_reentry_confirmation_staged"
+            return "planner_reentry_confirmation_required"
+        await host.interaction_runtime.runtime.record_planning_submission(
+            response, lambda: host.conversation_state.record_interaction_response(session_id, response),
+        )
+        await host._dispatch_detached_interaction(
+            response,
+            session_id,
+            confirmed_request_ids=None,
+            reset_playback=False,
+            mark_session_done=False,
+        )
+        return "planner_reentry_dispatched"
+    except StalePlanningSubmissionError as exc:
+        record_stale_planning_submission(host, session_id, evidence=exc.evidence())
+        return "planning_submission_stale"
 
 
 async def planner_state_reentry_response(
@@ -1210,13 +1229,14 @@ async def planner_state_reentry_response(
         await planning_runtime.validate_planning_state(planning_snapshot, cancelled_bindings=cancelled_bindings)
         planning_commit = await planning_runtime.reserve_planning_submission(
             planning_snapshot, plan_id=replanned.plan_id, fingerprint=canonical_plan_fingerprint(replanned),
+            covered_goal_ids=list(replanned.goal_ids),
             prepared_activity_ids=[*replanned.cancel_activity_ids, *(step.reuse_activity_id for step in replanned.steps)],
         )
     response = await host.cognitive_runtime.resolve_plan_interaction(
         session, plan=replanned, work_request=request,
         session_id=sid,
         language=language,
-        context=context, evidence_refs=normalized_evidence_refs,
+        context=context, evidence_refs=normalized_evidence_refs, planning_commit=planning_commit,
     )
     response.metadata.update(
         {
@@ -1413,6 +1433,7 @@ async def optional_completed_resource_social_response(
         evidence_refs=list(evidence_refs),
         communication_needs=[need],
         context={
+            **({"user_turn_envelope": turn_envelope} if isinstance(turn_envelope, dict) else {}),
             "interaction_context": interaction_context,
             "work_result": {
                 "status": "completed",
@@ -1449,15 +1470,11 @@ async def requested_result_evidence_social_response(
     goal_ids: list[str],
     extra_context: dict[str, Any],
 ) -> InteractionResponse | None:
-    """Give SC terminal Evidence for a result the person asked to be told or cannot see.
+    """Give SC unhandled terminal requested-Work Evidence, without a UMI category gate.
 
-    Every communication with the user goes through Social Cognition. When Activation or
-    the Planner chose no next Work for terminal Evidence whose Goal carries an
-    ``information`` Responsibility, or a ``stateful_effect`` one the person cannot see
-    happen (live 2026-10-27: "帮我记一下，要买鸡蛋和面包。" was kept in silence), SC still
-    receives that Evidence directly with one Runtime result Need and decides how to
-    communicate it (speech, gesture, gaze). The Planner path already invokes SC itself,
-    so this runs only when that path produced nothing.
+    Planner already had its evidence re-entry opportunity. SC decides whether the
+    grounded result merits communication; failure notification remains mandatory.
+    This fallback grants no execution permission and never invents a Work result.
     """
 
     if not evidence or not goal_ids:
@@ -1470,7 +1487,6 @@ async def requested_result_evidence_social_response(
             for item in planner_reentry_responsibilities(
                 source_response=source_response, goal_ids=[goal_id],
             )
-            if item.output_mode in {"information", "stateful_effect"}
         ]
         if goal_responsibilities:
             result_goal_ids.append(goal_id)
@@ -1517,8 +1533,7 @@ async def requested_result_evidence_social_response(
         }
     )
     status = aggregate_execution_status([item.status for item in evidence])
-    result_kind = ("requested_information" if any(
-        item.output_mode == "information" for item in responsibilities.values()) else "unseen_effect")
+    result_kind = "requested_work"
     need = SocialCommunicationNeed(
         need_id=communication_need_id(plan.plan_id, "requested_result_evidence"),
         owner="runtime",
@@ -1550,6 +1565,7 @@ async def requested_result_evidence_social_response(
         evidence_refs=list(evidence_refs),
         communication_needs=[need],
         context={
+            **({"user_turn_envelope": turn_envelope} if isinstance(turn_envelope, dict) else {}),
             "interaction_context": interaction_context,
             "trusted_terminal_evidence": [
                 item.model_dump(mode="json") for item in evidence
@@ -1791,6 +1807,9 @@ async def plan_evidence_bound_capability_result_response(
             goal_ids=goal_ids,
             extra_context=extra_context,
         )
+    except StalePlanningSubmissionError as exc:
+        record_stale_planning_submission(host, session_id, evidence=exc.evidence())
+        return None
     except Exception as exc:
         host.session_log(
             session_id,

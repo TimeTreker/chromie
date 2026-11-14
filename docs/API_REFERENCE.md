@@ -235,9 +235,15 @@ with at most eight usable contracts. Search never returns unavailable, restricte
 non-executable or turn-ineligible entries, and the first pass contributes no Plan. Search
 covers every contract the Planner did not see, including a common contract the Goal
 applicability filter hid; loaded contracts are composition components and are not
-filtered against the whole Goal again. A speech-only turn loads nothing. A provider media,
-vocal, information or resource Goal without a loaded provider is decoded as `unavailable`
-until a search loads one. User Meaning Interpretation remains WHAT-only
+filtered against the whole Goal again. Retained typed Goal constraints continue to
+govern contract eligibility. A requested provider effect or read without a fitting
+loaded contract is decoded as `unavailable` until search loads one. When no executable
+ability is required, `ability_needs` is `[]`; absence is never a placeholder
+object. `closest_loaded: "none"` instead belongs to a real unmet ability and cannot
+mean that no ability was required. A terminal `respond` cannot discharge nonempty
+Work abilities; Native Schema and Host enforce the same constraint. Canonical
+waiting with an explicit nonempty `time_conditions` retains the existing future
+exception and its unmet obligation. User Meaning Interpretation remains WHAT-only
 and does not gain Capability-selection authority from catalog projection. Safety-locked
 entries are excluded from the common prompt even when an experience overlay requests
 `common`, and search never returns them. The initial
@@ -281,14 +287,22 @@ ordinary initial requests omit it. They do not accept a Goal-Interpreter `route_
 
 The maintained Cognitive Core interpretation result contains first-class
 `responsibilities` as provider-neutral Goal-Interpretation evidence: a local reference,
-complete human outcome, requested result type (`output_mode`), and
+complete contextual human outcome, required `value_review`, confidence, and
 the primary-result source evidence required for mechanical coverage validation.
+UMI does not author `output_mode`, `body_effect_family` or `continuity_scope`.
 Effectful or multi-Responsibility results do not cross a second LLM coverage reviewer.
 Responsibility evidence is the authoritative WHAT handoff
 for downstream cognition; it is not a Goal, Plan, or Goal-Association-only DTO.
 Parameter bindings, Goal relationships, activation timestamps, Capability IDs,
 executable args/actions, provider identity, execution methods,
 Activities, response wording, `route`, and `intent` are forbidden.
+
+The owner's WHAT-only UMI amendment preserves requested information, creative results,
+physical effects, form, modifiers and relations in the complete intention. Planner
+chooses methods, Skills, evidence/cache sufficiency and necessary Work; SC decides
+communication. Missing result categories grant no permission to execute or close a
+Goal. Current source migration requires fresh qualification; retained results from the
+former Role2 transaction do not qualify this revision.
 
 UMI primary and depth use the same closed intent-only wire. Exact source spans are
 validated for identity and ordering; Responsibilities may share source words. Both variants receive the complete
@@ -297,13 +311,13 @@ instead of silently dropping its tail. UMI and Fast share the ordered source-spa
 decoder contract; backward endpoints are excluded before Host validation. This does
 not select a span or prove that its material meaning is complete. UMI does not receive Capability
 argument schemas or normalize duration, speed, direction or activation time into
-execution fields. GA inherits new Goal meaning and result type from the accepted
+execution fields. GA inherits complete new Goal meaning from the accepted
 source ref; Planner realizes inputs and scheduling. Source membership alone does
 not establish semantic completeness or correct conversion.
 
 Planning `InformationGap` creation/resolution, execution-input completeness, blocking
 status, source/default selection, and clarification selection belong to Planner.
-UMI carries complete Responsibility meaning, requested result type, source evidence
+UMI carries complete Responsibility meaning, source evidence
 and bounded unresolved meaning. GA owns Goal relations;
 its maintained schema contains no planning-gap or resolution-policy fields.
 
@@ -324,13 +338,34 @@ response/input Need. The decoder fixes `activities` to exactly `activity_count` 
 the Host takes the count before the DTO (it must equal the Activities written), so a
 value-closing token can no longer open an extra, copied Activity. A limitation is that decision, not a model-authored Activity: the Host binds it
 as the unavailable Activity (a terminal Activity for that Responsibility) and the
-Planner's result need. An `answer` decision whose word-free response Need was omitted
-is bound the same way (the Need names only its Responsibility); `work` and `clarify`
+Planner's result need. Beside executable Work, an `answer` decision must carry its
+primary authored response Need and explicit `timing`; Host never supplies a missing
+answer with default parallel timing. Minimal native branches preserve both Activity
+orders; longer plans retain free Activity placement, with full coverage checked by Host.
+Speech-only omitted answers retain their mechanical projection.
+The native provider contract spells Need timing `ordered_with_work` or
+`concurrent_with_work`; the parser maps these one-to-one to canonical
+`sequential`/`parallel`. The public DTO/NDJSON retains canonical values. A compound
+body outcome may own both executable Work and its requested word-free response Need;
+that does not make a body outcome answer-only. An exact SC context-grounded answer
+may queue after same-Goal Work without asserting physical completion. A primary
+concurrent answer reuses existing prepared-start coordination; voice and Work stay
+in one Runtime batch even when only Work carries an execution-group index.
+Provider readiness, resource safety, cancellation and independent group order remain
+binding. A common-start group cannot contain dependent Work; Host fails closed
+rather than invent an overlap target.
+ `work` and `clarify`
 carry content only the model authors and fail closed without their Activity, so the decoder
 requires a `clarify` state's Activity, and an `unresolved_meaning` gap cites the exact UMI
 uncertainty wording. A mixed
 state may therefore hold only a response or an input Need beside a limitation.
-Ordinary speech is always answered, never decided unavailable. A Responsibility that
+Ordinary speech is always answered, never decided unavailable.
+The owner rejected expanding speech Work admission to compensate for UMI typing a
+fact as speech. That admission remains unchanged. Current-target qualification is
+open: the current native replay also exposes a correctly typed information/status
+Goal being assigned unrelated physical Work, and a repeated nod reaching a Runtime
+parallel-contract rejection. Structural acceptance alone does not qualify these Plans.
+ A Responsibility that
 could be a limitation first states `needed_abilities_fit`: `true` offers `work`, `answer`
 or `clarify`, `false` only `unavailable`, and the DTO rejects any other pairing (an uncertain
 referent whose abilities fit is a clarification, not a limitation). A turn-span argument
@@ -586,11 +621,11 @@ continuity before creation: each accepted UMI Responsibility is represented exac
 once by an existing-Goal association or a new-Goal identity/relationship row. GA
 does not author clarification wording or revise accepted UMI meaning. Existing goal IDs must be copied
 from the supplied active-goal snapshots; unknown or below-threshold associations
-are rejected. Every validated new Goal retains provider-neutral WHAT semantics. `output_mode`
-distinguishes ordinary speech, expressive speech, recitation, singing, humming,
-nonverbal vocalization, body action, media playback, information, stateful effect,
-or other. A complete media intention does not require a pre-extracted operation:
-Planner derives the operation and Capability arguments from the accepted intention. The live model-facing and canonical Goal contracts do not contain
+are rejected. Every validated new Goal retains the complete provider-neutral WHAT intention without
+a UMI/GA-authored result category. Explicit requested form stays in that meaning;
+Planner derives methods and Capability arguments. Older retained typed Goal constraints
+remain authoritative for their exact revisions and are never silently erased.
+The live model-facing and canonical Goal contracts do not contain
 `responsibility_kind`, `execution_lane`, `provider_required`, or `capability_work`.
 Those concepts are not reconstructed by the Host. Planner decides HOW from the
 canonical Goal, current trusted state/Evidence, and the available Capability catalog;
@@ -598,7 +633,7 @@ selected Capability/Activity records carry Runtime execution facts separately. T
 keeps Goal identity stable across provider changes and prevents Goal Association from
 quietly taking back planning authority.
 The live GA new-Goal schema contains only source Responsibility refs, related Goal
-IDs and superseded Goal IDs. Description, criteria and result type are inherited
+IDs and superseded Goal IDs. Description and criteria are inherited
 mechanically from UMI. Every identity row explicitly supplies all three arrays;
 `related_goal_ids` can reference retained terminal history, while `supersedes_goal_ids`
 can reference only supplied open Goals. Unknown, duplicate or overlapping IDs reject;
@@ -607,6 +642,12 @@ The primary collections are `associations` and `new_goals`; the incomplete
 `unassociated_responsibility_refs` field is retired with no compatibility path.
 Resource details remain in that complete intention for Planner. UMI owns initial
 Planner activation; Host does not invent it from the new-Goal result.
+
+Historical re-entry records are projected only when the exact originating UMI
+record matches a bound trusted Goal that still retains its typed constraints.
+The re-entry view omits retired UMI wrapper fields; the stored record, canonical
+Goal, versions and constraints remain unchanged. Missing or conflicting provenance
+fails closed. Fresh UMI admission always rejects those retired fields.
 
 Existing typed resource Goals retain one nested authority:
 `resource_responsibility.resource`, `.source`, `.recipient`, and `.delivery_mode`.

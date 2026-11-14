@@ -74,6 +74,105 @@ class _ConversationState:
 
 
 class CognitiveGatewayRegressionTests(unittest.IsolatedAsyncioTestCase):
+    async def test_followup_context_waits_for_prior_admission_not_prior_cognition(self) -> None:
+        from orchestrator.runtime.cognitive_gateway import CognitiveGateway
+
+        for first_text, followup_text, decision in (
+            ("I'm thirsty; can you help?", "Sure, please bring it quickly.", "admit"),
+            ("我有点饿，能帮帮我吗？", "好，麻烦快点拿来。", "admit"),
+            ("A preceding observation.", "What about it?", "suppress"),
+            ("A preceding request.", "Please help with it.", "fail_open"),
+            ("An input cancelled before admission.", "A separate request.", "cancel"),
+        ):
+            with self.subTest(decision=decision, first_text=first_text):
+                assistant = bare_voice_assistant()
+                assistant.cognitive_runtime_mode = "apply"
+                assistant.conversation_state = _ConversationState("rapid-inputs")
+                assistant.sessions = _Sessions("first")
+                assistant.sessions.state["second"] = {"llm_done": False}
+                first_review = asyncio.Event()
+                release_review = asyncio.Event()
+                second_capture = asyncio.Event()
+                first_core = asyncio.Event()
+                second_core = asyncio.Event()
+                release_core = asyncio.Event()
+                snapshots = {}
+                gateway = CognitiveGateway()
+                real_capture = gateway.capture
+
+                def capture(*args, **kwargs):
+                    if kwargs.get("session_id") == "second":
+                        second_capture.set()
+                    return real_capture(*args, **kwargs)
+
+                gateway.capture = capture
+                assistant._cognitive_gateway_adapter = lambda: gateway
+
+                class Client:
+                    async def review_attention(self, session, *, request):
+                        if request.session_id == "first":
+                            first_review.set()
+                            await release_review.wait()
+                            if decision == "fail_open":
+                                raise RuntimeError("controlled attention unavailability")
+                        return AttentionReviewResult(turn_id=request.turn_id, session_id=request.session_id,
+                            context_digest=request.context_digest,
+                            disposition="suppress" if request.session_id == "first" and decision == "suppress" else "admit",
+                            speech_act="request", confidence=1, source="test", reason="controlled admission")
+
+                    async def interpret_turn(self, session, *, turn_envelope, context_snapshot):
+                        sid = turn_envelope.session_id
+                        snapshots[sid] = context_snapshot.context
+                        if sid == "first":
+                            first_core.set()
+                            await release_core.wait()
+                        else:
+                            second_core.set()
+                        return CoreInterpretationResult(turn_id=turn_envelope.turn_id, session_id=sid,
+                            confidence=1, language="en-US", responsibilities=[])
+
+                async def session(self):
+                    return object()
+
+                async def not_confirmation(self, *args, **kwargs):
+                    return False
+
+                async def handled(self, *args, **kwargs):
+                    return True
+
+                assistant.agent_client = Client()
+                assistant.get_http_session = MethodType(session, assistant)
+                assistant._handle_confirmation_reply = MethodType(not_confirmation, assistant)
+                assistant._try_apply_cognitive_runtime = MethodType(handled, assistant)
+                assistant.build_context = lambda sid: {"conversation_id": "rapid-inputs", "history": [
+                    {"role": "user", "text": row["text"], "sid": row["sid"]}
+                    for row in assistant.conversation_state.accepted_turns]}
+                assistant._log_goal_list = lambda *args, **kwargs: None
+                assistant.session_log = lambda *args, **kwargs: None
+                assistant.maybe_session_done = lambda *args, **kwargs: None
+                first = asyncio.create_task(assistant.handle_routed_text(first_text, "first", channel="text"))
+                second = None
+                try:
+                    await asyncio.wait_for(first_review.wait(), 1)
+                    second = asyncio.create_task(assistant.handle_routed_text(followup_text, "second", channel="text"))
+                    await asyncio.wait_for(second_capture.wait(), 1)
+                    if decision == "cancel":
+                        first.cancel()
+                        await asyncio.gather(first, return_exceptions=True)
+                    else:
+                        release_review.set()
+                    await asyncio.wait_for(second_core.wait(), 1)
+                    expected = [first_text] if decision in {"admit", "fail_open"} else []
+                    self.assertEqual([row["text"] for row in snapshots["second"]["history"]], expected)
+                    if expected:
+                        await asyncio.wait_for(first_core.wait(), 1)
+                        self.assertFalse(first.done(), "Later cognition must not wait for prior UMI to finish")
+                        self.assertEqual(snapshots["first"]["history"], [])
+                finally:
+                    release_review.set()
+                    release_core.set()
+                    await asyncio.gather(first, *([second] if second else []), return_exceptions=True)
+
     async def test_deterministic_ignore_stays_suppressed_without_user_meaning_interpreter_result(
         self,
     ) -> None:

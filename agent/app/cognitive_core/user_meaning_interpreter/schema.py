@@ -80,7 +80,7 @@ class UserMeaningInterpretationDecision(BaseModel):
         ),
     )
     cognitive_requests: list[CognitiveActivationRequest] = Field(
-        default_factory=list, max_length=3,
+        default_factory=list, max_length=2,
         description=(
             "Which existing cognitive authorities should work next from this accepted "
             "meaning. This is orchestration only, never another role's decision."
@@ -108,6 +108,8 @@ class UserMeaningInterpretationDecision(BaseModel):
             raise ValueError("meaning uncertainty local_ref values must be unique")
         known_refs = set(refs)
         authorities = [item.authority for item in self.cognitive_requests]
+        if set(authorities) - {"goal_association", "planner"}:
+            raise ValueError("UMI may request only non-standing Goal Association and Planner")
         if len(authorities) != len(set(authorities)):
             raise ValueError("UMI may request each cognitive authority at most once")
         for request in self.cognitive_requests:
@@ -125,20 +127,11 @@ class UserMeaningInterpretationDecision(BaseModel):
             raise ValueError(
                 "initial Goal Association cognition is turn-wide and must cover every Responsibility"
             )
-        scope_by_ref = {
-            item.local_ref: item.continuity_scope for item in self.responsibilities
-        }
         for uncertainty in self.meaning_uncertainties:
             unknown_refs = set(uncertainty.responsibility_refs) - known_refs
             if unknown_refs:
                 raise ValueError(
                     "meaning uncertainty references unknown Responsibilities: "
                     + ",".join(sorted(unknown_refs))
-                )
-            scopes = {scope_by_ref[ref] for ref in uncertainty.responsibility_refs}
-            if len(scopes) != 1:
-                raise ValueError(
-                    "one meaning uncertainty cannot span turn-local and goal-scoped "
-                    "Responsibilities; UMI must keep those semantic uncertainties separate"
                 )
         return self

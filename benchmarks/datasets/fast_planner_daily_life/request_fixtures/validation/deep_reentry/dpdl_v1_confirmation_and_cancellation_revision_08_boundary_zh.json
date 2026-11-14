@@ -125,7 +125,6 @@
           "confidence": 0.99,
           "local_ref": "r1",
           "outcome": "在重新确认后创建晚上八点的提醒。",
-          "output_mode": "stateful_effect",
           "schema_version": 1,
           "source_evidence": {
             "source_end_token_ref": "t999",

@@ -31,8 +31,8 @@ def planner_request() -> CognitiveActivationContext:
     responsibility = CognitiveResponsibilityProposal(
         local_ref="r1",
         outcome="Check the weather.",
-        output_mode="information",
-        continuity_scope="goal",
+
+
         confidence=1.0,
     )
     return CognitiveActivationContext(

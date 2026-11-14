@@ -151,7 +151,6 @@
           "confidence": 0.99,
           "local_ref": "r1",
           "outcome": "Move toward the requester only if safe movement is available.",
-          "output_mode": "body_action",
           "schema_version": 1,
           "source_evidence": {
             "source_end_token_ref": "t999",

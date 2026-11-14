@@ -43,7 +43,6 @@
           "confidence": 0.99,
           "local_ref": "r1",
           "outcome": "向前走五秒，并与另一个行走动作并行。",
-          "output_mode": "body_action",
           "schema_version": 1,
           "source_evidence": {
             "source_end_token_ref": "t999",
@@ -60,7 +59,6 @@
           "confidence": 0.99,
           "local_ref": "r2",
           "outcome": "向前走八秒，并与另一个行走动作并行。",
-          "output_mode": "body_action",
           "schema_version": 1,
           "source_evidence": {
             "source_end_token_ref": "t999",

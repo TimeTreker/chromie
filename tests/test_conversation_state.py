@@ -2557,7 +2557,7 @@ class TimeConditionContinuousCognitionTests(unittest.TestCase):
                     "local_ref": "resp-reminder",
                     "outcome": "Remind the user at the requested time.",
                     "bindings": {},
-                    "output_mode": "stateful_effect",
+
                     "relationship": "new",
                     "target_goal_ids": [],
                     "confidence": 0.95,
@@ -2705,3 +2705,44 @@ def test_untrusted_memory_update_cannot_self_promote_relational_disclosure() -> 
     raw = manager.snapshot()["extracted_memory"]
     assert raw[0]["disclosure_scope"] == "unknown"
     assert manager.session_memory()["extracted_memory"] == []
+
+
+def test_fresh_goal_completion_requires_work_and_played_answer_in_either_order():
+    from shared.chromie_contracts.plan import CanonicalPlan, canonical_plan_fingerprint
+    for spoken_first in (False, True):
+        state = ConversationStateManager(base_conversation_id='conjunction')
+        state.apply_semantic_task_operations_atomically([{
+            'operation_id': 'create', 'operation': 'create', 'goal': {
+                'goal_id': 'goal', 'description': 'Perform the requested work and tell its story.',
+                'source_text': 'Do the work and tell its story.', 'source_responsibility_refs': ['r1'],
+            }}], sid='sid', user_text='Do the work and tell its story.')
+        plan = CanonicalPlan(plan_id='plan', planner_tier='fast', disposition='execute', coverage='complete',
+            goal_ids=['goal'], steps=[{'step_id': 'work', 'capability_id': 'test.work', 'source_goal_ids': ['goal']}],
+            goal_outcomes=[{'goal_id': 'goal', 'disposition': 'execute', 'coverage': 'complete', 'step_ids': ['work']}],
+            communication_needs=[{'need_id': 'answer', 'owner': 'planner', 'kind': 'answer', 'reference_id': 'plan',
+                                  'source_goal_ids': ['goal'], 'source_responsibility_refs': ['r1']}])
+        fingerprint = canonical_plan_fingerprint(plan)
+        state.record_interaction_response('sid', InteractionResponse(interaction_id='interaction', capabilities=[{
+            'request_id': 'request', 'capability_id': 'test.work', 'metadata': {'source_goal_ids': ['goal']}}],
+            metadata={'planning_result': 'composed_plan', 'canonical_plan': plan.model_dump(mode='json'),
+                      'canonical_plan_id': 'plan', 'canonical_plan_fingerprint': fingerprint, 'turn_id': 'turn'}))
+        bundle = ExecutionOutcomeBundle(outcome_id='outcome', turn_id='turn', interaction_id='interaction',
+            canonical_plan_id='plan', canonical_plan_fingerprint=fingerprint, canonical_goal_ids=['goal'],
+            aggregate_status='completed', evidence=[{'evidence_id': 'evidence', 'request_id': 'request',
+                'step_id': 'work', 'capability_id': 'test.work', 'source_goal_ids': ['goal'], 'status': 'completed'}],
+            goal_outcomes=[{'goal_id': 'goal', 'status': 'completed', 'step_ids': ['work'],
+                            'completed_step_ids': ['work'], 'evidence_ids': ['evidence']}])
+        def speak(stage='context_grounded'):
+            return state.reconcile_communicative_goal_completion('sid', ['goal'], metadata={
+                'source': 'social_cognition_communicative_completion', 'speech_event_id': 'speech',
+                'playback_completed': True, 'truth_stages': [stage], 'addressed_need_ids': ['answer']})
+        def work():
+            state.record_execution_outcome_bundle(bundle, sid='sid')
+            return state.reconcile_execution_outcome_responsibilities(bundle, sid='sid')
+        assert not speak('pre_evidence')[0]['changed']
+        first = speak() if spoken_first else work()
+        assert first[0].get('responsibility_status', 'open') != 'satisfied'
+        assert [item['goal_id'] for item in state.active_goal_snapshots()] == ['goal']
+        second = work() if spoken_first else speak()
+        assert second[0]['responsibility_status'] == 'satisfied'
+        assert state.active_goal_snapshots() == []

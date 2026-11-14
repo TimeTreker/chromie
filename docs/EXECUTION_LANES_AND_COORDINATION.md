@@ -228,7 +228,9 @@ into a parallel one. Planner Work is the one exception by contract, not repair:
 the one Planner authors WorkDAG `depends_on`, and the Host derives each
 step's timing and `execution_group` from those dependencies and the declared Capability
 resources. Runtime keeps adjacent groups apart and never adds or removes a
-dependency.
+dependency. A primary concurrent answer Need may mark a singleton Work step
+parallel with Vocal. This does not promote multiple serial Work groups; explicit
+provider parallel declarations and resources are still checked before dispatch.
 
 ## Playback and confirmation rules
 

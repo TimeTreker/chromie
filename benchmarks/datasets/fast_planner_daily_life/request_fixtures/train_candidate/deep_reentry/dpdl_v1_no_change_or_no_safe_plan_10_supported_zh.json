@@ -148,7 +148,6 @@
           "confidence": 0.99,
           "local_ref": "r1",
           "outcome": "确认请求的安慰回应已经送达，不要重播。",
-          "output_mode": "speech",
           "schema_version": 1,
           "source_evidence": {
             "source_end_token_ref": "t999",

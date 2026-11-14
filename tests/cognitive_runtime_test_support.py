@@ -85,42 +85,10 @@ def admitted_core(
         for index, description in enumerate(meaning_uncertainties or [], start=1)
     ]
     refs = [str(item.get("local_ref") or "r1") for item in rows]
-    default_requests = (
-        [
-            {
-                "authority": "goal_association",
-                "responsibility_refs": refs,
-                "reason_summary": "Fixture requests canonical Goal continuity.",
-            },
-            {
-                "authority": "social_cognition",
-                "responsibility_refs": refs,
-                "reason_summary": "Fixture requests interaction cognition.",
-            },
-        ]
-        if all(
-            str(item.get("output_mode") or "speech") == "speech"
-            and str(item.get("continuity_scope") or "goal") == "turn"
-            for item in rows
-        )
-        else [
-            {
-                "authority": "goal_association",
-                "responsibility_refs": refs,
-                "reason_summary": "Fixture requests canonical Goal continuity.",
-            },
-            {
-                "authority": "social_cognition",
-                "responsibility_refs": refs,
-                "reason_summary": "Fixture requests interaction cognition.",
-            },
-            {
-                "authority": "planner",
-                "responsibility_refs": refs,
-                "reason_summary": "Fixture requests Work cognition.",
-            },
-        ]
-    )
+    default_requests = [
+        {"authority": "goal_association", "responsibility_refs": refs},
+        {"authority": "planner", "responsibility_refs": refs},
+    ]  # These generic Work fixtures explicitly request HOW; no WHAT classifier.
     core = CoreInterpretationResult(
         turn_id=envelope.turn_id,
         session_id=envelope.session_id,
@@ -496,7 +464,7 @@ def blink_definition(*, confirmation: bool = False) -> CapabilityDefinition:
         interruptible=True,
         can_run_parallel=True,
         exclusive_group="eye_expression",
-        metadata={"resource_claims": ["eye_expression"]},
+        metadata={"resource_claims": ["eye_expression"], "parallel_metadata_declared": True},
     )
 
 

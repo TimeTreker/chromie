@@ -7,7 +7,6 @@
   "expected": {
     "responsibilities": [
       {
-        "output_mode": "body_action",
         "outcome_contains_any": [
           "nod",
           "点头"
@@ -22,7 +21,6 @@
         ]
       },
       {
-        "output_mode": "speech",
         "outcome_contains_any": [
           "greet",
           "hello",
@@ -60,14 +58,13 @@
     "responsibilities": [
       {
         "local_ref": "r1",
-        "output_mode": "other",
         "outcome": "点两下头，再跟我说声你好。",
         "confidence": 1.0,
         "source_evidence": {
           "source_start_token_ref": "t0",
           "source_end_token_ref": "t12"
         },
-        "continuity_scope": "goal"
+        "value_review": false
       }
     ],
     "meaning_uncertainties": [],
@@ -76,8 +73,7 @@
         "authority": "planner",
         "responsibility_refs": [
           "r1"
-        ],
-        "reason_summary": "Explicit authored fixture requests the existing cognitive owner."
+        ]
       }
     ]
   },

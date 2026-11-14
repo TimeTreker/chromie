@@ -41,7 +41,6 @@
           "confidence": 0.99,
           "local_ref": "r1",
           "outcome": "Acquire the red mug from the kitchen and physically hand it to the requester.",
-          "output_mode": "body_action",
           "schema_version": 1,
           "source_evidence": {
             "source_end_token_ref": "t999",

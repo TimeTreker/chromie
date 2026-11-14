@@ -29,12 +29,10 @@ def _cognitive_requests(*refs: str) -> list[dict[str, object]]:
         {
             "authority": "goal_association",
             "responsibility_refs": scope,
-            "reason_summary": "Check canonical continuity for the accepted meaning.",
         },
         {
             "authority": "planner",
             "responsibility_refs": scope,
-            "reason_summary": "The accepted meaning is ready for HOW reasoning.",
         },
     ]
 
@@ -52,8 +50,9 @@ def _valid_output(
             {
                 "local_ref": local_ref,
                 "outcome": "provide today's weather for Chongqing",
-                "output_mode": "information",
-                "continuity_scope": "goal",
+
+
+                "value_review": False,
                 "confidence": 0.95,
                 "source_evidence": {
                     "source_start_token_ref": tokens[0]["ref"],
@@ -81,9 +80,10 @@ def _compound_output() -> dict[str, object]:
         return {
             "local_ref": ref,
             "outcome": outcome,
-            "output_mode": "body_action",
-            "body_effect_family": "social_expression",
-            "continuity_scope": "goal",
+
+
+
+            "value_review": False,
             "confidence": 1.0,
             "source_evidence": {
                 "source_start_token_ref": source_ref,
@@ -133,8 +133,7 @@ class UserMeaningInterpreterContractTests(unittest.TestCase):
             {
                 "authority": "planner",
                 "responsibility_refs": ["r1"],
-                "reason_summary": "The accepted meaning is ready for HOW reasoning.",
-            },
+                },
         ]
 
         decision = OllamaUserMeaningInterpreter._validate_interpretation_content(
@@ -177,11 +176,11 @@ class UserMeaningInterpreterContractTests(unittest.TestCase):
         request = UserMeaningInterpretationRequest(text="Hi. Turn left.")
         parsed = _compound_output()
         parsed["responsibilities"][0].update(
-            outcome="Respond to the greeting", output_mode="speech", body_effect_family=None, continuity_scope="turn",
+            outcome="The person greets Chromie", value_review=False,
             source_evidence={"source_start_token_ref": "t0", "source_end_token_ref": "t1"},
         )
         parsed["responsibilities"][1].update(
-            outcome="Turn left", body_effect_family="task_physical_effect", continuity_scope="goal",
+            outcome="Turn left", value_review=False,
             source_evidence={"source_start_token_ref": "t2", "source_end_token_ref": "t4"},
         )
         parsed["cognitive_requests"][1]["responsibility_refs"] = ["r2"]
@@ -226,11 +225,9 @@ class UserMeaningInterpreterContractTests(unittest.TestCase):
         twice failed the whole turn (503); shared provenance is now accepted."""
         text = "I got promoted today, I'm so happy"
         parsed = _compound_output()
-        parsed["responsibilities"][0].update({"outcome": "reply to the promotion news", "output_mode": "speech", "value_review": False})  # type: ignore[union-attr]
-        parsed["responsibilities"][0].pop("body_effect_family")  # type: ignore[union-attr]
+        parsed["responsibilities"][0].update({"outcome": "reply to the promotion news", "value_review": False})  # type: ignore[union-attr]
         parsed["responsibilities"][0]["source_evidence"] = {"source_start_token_ref": "t0", "source_end_token_ref": "t6"}  # type: ignore[index]
-        parsed["responsibilities"][1].update({"outcome": "share the happiness", "output_mode": "speech", "value_review": False})  # type: ignore[union-attr]
-        parsed["responsibilities"][1].pop("body_effect_family")  # type: ignore[union-attr]
+        parsed["responsibilities"][1].update({"outcome": "share the happiness", "value_review": False})  # type: ignore[union-attr]
         parsed["responsibilities"][1]["source_evidence"] = {"source_start_token_ref": "t2", "source_end_token_ref": "t6"}  # type: ignore[index]
         decision = OllamaUserMeaningInterpreter._validate_interpretation_content(
             UserMeaningInterpretationRequest(text=text), json.dumps(parsed)
@@ -306,19 +303,19 @@ def test_umi_system_prompt_preserves_information_delivery_as_terminal_what() -> 
         Path(__file__).parents[1]
         / "agent/app/cognitive_core/user_meaning_interpreter/prompts/user_meaning_interpreter_system.txt"
     ).read_text(encoding="utf-8")
-    assert "made available to the intended recipient" in prompt
-    assert "Acquiring or checking the source alone is not" in prompt
-    assert "the complete WHAT" in prompt
+    assert "every material object, person, place" in prompt
+    assert "An eventual verbal delivery does not mean" in prompt
+    assert "the requested result is already fulfilled" in prompt
 
 def test_umi_system_prompt_keeps_answer_facts_and_bare_assertions_out_of_what() -> None:
     prompt = (
         Path(__file__).parents[1]
         / "agent/app/cognitive_core/user_meaning_interpreter/prompts/user_meaning_interpreter_system.txt"
     ).read_text(encoding="utf-8")
-    assert '"Who are you?" means "answer who I am"' in prompt
-    assert "does not pre-write Chromie's answer" in prompt
-    assert "bare user-supplied assertion or scene description" in prompt
-    assert "do not invent an information Responsibility" in prompt
+    assert "question predicate" in prompt
+    assert "Do not pre-write an answer from supplied facts" in prompt
+    assert "A report, feeling, correction, confirmation, question or elliptical reply" in prompt
+    assert "Do not invent an external task" in prompt
 
 
 def test_umi_system_prompt_carries_contextual_resource_facts_in_complete_outcome() -> None:
@@ -326,10 +323,10 @@ def test_umi_system_prompt_carries_contextual_resource_facts_in_complete_outcome
         Path(__file__).parents[1]
         / "agent/app/cognitive_core/user_meaning_interpreter/prompts/user_meaning_interpreter_system.txt"
     ).read_text(encoding="utf-8")
-    assert "physical resource previously introduced in the conversation" in prompt
-    assert "entity, location, distance, quantity, recipient" in prompt
-    assert "present in this Responsibility's complete outcome" in prompt
-    assert "Do not author `bindings` or another structured fact/parameter table" in prompt
+    assert "include the resolved subject, need and still-applicable constraints" in prompt
+    assert "every material object, person, place, quantity, unit" in prompt
+    assert "in the outcome itself" in prompt
+    assert "No output_mode, body_effect_family, continuity_scope, bindings" in prompt
 
 
 class UserMeaningInterpreterPromptTests(unittest.TestCase):
@@ -713,11 +710,9 @@ class UserMeaningInterpreterPromptTests(unittest.TestCase):
             UserMeaningInterpretationRequest(text=text, language="zh-CN")
         )["format"]
         responsibility = schema["$defs"]["CognitiveResponsibilityProposal"]
-        self.assertIn("oneOf", responsibility)
-        self.assertTrue(all(
-            "source_evidence" in branch["required"]
-            for branch in responsibility["oneOf"]
-        ))
+        self.assertEqual(set(responsibility["required"]),
+                         {"local_ref", "outcome", "value_review", "confidence", "source_evidence"})
+        self.assertTrue(responsibility["additionalProperties"] is False)
         evidence = schema["$defs"]["ResponsibilitySourceEvidence"]
         refs = [item["ref"] for item in _source_tokens(text)]
         validator = Draft202012Validator(evidence)
@@ -941,29 +936,29 @@ if __name__ == "__main__":
     unittest.main()
 
 
-def test_user_meaning_interpreter_keeps_multi_action_physical_compounds_body_action() -> None:
+def test_user_meaning_interpreter_keeps_connected_intentions_complete() -> None:
     from pathlib import Path
 
     prompt = (
         (Path(__file__).resolve().parents[1] / "agent/app/cognitive_core/user_meaning_interpreter/prompts/user_meaning_interpreter_system.txt")
         .read_text(encoding="utf-8")
     )
-    assert "do not use other merely because the compound has" in prompt
-    assert "several actions or Activities" in prompt
-    assert "different observable result domains" in prompt
+    assert "Keep one complete Responsibility for a connected human intention" in prompt
+    assert "Planner owns that decomposition" in prompt
+    assert "Preserve every effect, constraint and relation explicitly" in prompt
 
-def test_user_meaning_interpreter_scope_prompt_distinguishes_work_from_duration() -> None:
+def test_user_meaning_interpreter_retires_output_and_lifetime_classification() -> None:
     from pathlib import Path
 
     prompt = (
         (Path(__file__).resolve().parents[1] / "agent/app/cognitive_core/user_meaning_interpreter/prompts/user_meaning_interpreter_system.txt")
         .read_text(encoding="utf-8")
     )
-    assert "lifetime distinction" in prompt
-    assert "Every non-speech output_mode therefore\nuses goal" in prompt
-    assert "Use turn for ordinary current-conversation\nspeech" in prompt
-    assert 'does NOT mean "no Goal"' in prompt
-    assert "does not block Planner" in prompt
+    assert "No output_mode, body_effect_family, continuity_scope" in prompt
+    assert "Exact requested form and desired real-world effects stay in the natural-language meaning" in prompt
+    assert "UMI owns WHAT, GA identity/continuity, Planner HOW" in prompt
+    assert "goal_association for canonical continuity worth checking" in prompt
+    assert "including method and Skill choices" in prompt
 
 
 def test_umi_preserves_explicit_social_purpose_without_inventing_emotion() -> None:
@@ -971,7 +966,24 @@ def test_umi_preserves_explicit_social_purpose_without_inventing_emotion() -> No
         (Path(__file__).resolve().parents[1] / "agent/app/cognitive_core/user_meaning_interpreter/prompts/user_meaning_interpreter_system.txt")
         .read_text(encoding="utf-8")
     )
-    assert "Explicitly stated emotional/social context" in prompt
-    assert "materially supplies the purpose" in prompt
-    assert "without inventing an unstated mood, motive" in prompt
-    assert "GA owns association with retained Goal history" in prompt
+    assert "purpose and relation" in prompt
+    assert "without requesting a new external action" in prompt
+    assert "Do not add personal attributes, relationships, motives" in prompt
+    assert "GA identity/continuity" in prompt
+
+
+def test_umi_cannot_author_presentation_execution_or_lifetime_categories():
+    from shared.chromie_contracts.core_interpretation import CognitiveResponsibilityProposal
+    from pydantic import ValidationError
+    text = "给我讲个故事"
+    request = UserMeaningInterpretationRequest(text=text)
+    schema = OllamaUserMeaningInterpreter._user_meaning_interpretation_response_schema(admitted_turn=text)
+    for field, value in (("output_mode", "speech"), ("body_effect_family", "social_expression"),
+                         ("continuity_scope", "turn")):
+        raw = _valid_output(text)
+        raw["responsibilities"][0][field] = value
+        assert not Draft202012Validator(schema).is_valid(raw)
+        with unittest.TestCase().assertRaises(ValueError):
+            OllamaUserMeaningInterpreter._validate_interpretation_content(request, json.dumps(raw))
+        with unittest.TestCase().assertRaises(ValidationError):
+            CognitiveResponsibilityProposal.model_validate(raw["responsibilities"][0])

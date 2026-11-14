@@ -29,12 +29,15 @@ from orchestrator.runtime.named_goal_cancellation import (
 from orchestrator.runtime.cognitive_runtime import (
     CognitiveRuntimeResolution,
 )
+from orchestrator.runtime.capability_runtime import StalePlanningSubmissionError
+from orchestrator.runtime.interaction_dispatch_host import finish_stale_planning_submission
 from orchestrator.runtime.observability_recording import (
     record_cognitive_runtime_evidence,
 )
 from orchestrator.runtime.session import (
     now_ms,
     record_session_workflow_stage,
+    record_stale_planning_submission,
 )
 from shared.chromie_contracts.core_interpretation import (
     CognitiveResponsibilityProposal,
@@ -54,6 +57,28 @@ from shared.chromie_contracts.user_turn import (
 )
 
 logger = logging.getLogger("chromie-orchestrator")
+
+
+def _finish_stale_resolution(
+    host: Any, resolution: CognitiveRuntimeResolution, *, session_id: str,
+    user_text: str, turn_envelope: UserTurnEnvelope | None, evidence: dict[str, Any],
+) -> None:
+    resolution = resolution.model_copy(update={"status": "skipped", "metadata": {
+        **resolution.metadata, "host_commit_status": "rejected_stale",
+        "planning_submission_rejection": evidence,
+    }})
+    host.conversation_state.record_user_turn(
+        session_id, user_text, metadata=host._metadata_with_turn_envelope({
+            "source": "goal_driven_cognitive_runtime",
+            "cognitive_runtime_resolution": host._cognitive_resolution_summary(resolution),
+            "planning_submission_status": "stale",
+        }, turn_envelope),
+    )
+    record_cognitive_runtime_evidence(
+        getattr(host, "cognitive_evidence", None), resolution,
+        session_id=session_id, user_text=user_text, session_log=host.session_log,
+    )
+    finish_stale_planning_submission(host, session_id, evidence=evidence)
 
 
 def current_conversation_id(host: Any, session_id: str) -> str:
@@ -309,32 +334,37 @@ async def reenter_coaffected_goals_after_cancellation(
             reason_codes=[evidence.reason_code],
             recommended_cognition="fast",
         )
-        planner_response = await host._planner_state_reentry_response(
-            source_response=None,
-            canonical_plan=None,
-            user_request=source_text,
-            language=str(item.get("language") or "auto"),
-            goal_ids=[goal_id],
-            evidence_goal_ids=[goal_id],
-            evidence_refs=[evidence.evidence_id],
-            session_id=session_id,
-            phase="goal_cancellation_reentry",
-            context_updates={
-                "trusted_goal_cancellation_evidence": [
-                    evidence.model_dump(mode="json")
-                ],
-                "goal_cancellation_reentry": {
-                    "phase": "goal_cancellation_reentry",
-                    "source_goal_ids": list(evidence.target_goal_ids),
-                    "evidence_refs": [evidence.evidence_id],
-                    "planner_authority": "planner",
+        try:
+            planner_response = await host._planner_state_reentry_response(
+                source_response=None,
+                canonical_plan=None,
+                user_request=source_text,
+                language=str(item.get("language") or "auto"),
+                goal_ids=[goal_id],
+                evidence_goal_ids=[goal_id],
+                evidence_refs=[evidence.evidence_id],
+                session_id=session_id,
+                phase="goal_cancellation_reentry",
+                context_updates={
+                    "trusted_goal_cancellation_evidence": [
+                        evidence.model_dump(mode="json")
+                    ],
+                    "goal_cancellation_reentry": {
+                        "phase": "goal_cancellation_reentry",
+                        "source_goal_ids": list(evidence.target_goal_ids),
+                        "evidence_refs": [evidence.evidence_id],
+                        "planner_authority": "planner",
+                    },
+                    "cognitive_opportunity": opportunity.prompt_projection(),
                 },
-                "cognitive_opportunity": opportunity.prompt_projection(),
-            },
-            fast_workflow_stage="fast_planner_goal_cancellation_reentry",
-            response_source="fast_planner_goal_cancellation_reentry",
-            responsibilities_override=responsibilities,
-        )
+                fast_workflow_stage="fast_planner_goal_cancellation_reentry",
+                response_source="fast_planner_goal_cancellation_reentry",
+                responsibilities_override=responsibilities,
+            )
+        except StalePlanningSubmissionError as exc:
+            record_stale_planning_submission(host, session_id, evidence=exc.evidence())
+            statuses[goal_id] = "planning_submission_stale"
+            continue
         if planner_response is None:
             statuses[goal_id] = "no_change"
             continue
@@ -587,6 +617,12 @@ async def try_apply_cognitive_runtime(
         or planner_speech_events
     )
     summary = host._cognitive_resolution_summary(resolution)
+    if resolution.status == "skipped" and resolution.metadata.get("host_commit_status") == "rejected_stale":
+        _finish_stale_resolution(
+            host, resolution, session_id=session_id, user_text=user_text,
+            turn_envelope=turn_envelope, evidence=resolution.metadata["planning_submission_rejection"],
+        )
+        return True
     if resolution.status != "applied" or resolution.interaction_response is None:
         sessions = getattr(host, "sessions", None)
         if sessions is not None and session_id in sessions.state:
@@ -707,6 +743,8 @@ async def try_apply_cognitive_runtime(
             except (TypeError, ValueError):
                 cancellation_reentry_source_plan = None
     try:
+        if response.metadata.get("planning_commit") is not None:
+            await host.interaction_runtime.runtime.validate_planning_submission(response)
         response_metadata = host._metadata_with_turn_envelope(
             {
                 **response.metadata,
@@ -913,6 +951,12 @@ async def try_apply_cognitive_runtime(
                 **resolution.metadata,
                 "host_commit_status": "prepared_and_goal_state_committed",
             }
+    except StalePlanningSubmissionError as exc:
+        _finish_stale_resolution(
+            host, resolution, session_id=session_id, user_text=user_text,
+            turn_envelope=turn_envelope, evidence=exc.evidence(),
+        )
+        return True
     except Exception as exc:
         cancellation_failure_evidence: GoalCancellationEvidence | None = None
         if cancellation_goal_ids:
@@ -1128,16 +1172,23 @@ async def try_apply_cognitive_runtime(
         )
         host._finish_delivered_social_session(session_id, response)
         return True
-    if await host._stage_interaction_confirmation(
-        response,
-        session_id,
-        language=core_interpretation.language,
-        reset_playback=not fast_first_scheduled,
-    ):
+    try:
+        if await host._stage_interaction_confirmation(
+            response,
+            session_id,
+            language=core_interpretation.language,
+            reset_playback=not fast_first_scheduled,
+        ):
+            return True
+        await host.interaction_runtime.runtime.record_planning_submission(
+            response, lambda: host.conversation_state.record_interaction_response(session_id, response),
+        )
+    except StalePlanningSubmissionError as exc:
+        _finish_stale_resolution(
+            host, resolution, session_id=session_id, user_text=user_text,
+            turn_envelope=turn_envelope, evidence=exc.evidence(),
+        )
         return True
-    await host.interaction_runtime.runtime.record_planning_submission(
-        response, lambda: host.conversation_state.record_interaction_response(session_id, response),
-    )
     host._launch_interaction(
         response, session_id, reset_playback=not (fast_first_scheduled or resolution.metadata.get("social_cognition_started"))
     )

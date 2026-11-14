@@ -517,7 +517,6 @@
           "confidence": 0.99,
           "local_ref": "r1",
           "outcome": "从厨房获取红色马克杯并递给请求者。",
-          "output_mode": "body_action",
           "schema_version": 1,
           "source_evidence": {
             "source_end_token_ref": "t999",

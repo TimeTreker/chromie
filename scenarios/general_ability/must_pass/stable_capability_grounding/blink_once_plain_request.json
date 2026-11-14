@@ -17,24 +17,42 @@
       "safety_authorization_capability_and_execution_evidence",
       "provenance_and_llm_integrity"
     ],
-    "semantic_dimensions": ["intent_understanding", "capability_grounding"],
+    "semantic_dimensions": [
+      "intent_understanding",
+      "capability_grounding"
+    ],
     "semantic_blocking": true
   },
   "review_rubric": {
     "judge_meaning_not_exact_wording": true,
-    "dimensions": ["intent_understanding", "capability_grounding"],
-    "primary_outcomes": ["Perform a catalog-backed blink gesture with matching execution evidence; the casual wording does not require an exact repetition count."],
-    "acceptable_auxiliary": ["Speech is optional for this low-risk visible gesture.", "A natural number of blinks and independently intended SC expression are acceptable."],
+    "dimensions": [
+      "intent_understanding",
+      "capability_grounding"
+    ],
+    "primary_outcomes": [
+      "Perform a catalog-backed blink gesture with matching execution evidence; the casual wording does not require an exact repetition count."
+    ],
+    "acceptable_auxiliary": [
+      "Speech is optional for this low-risk visible gesture.",
+      "A natural number of blinks and independently intended SC expression are acceptable."
+    ],
     "forbidden_semantic_outcomes": [
       "Deny an exactly supported blink ability.",
       "Omit the requested blink or substitute an unrelated action.",
       "Claim execution without matching provider evidence."
     ],
-    "verdicts": ["pass", "partial", "fail", "insufficient_evidence"]
+    "verdicts": [
+      "pass",
+      "partial",
+      "fail",
+      "insufficient_evidence"
+    ]
   },
   "text": "眨一下眼睛。",
   "language": "zh-CN",
-  "expected_capabilities": ["soridormi.blink_eyes"],
+  "expected_capabilities": [
+    "soridormi.blink_eyes"
+  ],
   "expected_args": [],
   "require_speech": false,
   "description": "A casual blink request checks ability grounding rather than exact counting; historical case ID retained for evidence continuity.",
@@ -45,7 +63,12 @@
         "title": "Stable Capability Grounding",
         "general_rule": "When the live catalog contains an exact high-level ability, Chromie should ground the user meaning to that ability without relying on a fragile timeout-prone second chance.",
         "rationale": "An ordinary colloquial blink request should ground to the supported blink ability, allowing natural repetition.",
-        "root_cause_boundaries": ["Cognitive Core/user meaning interpretation", "Agent contract", "Trusted Capability Runtime/provider", "Test evidence"]
+        "root_cause_boundaries": [
+          "Cognitive Core/user meaning interpretation",
+          "Agent contract",
+          "Trusted Capability Runtime/provider",
+          "Test evidence"
+        ]
       }
     ]
   }

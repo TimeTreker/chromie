@@ -71,7 +71,9 @@
     {
       "type": "locomotion.turn",
       "status": "completed",
-      "args": {"direction": "left"}
+      "args": {
+        "direction": "left"
+      }
     }
   ],
   "expected_observation_sequence": [

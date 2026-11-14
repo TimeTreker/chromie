@@ -38,7 +38,6 @@
           "confidence": 0.99,
           "local_ref": "r1",
           "outcome": "Provide the requested context-grounded observation now.",
-          "output_mode": "speech",
           "schema_version": 1,
           "source_evidence": {
             "source_end_token_ref": "t999",

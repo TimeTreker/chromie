@@ -186,18 +186,6 @@ class WeatherCatalog(FakeCatalog):
         )
 
 
-def _test_what_mode(text: str, *, goal_metadata: dict | None = None) -> str:
-    configured = str((goal_metadata or {}).get("output_mode") or "").strip()
-    if configured:
-        return configured
-    lowered = str(text or "").casefold()
-    if any(token in lowered for token in ("weather", "天气", "下雨", "rain", "temperature", "温度", "check", "determine whether")):
-        return "information"
-    if any(token in lowered for token in ("hello", "你好", "greet", "joke", "笑话", "feel", "feeling", "tired", "累")):
-        return "speech"
-    return "body_action"
-
-
 def _work_request(**kwargs):
     context = dict(kwargs.pop("context", {}) or {})
     responsibilities = kwargs.pop("responsibilities", None)
@@ -210,7 +198,7 @@ def _work_request(**kwargs):
                 "local_ref": "r1",
                 "outcome": text or "satisfy the current user outcome",
                 "bindings": {},
-                "output_mode": _test_what_mode(text),
+
                 "confidence": 0.9,
             }
         ]
@@ -218,7 +206,6 @@ def _work_request(**kwargs):
     source_tokens = user_turn_source_tokens(str(kwargs.get("text") or ""))
     for item in responsibilities:
         payload = dict(item) if isinstance(item, dict) else item.model_dump(mode="json")
-        payload.setdefault("output_mode", _test_what_mode(str(payload.get("outcome") or kwargs.get("text") or "")))
         if source_tokens and not payload.get("source_evidence"):
             payload["source_evidence"] = {
                 "source_start_token_ref": source_tokens[0]["ref"],
@@ -255,7 +242,7 @@ def request(text: str, *, goal_ids=None, goal_metadata=None):
                 "local_ref": "r1",
                 "outcome": text,
                 "bindings": {},
-                "output_mode": _test_what_mode(text, goal_metadata=goal_metadata),
+
                 "confidence": 0.9,
             }
         ],
@@ -558,7 +545,7 @@ def canonical_compound_body_case():
     request = CognitiveWorkRequest(
         sid='canonical-compound', text=text, language='en-US', interpretation_confidence=1,
         responsibilities=[CognitiveResponsibilityProposal(local_ref='r1', outcome=text,
-            output_mode='body_action', body_effect_family='task_physical_effect', confidence=1)],
+              confidence=1)],
         context={'goal_association_resolution': {'associations': [], 'new_goals': [{
             'goal_id': goal_id, 'description': text, 'source_responsibility_refs': ['r1'],
             'metadata': {'output_mode': 'body_action', 'body_effect_families': ['task_physical_effect']},

@@ -18,12 +18,20 @@
       "safety_authorization_capability_and_execution_evidence",
       "provenance_and_llm_integrity"
     ],
-    "semantic_dimensions": ["dialogue_continuity", "evidence_grounding", "truthfulness"],
+    "semantic_dimensions": [
+      "dialogue_continuity",
+      "evidence_grounding",
+      "truthfulness"
+    ],
     "semantic_blocking": true
   },
   "review_rubric": {
     "judge_meaning_not_exact_wording": true,
-    "dimensions": ["dialogue_continuity", "evidence_grounding", "truthfulness"],
+    "dimensions": [
+      "dialogue_continuity",
+      "evidence_grounding",
+      "truthfulness"
+    ],
     "primary_outcomes": [
       "Obtain and report today's Chongqing weather from the live provider.",
       "Interpret the second turn as asking about rain today in Chongqing, then answer with the uncertainty supported by fresh or verified retained weather evidence.",
@@ -39,7 +47,12 @@
       "Invoke Deep to repair an invalid Fast output.",
       "Invent precipitation or turn a probability into certainty."
     ],
-    "verdicts": ["pass", "partial", "fail", "insufficient_evidence"]
+    "verdicts": [
+      "pass",
+      "partial",
+      "fail",
+      "insufficient_evidence"
+    ]
   },
   "description": "Retained English weather episode covering terminal Goal continuity and compact Evidence re-entry.",
   "turns": [
@@ -47,7 +60,9 @@
       "id": "chongqing_weather_today",
       "text": "Can you help me check the weather today in chongqing?",
       "language": "en-US",
-      "expected_capabilities": ["chromie.weather.lookup"],
+      "expected_capabilities": [
+        "chromie.weather.lookup"
+      ],
       "require_evidence_bound_claims": true,
       "require_speech": true,
       "expect_created_goals_satisfied": true,
@@ -71,7 +86,13 @@
         "title": "Human-like Cognitive Continuity",
         "general_rule": "Chromie should remain one continuous interlocutor while work progresses: preserve recent meaning, avoid duplicate acknowledgements, keep conversation available, and let follow-up turns revise only the relevant unfinished responsibility.",
         "rationale": "Follow-up meaning must survive completion without rewriting terminal Goal history.",
-        "root_cause_boundaries": ["Cognitive Gateway", "User Meaning Interpretation/Goal Association", "Planner", "Host interaction state", "Test evidence"]
+        "root_cause_boundaries": [
+          "Cognitive Gateway",
+          "User Meaning Interpretation/Goal Association",
+          "Planner",
+          "Host interaction state",
+          "Test evidence"
+        ]
       }
     ]
   }

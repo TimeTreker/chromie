@@ -17,29 +17,63 @@
       "safety_authorization_capability_and_execution_evidence",
       "provenance_and_llm_integrity"
     ],
-    "semantic_dimensions": ["intent_understanding", "plan_completeness", "sequence_preservation"],
+    "semantic_dimensions": [
+      "intent_understanding",
+      "plan_completeness",
+      "sequence_preservation"
+    ],
     "semantic_blocking": true
   },
   "review_rubric": {
     "judge_meaning_not_exact_wording": true,
-    "dimensions": ["intent_understanding", "plan_completeness", "sequence_preservation"],
-    "primary_outcomes": ["Walk forward for three seconds, then perform an in-place right turn."],
-    "acceptable_auxiliary": ["The provider may choose a safe bounded turn magnitude when the user does not specify an angle."],
+    "dimensions": [
+      "intent_understanding",
+      "plan_completeness",
+      "sequence_preservation"
+    ],
+    "primary_outcomes": [
+      "Walk forward for three seconds, then perform an in-place right turn."
+    ],
+    "acceptable_auxiliary": [
+      "The provider may choose a safe bounded turn magnitude when the user does not specify an angle."
+    ],
     "forbidden_semantic_outcomes": [
       "Turn before walking.",
       "Turn left or omit the requested direction.",
       "Omit either the walk or turn."
     ],
-    "verdicts": ["pass", "partial", "fail", "insufficient_evidence"]
+    "verdicts": [
+      "pass",
+      "partial",
+      "fail",
+      "insufficient_evidence"
+    ]
   },
   "text": "往前走三秒，然后原地向右转一下。",
   "language": "zh-CN",
-  "expected_capabilities": ["soridormi.walk_forward", "soridormi.turn_in_place"],
-  "expected_observations": [
-    {"type": "locomotion.walk_forward", "args": {"duration_s": 3.0}},
-    {"type": "locomotion.turn", "status": "completed", "args": {"direction": "right"}}
+  "expected_capabilities": [
+    "soridormi.walk_forward",
+    "soridormi.turn_in_place"
   ],
-  "expected_observation_sequence": ["locomotion.walk_forward", "locomotion.turn"],
+  "expected_observations": [
+    {
+      "type": "locomotion.walk_forward",
+      "args": {
+        "duration_s": 3.0
+      }
+    },
+    {
+      "type": "locomotion.turn",
+      "status": "completed",
+      "args": {
+        "direction": "right"
+      }
+    }
+  ],
+  "expected_observation_sequence": [
+    "locomotion.walk_forward",
+    "locomotion.turn"
+  ],
   "require_speech": false,
   "description": "A routine two-step navigation instruction exercises direction and ordering.",
   "general_ability": {
@@ -49,7 +83,12 @@
         "title": "Composable High-Level Action Planning",
         "general_rule": "Supported multi-step body requests should produce ordered high-level skills while preserving sequential execution and validation.",
         "rationale": "A routine navigation sequence must walk first and then turn right in place, preserving direction and order.",
-        "root_cause_boundaries": ["Cognitive Core/user meaning interpretation", "Agent contract", "Trusted Capability Runtime/provider", "Test evidence"]
+        "root_cause_boundaries": [
+          "Cognitive Core/user meaning interpretation",
+          "Agent contract",
+          "Trusted Capability Runtime/provider",
+          "Test evidence"
+        ]
       }
     ]
   }

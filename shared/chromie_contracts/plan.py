@@ -29,7 +29,7 @@ class SocialCommunicationNeed(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
     need_id: str = Field(min_length=1, max_length=160)
-    owner: Literal["user_meaning_interpretation", "goal_association", "planner", "runtime"]
+    owner: Literal["goal_association", "planner", "runtime"]
     kind: Literal["answer", "input", "confirmation", "result"]
     source_goal_ids: list[str] = Field(default_factory=list)
     source_responsibility_refs: list[str] = Field(default_factory=list)

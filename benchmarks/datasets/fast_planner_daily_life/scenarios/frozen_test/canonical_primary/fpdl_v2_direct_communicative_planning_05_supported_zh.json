@@ -74,7 +74,6 @@
           "confidence": 0.99,
           "local_ref": "r1",
           "outcome": "围绕一个难熬的下午说一句温暖简短的话。",
-          "output_mode": "speech",
           "schema_version": 1,
           "source_evidence": {
             "source_end_token_ref": "t999",

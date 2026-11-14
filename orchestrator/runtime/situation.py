@@ -33,7 +33,8 @@ from shared.chromie_contracts.situation import (
     SituationSourceRef,
 )
 
-from orchestrator.runtime.session import now_ms, record_session_workflow_stage
+from orchestrator.runtime.session import now_ms, record_session_workflow_stage, record_stale_planning_submission
+from orchestrator.runtime.capability_runtime import StalePlanningSubmissionError
 
 
 def _normalized(value: Any) -> str:
@@ -993,24 +994,28 @@ async def apply_due_time_condition_opportunity(
         )
         return "missing_source_text"
 
-    planner_response = await host._planner_state_reentry_response(
-        source_response=None,
-        canonical_plan=None,
-        user_request=source_text,
-        language=_normalized(due_item.get("language")) or "auto",
-        goal_ids=list(opportunity.goal_ids),
-        evidence_goal_ids=[],
-        evidence_refs=[],
-        session_id=None,
-        phase="time_condition_reentry",
-        context_updates={
-            "time_condition": condition.model_dump(mode="json"),
-            "cognitive_opportunity": opportunity.prompt_projection(),
-        },
-        fast_workflow_stage="fast_planner_time_condition_reentry",
-        response_source="fast_planner_time_condition_reentry",
-        responsibilities_override=responsibilities,
-    )
+    try:
+        planner_response = await host._planner_state_reentry_response(
+            source_response=None,
+            canonical_plan=None,
+            user_request=source_text,
+            language=_normalized(due_item.get("language")) or "auto",
+            goal_ids=list(opportunity.goal_ids),
+            evidence_goal_ids=[],
+            evidence_refs=[],
+            session_id=None,
+            phase="time_condition_reentry",
+            context_updates={
+                "time_condition": condition.model_dump(mode="json"),
+                "cognitive_opportunity": opportunity.prompt_projection(),
+            },
+            fast_workflow_stage="fast_planner_time_condition_reentry",
+            response_source="fast_planner_time_condition_reentry",
+            responsibilities_override=responsibilities,
+        )
+    except StalePlanningSubmissionError as exc:
+        record_stale_planning_submission(host, None, evidence=exc.evidence())
+        return "planning_submission_stale"
     if planner_response is None:
         host.session_log(
             None,

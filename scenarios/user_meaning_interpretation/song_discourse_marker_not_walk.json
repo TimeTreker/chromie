@@ -18,12 +18,10 @@
       "confidence": 0.91,
       "responsibilities": [
         {
-          "schema_version": 1,
           "local_ref": "r1",
           "outcome": "sing a song for the user",
           "confidence": 0.91,
-          "output_mode": "singing",
-          "continuity_scope": "goal"
+          "value_review": false
         }
       ],
       "meaning_uncertainties": [],
@@ -32,8 +30,7 @@
           "authority": "planner",
           "responsibility_refs": [
             "r1"
-          ],
-          "reason_summary": "Explicit authored fixture requests the existing cognitive owner."
+          ]
         }
       ]
     }
@@ -49,8 +46,7 @@
       {
         "local_ref": "r1",
         "outcome": "sing a song for the user",
-        "confidence": 0.91,
-        "output_mode": "singing"
+        "confidence": 0.91
       }
     ]
   },

@@ -27,6 +27,20 @@ PY
 RUN git -C /tmp/xgrammar fetch --depth 2 origin da28642d8e228f11fb2292d018710466d9bb59c1 && \
     git -C /tmp/xgrammar diff da28642d8e228f11fb2292d018710466d9bb59c1^ \
       da28642d8e228f11fb2292d018710466d9bb59c1 -- cpp/ | git -C /tmp/xgrammar apply --verbose
+# Identical bounded string/whitespace repetitions previously gained independent
+# rule chains before FSM construction and token-mask generation. Keep their
+# accepted counts unchanged while sharing each exact repetition expansion once.
+RUN git -C /tmp/xgrammar fetch --depth 2 origin a012826cfa647478f9a7332332f051a45d970c9b && \
+    git -C /tmp/xgrammar diff a012826cfa647478f9a7332332f051a45d970c9b^ \
+      a012826cfa647478f9a7332332f051a45d970c9b -- cpp/ | git -C /tmp/xgrammar apply --verbose
+# Per-rule FSM views copied a dense end-state bitmap over the complete grammar.
+# The retained two-Responsibility Planner packet stalls here before token masks
+# or model inference, even with caching disabled. Backport only sparse end states
+# and their unchanged serialization, keeping the model and all budgets fixed.
+# Remove when the pinned compiler contains mlc-ai/xgrammar#702's first commit.
+RUN git -C /tmp/xgrammar fetch --depth 2 origin c9268816dc8c61bbf725fa5ac82fca65781a7c97 && \
+    git -C /tmp/xgrammar diff c9268816dc8c61bbf725fa5ac82fca65781a7c97^ \
+      c9268816dc8c61bbf725fa5ac82fca65781a7c97 -- cpp/ | git -C /tmp/xgrammar apply --verbose
 COPY test_xgrammar_parser.cc /tmp/test_xgrammar_parser.cc
 RUN cmake -S /tmp/xgrammar -B /tmp/xgrammar/build -DCMAKE_BUILD_TYPE=Release && \
     cmake --build /tmp/xgrammar/build -j 6 && \
@@ -40,7 +54,7 @@ RUN cmake -S /tmp/xgrammar -B /tmp/xgrammar/build -DCMAKE_BUILD_TYPE=Release && 
 FROM lmsysorg/sglang@sha256:59e11312666e1c5c155210ea335589b91daa0d70848521b390b93b1b1e8fb0ef
 COPY --from=xgrammar-build /tmp/xgrammar/python/xgrammar/libxgrammar_bindings.so /opt/sglang/lib/python3.12/site-packages/xgrammar/libxgrammar_bindings.so
 LABEL org.chromie.xgrammar.source="5b4e9ce9e72524037ae24ecd831b9b6604d2eb48" \
-      org.chromie.xgrammar.patch="earley-unexpanded-sentinel-minus-two,fsm-edge-int32-rule-id-652"
+      org.chromie.xgrammar.patch="earley-unexpanded-sentinel-minus-two,fsm-edge-int32-rule-id-652,repetition-expansion-dedup-691,sparse-fsm-end-states-702"
 
 # The unified constructor skips the parent constructor, but inherits forward(),
 # which reads lm_head_is_tied. Preserve the exact existing GPU branch predicate.
@@ -312,13 +326,15 @@ class Tokenizer:
         return TokenizerInfo([bytes([i]) for i in range(256)], stop_token_ids=[255]), None
 
 backend = XGrammarGrammarBackend(Tokenizer(), 256)
-fields = [f'p{i}' for i in range(300)]
+fields = [f'p{i}' for i in range(39900)]
 schema = {'type': 'object', 'additionalProperties': False, 'required': fields,
           'properties': {name: {'type': 'string', 'maxLength': 160} for name in fields}}
 for _ in range(2):
     grammar = backend.dispatch_json(json.dumps(schema))
     if not hasattr(grammar, 'matcher'):
         raise RuntimeError('Grammar beyond 32767 rules failed to compile')
+    if len(str(grammar.ctx.grammar).splitlines()) <= 32767:
+        raise RuntimeError('Rule-ID pressure fixture no longer crosses 32767 rules')
     if not grammar.matcher.accept_string(json.dumps({name: 'x' for name in fields})):
         raise RuntimeError('Large grammar rejected a declared instance')
     long_value = {name: 'x' for name in fields}

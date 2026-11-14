@@ -19,7 +19,7 @@ from agent.app.planner_model_contract import PlannerModelOutput
 from agent.app.planner_schema import canonical_plan_response_schema
 from agent.app.planner_validation import validate_goal_responsibility_outcomes
 from tests.cognitive_work_test_support import cognitive_work_request
-from orchestrator.runtime.cognitive_runtime import GoalDrivenRuntimeCoordinator
+from orchestrator.runtime.conversation_state import ConversationStateManager
 from orchestrator.runtime.canonical_plan_adapter import CanonicalPlanRuntimeAdapter
 from orchestrator.runtime.cognitive_turn_closure import CognitiveTurnClosure
 from orchestrator.runtime.interaction_coordinator import InteractionRuntimeCoordinator
@@ -163,6 +163,9 @@ class ScriptedModel:
         self.calls.append((prompt, dict(kwargs)))
         return copy.deepcopy(self.responses[min(len(self.calls), len(self.responses)) - 1])
 
+    async def generate_stream(self, prompt: str, **kwargs: object):
+        yield json.dumps(await self.generate(prompt, **kwargs), ensure_ascii=False)
+
 
 class RuntimeDefinitionView:
     def __init__(self, definition) -> None:  # type: ignore[no-untyped-def]
@@ -298,40 +301,22 @@ class VocalDeclarationAndPlannerTests(unittest.TestCase):
         self.assertNotIn("execute", first_pass)
         self.assertIn("execute", second_pass)
 
-    def test_provider_vocal_goal_cannot_take_direct_chat_shortcut(self) -> None:
-        provider_association = GoalAssociationResolution.model_validate(
-            {"resolution_status": "resolved",
-                "turn_id": "turn-provider-vocal",
-                "new_goals": [vocal_goal(mode="recitation")],
-                "confidence": 1.0,
-                "metadata": {"status": "resolved"},
-            }
-        )
-        ordinary_goal = {
-            **vocal_goal(mode="speech"),
-            "metadata": {
-                **vocal_goal(mode="speech")["metadata"],
-            },
-        }
-        ordinary_association = GoalAssociationResolution.model_validate(
-            {"resolution_status": "resolved",
-                "turn_id": "turn-ordinary-speech",
-                "new_goals": [ordinary_goal],
-                "confidence": 1.0,
-                "metadata": {"status": "resolved"},
-            }
-        )
-
-        self.assertFalse(
-            GoalDrivenRuntimeCoordinator._is_direct_spoken_association(
-                provider_association
-            )
-        )
-        self.assertTrue(
-            GoalDrivenRuntimeCoordinator._is_direct_spoken_association(
-                ordinary_association
-            )
-        )
+    def test_provider_vocal_goal_cannot_complete_from_ordinary_spoken_delivery(self) -> None:
+        state = ConversationStateManager(base_conversation_id="vocal-proof")
+        association = GoalAssociationResolution.model_validate({
+            "resolution_status": "resolved", "turn_id": "turn-provider-vocal",
+            "new_goals": [vocal_goal(mode="recitation")], "confidence": 1.0,
+        })
+        state.apply_goal_association_resolution(association, sid="vocal-proof", user_text="Recite it.", atomic=True)
+        state.reconcile_communicative_goal_completion("vocal-proof", ["goal-vocal"], metadata={
+            "source": "social_cognition_communicative_completion", "delivery_role": "response",
+            "speech_event_id": "ordinary-words", "playback_completed": True,
+            "truth_stages": ["context_grounded"], "addressed_need_ids": ["answer"],
+            "communication_needs": [{"need_id": "answer", "kind": "answer", "source_goal_ids": ["goal-vocal"]}],
+        })
+        [goal] = state.active_goal_snapshots()
+        self.assertEqual(goal["goal_id"], "goal-vocal")
+        self.assertEqual(goal["responsibility_status"], "open")
 
 
 class VocalTrustedRuntimeTests(unittest.IsolatedAsyncioTestCase):

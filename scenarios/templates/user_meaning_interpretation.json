@@ -15,12 +15,10 @@
       "confidence": 0.8,
       "responsibilities": [
         {
-          "schema_version": 1,
           "local_ref": "r1",
           "outcome": "respond to the user request: $text",
           "confidence": 0.8,
-          "output_mode": "speech",
-          "continuity_scope": "turn"
+          "value_review": false
         }
       ],
       "meaning_uncertainties": [],
@@ -29,8 +27,7 @@
           "authority": "goal_association",
           "responsibility_refs": [
             "r1"
-          ],
-          "reason_summary": "Associate the complete current meaning."
+          ]
         }
       ]
     }
@@ -46,9 +43,7 @@
       {
         "local_ref": "r1",
         "outcome": "respond to the user request: $text",
-        "confidence": 0.8,
-        "output_mode": "speech",
-        "continuity_scope": "turn"
+        "confidence": 0.8
       }
     ]
   }

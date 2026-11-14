@@ -19,6 +19,7 @@ from orchestrator.runtime import goal_outcome_state
 
 from orchestrator.runtime.conversation_state import _now_ms
 from orchestrator.runtime.memory import person_fact_entry
+from orchestrator.runtime.planner_reentry import retained_responsibility_records
 
 logger = logging.getLogger("chromie.orchestrator.conversation_state")
 
@@ -396,13 +397,9 @@ def due_time_condition_opportunities(
                         metadata.get("planner_reentry_language") or "auto"
                     ).strip()
                     or "auto",
-                    "responsibilities": [
-                        state._json_safe(item)
-                        for item in (
-                            metadata.get("planner_reentry_responsibilities") or []
-                        )
-                        if isinstance(item, dict)
-                    ],
+                    "responsibilities": retained_responsibility_records(
+                        metadata.get("planner_reentry_responsibilities"),
+                        goal=goal.model_dump(mode="json")),
                 }
             )
         if len(keep) != len(raw_conditions):
@@ -472,11 +469,7 @@ def runtime_revalidation_candidates(state: Any) -> list[dict[str, Any]]:
                 "source_text": str(semantic_goal.get("source_text") or context.get("last_meaningful_user_turn") or "").strip(),
                 "language": str(metadata.get("planner_reentry_language") or "auto").strip() or "auto",
                 "capability_ids": capability_ids,
-                "responsibilities": [
-                    state._json_safe(item)
-                    for item in responsibilities
-                    if isinstance(item, dict)
-                ],
+                "responsibilities": retained_responsibility_records(responsibilities, goal=semantic_goal),
                 "restored_ms": metadata.get("restored_ms"),
             }
         )
@@ -512,11 +505,7 @@ def goal_reentry_provenance(
                 "goal_id": goal_id,
                 "source_text": str(semantic_goal.get("source_text") or context.get("last_meaningful_user_turn") or "").strip(),
                 "language": str(metadata.get("planner_reentry_language") or "auto").strip() or "auto",
-                "responsibilities": [
-                    state._json_safe(item)
-                    for item in (responsibilities if isinstance(responsibilities, list) else [])
-                    if isinstance(item, dict)
-                ],
+                "responsibilities": retained_responsibility_records(responsibilities, goal=semantic_goal),
             }
         )
     return provenance
@@ -630,6 +619,20 @@ def record_interaction_response(
             result_metadata,
             confirmation_authorized=bool(confirmed_request_ids),
         )
+        raw_plan = result_metadata.get("canonical_plan")
+        if isinstance(raw_plan, dict) and "communication_needs" in raw_plan:
+            plan = CanonicalPlan.model_validate(raw_plan)
+            for goal_id in plan.goal_ids:
+                goal_context = state._task_context_by_goal_id(goal_id)
+                if goal_context is not None:
+                    goal_context.setdefault("metadata", {}).update({
+                        "communication_needs": [need.model_dump(mode="json")
+                            for need in plan.communication_needs
+                            if need.kind == "answer" and goal_id in need.source_goal_ids],
+                        "communication_plan_id": plan.plan_id,
+                        "communication_work_step_ids": [step.step_id for step in plan.steps
+                            if goal_id in step.source_goal_ids],
+                    })
         record_planner_time_conditions(state, result_metadata)
         goal_outcomes = goal_outcome_state.canonical_goal_outcomes(result_metadata)
         goal_outcome_state.record_nonexecuting_goal_outcomes(state, goal_outcomes)

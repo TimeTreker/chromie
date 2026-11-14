@@ -16,7 +16,8 @@ from orchestrator.runtime.outcome_delivery import build_host_outcome_delivery
 from orchestrator.runtime.planner_reentry import (
     execution_outcome_user_text,
 )
-from orchestrator.runtime.capability_runtime import CapabilityRuntimeResult
+from orchestrator.runtime.capability_runtime import CapabilityRuntimeResult, StalePlanningSubmissionError
+from orchestrator.runtime.session import record_stale_planning_submission
 from shared.chromie_contracts.interaction import (
     InteractionResponse,
 )
@@ -181,6 +182,9 @@ async def execute_cognitive_outcome_response(
         if isinstance(response.metadata.get("social_cognition_resolution"), dict) and response.metadata.get("authority_scope") != "goal_free_situation":
             host.cognitive_runtime.schedule_social_expression(response, session_id=delivery_session_id)
         execution = await host.interaction_runtime.wait_dispatch(dispatch)
+    except StalePlanningSubmissionError as exc:
+        record_stale_planning_submission(host, session_id, evidence=exc.evidence())
+        return "planning_submission_stale"
     except asyncio.CancelledError:
         raise
     except Exception as exc:

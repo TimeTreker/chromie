@@ -183,7 +183,7 @@ class ResponsibilitySourceEvidence(UserTurnSourceSpan):
 
 
 class CognitiveResponsibilityProposal(BaseModel):
-    """Complete human intention and expected result type understood by UMI.
+    """Complete contextual human intention understood by UMI.
 
     Live UMI supplies natural-language meaning and current-turn provenance only.
     Planner selects Capabilities, realizes parameters and decomposes Activities.
@@ -225,69 +225,6 @@ class CognitiveResponsibilityProposal(BaseModel):
             "local_ref values."
         ),
     )
-    body_effect_family: Literal[
-        "task_physical_effect",
-        "social_expression",
-        "gaze_or_orientation",
-    ] | None = Field(
-        default=None,
-        description=(
-            "Provider-neutral WHAT refinement for body_action only. "
-            "task_physical_effect covers locomotion, posture, manipulation, carrying and handover; "
-            "social_expression covers explicitly requested gesture/facial expression; "
-            "gaze_or_orientation covers explicitly requested looking/attention orientation. "
-            "This never names a Capability, provider, Activity or executable method."
-        ),
-    )
-    output_mode: Literal[
-        "unspecified",
-        "speech",
-        "styled_speech",
-        "recitation",
-        "singing",
-        "humming",
-        "nonverbal_vocalization",
-        "body_action",
-        "media_playback",
-        "information",
-        "stateful_effect",
-        "other",
-    ] = Field(
-        default="unspecified",
-        description=(
-            "User Meaning Interpretation's provider-neutral WHAT category for this one human "
-            "outcome. Goal Association preserves the accepted value and must not "
-            "re-author it. information "
-            "means the person wants Chromie to determine or provide information; "
-            "stateful_effect means the person wants a durable or future state change "
-            "outside embodiment. Chromie's own memory is not such a state: a request to "
-            "remember what the person tells her is speech, while doing something about it "
-            "later, such as a reminder, stays a future state change. Physical locomotion, posture, gaze, gesture, manipulation, "
-            "carrying, and handover are body_action even when they change location or "
-            "another lasting physical state. "
-            "These categories do not say whether work, fresh evidence, a Capability, "
-            "provider, Activity, executable argument, or later speech is required. "
-            "Requested physical-object acquisition/carrying/handover remains "
-            "body_action because the human-level outcome is an embodied effect."
-        ),
-    )
-    continuity_scope: Literal["goal", "turn"] = Field(
-        default="goal",
-        description=(
-            "Whether this understood human outcome needs canonical Goal/Planner continuity "
-            "after the UMI handoff. goal does not mean long-term or cross-session: it is "
-            "required whenever the requested result still needs information/evidence, "
-            "embodied/media/stateful work, or changes/answers pending Goal meaning, even "
-            "when that work can finish before the next user turn. turn is reserved for "
-            "ordinary current-conversation speech that Social Cognition can complete "
-            "directly and that leaves no separate user/world objective. This is a semantic "
-            "property of WHAT in context, never a keyword or hardware rule. It is not a GA "
-            "bypass flag: GA may still inspect conversational continuity and associate a terse "
-            "re-engagement with retained Goal state when evidence supports it. Planner readiness "
-            "is derived from substantive output domains/relations and later canonical Goal "
-            "ownership, not from continuity_scope alone."
-        ),
-    )
     value_review: bool = Field(
         default=False,
         description=(
@@ -327,15 +264,6 @@ class CognitiveResponsibilityProposal(BaseModel):
         _reject_planner_owned_bindings(normalized)
         return normalized
 
-    @model_validator(mode="after")
-    def validate_continuity_scope(self) -> "CognitiveResponsibilityProposal":
-        if self.output_mode != "body_action" and self.body_effect_family is not None:
-            raise ValueError("body_effect_family is valid only for body_action Responsibility")
-        if self.continuity_scope == "turn" and self.output_mode != "speech":
-            raise ValueError(
-                "turn-local Responsibility must be ordinary conversational speech"
-            )
-        return self
 
 
 class UserMeaningUncertainty(BaseModel):
@@ -456,10 +384,9 @@ class CoreInterpretationResult(BaseModel):
     responsibilities: list[CognitiveResponsibilityProposal] = Field(
         min_length=1,
         description=(
-            "Complete set of independently satisfiable human outcomes. Emit one item "
-            "per requested observable effect, including separate concurrent effects "
-            "even inside one result domain; coordination is a relation, not permission "
-            "to collapse two independently requested effects into one item."
+            "Complete contextual human intentions. Keep connected conditions, purposes, "
+            "ordering and concurrency within their complete intention; separate only "
+            "genuinely independent concerns. Planner decomposes the required Activities."
         ),
     )
     meaning_uncertainties: list[UserMeaningUncertainty] = Field(
@@ -472,7 +399,7 @@ class CoreInterpretationResult(BaseModel):
         ),
     )
     cognitive_requests: list[CognitiveActivationRequest] = Field(
-        default_factory=list, max_length=3,
+        default_factory=list, max_length=2,
         description=(
             "Model-authored requests to wake existing cognitive authorities. These requests "
             "schedule cognition only; they never author another role's semantic result."
@@ -495,9 +422,6 @@ class CoreInterpretationResult(BaseModel):
         if len(uncertainty_refs) != len(set(uncertainty_refs)):
             raise ValueError("User Meaning Interpretation uncertainty local_ref values must be unique")
         known = set(refs)
-        scope_by_ref = {
-            item.local_ref: item.continuity_scope for item in self.responsibilities
-        }
         for uncertainty in self.meaning_uncertainties:
             unknown = set(uncertainty.responsibility_refs) - known
             if unknown:
@@ -505,13 +429,9 @@ class CoreInterpretationResult(BaseModel):
                     "meaning uncertainty references unknown Responsibilities: "
                     + ",".join(sorted(unknown))
                 )
-            scopes = {scope_by_ref[ref] for ref in uncertainty.responsibility_refs}
-            if len(scopes) != 1:
-                raise ValueError(
-                    "one meaning uncertainty cannot span turn-local and goal-scoped "
-                    "Responsibilities; UMI must keep those semantic uncertainties separate"
-                )
         authorities = [item.authority for item in self.cognitive_requests]
+        if set(authorities) - {"goal_association", "planner"}:
+            raise ValueError("UMI may request only non-standing Goal Association and Planner")
         if len(authorities) != len(set(authorities)):
             raise ValueError("UMI may request each cognitive authority at most once")
         for request in self.cognitive_requests:

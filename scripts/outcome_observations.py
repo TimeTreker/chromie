@@ -32,6 +32,7 @@ _HARD_LLM_EVENTS = {
 }
 
 _TTS_ORDER_RE = re.compile(r"\border=(\d+)\b")
+_TTS_GENERATION_RE = re.compile(r"\bgeneration=(\d+)\b")
 _TTS_TEXT_RE = re.compile(r"\btext=(.+)$")
 
 
@@ -52,41 +53,64 @@ def _completed_tts_playback(summary: dict[str, Any]) -> list[dict[str, Any]]:
         for item in session.get("workflow_events") or []
         if isinstance(item, dict)
     ]
-    completed_orders: set[int] = set()
-    for item in events:
-        if item.get("event") != "playback_end":
-            continue
-        match = _TTS_ORDER_RE.search(str(item.get("message") or ""))
-        if match:
-            completed_orders.add(int(match.group(1)))
-
+    pending: list[dict[str, Any]] = []
     delivered: list[dict[str, Any]] = []
     for event_index, item in enumerate(events):
-        if item.get("event") != "tts_schedule":
-            continue
+        event = item.get("event")
         message = str(item.get("message") or "")
         order_match = _TTS_ORDER_RE.search(message)
-        text_match = _TTS_TEXT_RE.search(message)
-        if not order_match or not text_match:
+        if not order_match:
             continue
         order = int(order_match.group(1))
-        if order not in completed_orders:
+        generation_match = _TTS_GENERATION_RE.search(message)
+        generation = int(generation_match.group(1)) if generation_match else None
+        if event == "tts_schedule":
+            text_match = _TTS_TEXT_RE.search(message)
+            if not text_match:
+                continue
+            try:
+                text = ast.literal_eval(text_match.group(1).strip())
+            except (SyntaxError, ValueError):
+                continue
+            if isinstance(text, str) and text.strip():
+                pending.append({"order": order, "generation": generation, "event_index": event_index,
+                                "elapsed_ms": None, "text": text.strip(), "started": False})
             continue
-        try:
-            text = ast.literal_eval(text_match.group(1).strip())
-        except (SyntaxError, ValueError):
+        candidates = [entry for entry in pending if entry["order"] == order
+                      and (generation is None or entry["generation"] in (None, generation))]
+        if event == "playback_start":
+            entry = next((entry for entry in candidates if not entry["started"]), None)
+            if entry is not None:
+                entry.update(started=True, elapsed_ms=item.get("elapsed_ms"))
             continue
-        if not isinstance(text, str) or not text.strip():
+        entry = next((entry for entry in candidates if entry["started"]), next(iter(candidates), None))
+        if entry is None:
             continue
-        delivered.append(
-            {
-                "order": order,
-                "event_index": event_index,
-                "elapsed_ms": item.get("elapsed_ms"),
-                "text": text.strip(),
-            }
-        )
+        if event == "playback_end":
+            # Older retained logs may have only the completion event. Never
+            # substitute scheduling time for an observed delivery boundary.
+            if not entry["started"]:
+                entry["elapsed_ms"] = item.get("elapsed_ms")
+            delivered.append({key: value for key, value in entry.items() if key != "started"})
+            pending.remove(entry)
+        elif str(event).startswith("playback_skip") or event in {
+            "playback_stream_incomplete", "playback_aborted_by_interrupt",
+        }:
+            pending.remove(entry)
     return delivered
+
+
+def _receipt_elapsed_ms(summary: dict[str, Any], receipt: dict[str, Any]) -> float | None:
+    """Compare correlated Host receipts and playback on the same session clock."""
+    session = summary.get("session_state") or {}
+    try:
+        origin, start = (datetime.fromisoformat(str(value or "").replace("Z", "+00:00")) for value in (
+            session.get("started_at_utc"), receipt.get("started_at")))
+        if origin.utcoffset() is None or start.utcoffset() is None or start < origin:
+            return None
+        return (start - origin).total_seconds() * 1000
+    except (TypeError, ValueError):
+        return None
 
 
 @lru_cache(maxsize=4)
@@ -181,13 +205,6 @@ def collect_observations(
         for index, item in enumerate(execution_results)
     }
     fallback_order = len(execution_order)
-    timings = summary.get("timings_ms")
-    timings = timings if isinstance(timings, dict) else {}
-    try:
-        capability_receipt_lower_bound_ms = float(timings.get("agent_ms"))
-    except (TypeError, ValueError):
-        capability_receipt_lower_bound_ms = None
-
     observations: list[dict[str, Any]] = []
     for planned_sequence, skill in enumerate(response.get("capabilities") or []):
         if not isinstance(skill, dict):
@@ -217,6 +234,11 @@ def collect_observations(
             else "task_execution"
         )
         request_id = str(skill.get("request_id") or "")
+        receipt_elapsed_ms = (
+            _receipt_elapsed_ms(summary, receipt)
+            if receipt is not None and version and receipt.get("capability_id") == capability_id
+            and receipt.get("capability_version") == version else None
+        )
         observations.append(
             {
                 "sequence": execution_order.get(
@@ -238,15 +260,7 @@ def collect_observations(
                     and receipt.get("capability_version") == version
                     else {}
                 ),
-                **(
-                    {
-                        "_chronology_elapsed_ms": capability_receipt_lower_bound_ms
-                        + execution_order.get(request_id, planned_sequence) * 0.001
-                    }
-                    if receipt is not None
-                    and capability_receipt_lower_bound_ms is not None
-                    else {}
-                ),
+                **({"_chronology_elapsed_ms": receipt_elapsed_ms} if receipt_elapsed_ms is not None else {}),
             }
         )
 
@@ -285,13 +299,21 @@ def collect_observations(
         # Whitespace never distinguishes speech: a Chinese reply played as "！ 你呢？" is the
         # act re-cited as "！你呢？" (live 2026-10-29 counted one utterance twice).
         normalized_text = "".join(text.split()).casefold()
-        matching_deliveries = [
-            (index, item)
-            for index, item in enumerate(delivered_tts)
-            if index not in matched_delivery_indices
-            and "".join(str(item.get("text") or "").split()).casefold()
-            in normalized_text
-        ]
+        matching_deliveries = []
+        remaining_text = normalized_text
+        for index, item in enumerate(delivered_tts):
+            if index in matched_delivery_indices:
+                continue
+            chunk = "".join(str(item.get("text") or "").split()).casefold()
+            if remaining_text.startswith(chunk):
+                matching_deliveries.append((index, item))
+                remaining_text = remaining_text[len(chunk):]
+                if not remaining_text:
+                    break
+            elif matching_deliveries:
+                break
+        if remaining_text:
+            matching_deliveries = []
         matched_delivery_indices.update(index for index, _item in matching_deliveries)
         delivery_elapsed_ms = next(
             (
@@ -310,10 +332,11 @@ def collect_observations(
                 "type": "speech.output",
                 "domain": "speech",
                 "status": "completed"
-                if matching_deliveries
-                or str(speech.get("id") or "") in execution_by_request
-                or not execution_by_request
-                else "planned",
+                if matching_deliveries or (
+                    not any(item.get("event") == "tts_schedule"
+                            for item in (summary.get("session_state") or {}).get("workflow_events", []))
+                    and (speech_id in execution_by_request or not execution_by_request)
+                ) else "planned",
                 "interaction_role": "task_response",
                 "text": text,
                 "metadata": metadata,

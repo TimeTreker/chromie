@@ -118,7 +118,6 @@
           "confidence": 0.99,
           "local_ref": "r1",
           "outcome": "Walk forward for five seconds in parallel with the sibling walk.",
-          "output_mode": "body_action",
           "schema_version": 1,
           "source_evidence": {
             "source_end_token_ref": "t999",
@@ -135,7 +134,6 @@
           "confidence": 0.99,
           "local_ref": "r2",
           "outcome": "Walk forward for eight seconds in parallel with the sibling walk.",
-          "output_mode": "body_action",
           "schema_version": 1,
           "source_evidence": {
             "source_end_token_ref": "t999",

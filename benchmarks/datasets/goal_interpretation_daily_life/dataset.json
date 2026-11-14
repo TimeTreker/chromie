@@ -88,17 +88,9 @@
         "time": 92,
         "time_scope": 146
       },
-      "output_modes": {
-        "body_action": 850,
-        "humming": 34,
-        "information": 204,
-        "media_playback": 34,
-        "nonverbal_vocalization": 16,
-        "recitation": 18,
-        "singing": 68,
-        "speech": 204,
-        "stateful_effect": 204,
-        "styled_speech": 34
+      "value_review": {
+        "false": 1666,
+        "true": 0
       }
     }
   },
@@ -110,6 +102,12 @@
   },
   "asset_contract": {
     "path_pattern": "scenarios/<split>/<category>/<scenario-id>.json",
-    "scenario_tree_sha256": "e570b1584050ed5d01c790c9cf67efb42d5dd723875bc732a35d0c18248f0a69"
+    "scenario_tree_sha256": "4dbe034d43a04fe638fb84894990f57d3789d6ed06ae590b03d53694fca7d976"
+  },
+  "what_only_wire_migration": {
+    "owner_authorized_contract": "WHAT-only UMI; Planner owns HOW; SC owns communication",
+    "scope": "Retire only fresh UMI classifications and their obsolete oracles; retained canonical Goal constraints, inputs, complete WHAT, source ranges, relationships and splits preserved.",
+    "native_model_calls": 0,
+    "independent_semantic_review": false
   }
 }

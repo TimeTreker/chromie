@@ -491,12 +491,9 @@ Capability contract. When no exact Capability exists, Chromie preserves the unde
 Responsibility and returns an honest unavailable outcome rather than substituting
 weather, generic external information, or another merely adjacent tool.
 
-State mutation and information acquisition remain distinct provider-neutral WHAT. A
-deferred reminder, shopping-list edit, stored obligation, later message, device-setting
-change, or other persistent state effect uses `output_mode=stateful_effect`; it is not an
-information `resource_responsibility` merely because words or data are involved. A request
-to determine or provide information uses `output_mode=information`. Goal Association does
-not decide from either mode that a Provider, execution lane, Work item, or fresh Evidence is
+UMI preserves the difference between a requested state change and requested information
+in the complete contextual intention, without authoring result categories. Goal
+Association does not decide that a Provider, execution lane, Work item or fresh Evidence is
 required. Planner derives HOW from canonical Goal meaning, trusted current state/Evidence,
 and the advertised Capability catalog. Typed information-resource Goals still require
 trusted acquisition/retrieval Evidence before a factual response; stable reasoning or
@@ -2234,19 +2231,16 @@ fields are rejected rather than ignored or merged into canonical state; the
 bounded model may revise one invalid schema result, but the Host never treats
 transport noise as semantic input.
 
-A new Goal inherits UMI's requested result type as `output_mode`; GA does not author
-another modality or media-operation field. It is WHAT, not an execution
-truth. `responsibility_kind`, `execution_lane`, and `provider_required` are not Goal fields,
-not Host projections, and not compatibility inputs. Goal Association commits only the
-provider-neutral intent and inherited result type. Planner later decides whether current
-trusted state already satisfies the Goal or whether Capability-backed Work is needed; the
-selected Capability/Activity then carries its own Runtime execution-lane facts. There is no
-legacy responsibility/lane tuple to reverse-map and no `capability_work` bridge.
+A new Goal inherits UMI's complete contextual intention without a result category.
+GA does not author modality, methods or media-operation fields. Planner decides whether
+trusted state already satisfies that intention or Capability-backed Work and Skills
+are needed. Selected Capability/Activity records carry Runtime execution facts. No
+missing category supplies permission, and ordinary words cannot fulfill a physical
+request. Older retained typed Goal constraints remain binding for their exact revisions.
 
 The live UMI contract preserves named entities, quantities and temporal meaning in
 the complete natural-language outcome. It emits no typed parameter bindings or
-Goal relationships. GA inherits new Goal description, success criteria and result
-type from the exact UMI source ref; it does not classify a resource or author a
+Goal relationships. GA inherits new Goal description and success criteria from the exact UMI source ref; it does not classify a resource or author a
 parameter table. Existing typed Goals remain supported as retained authority, not
 as a second live UMI wire.
 
@@ -2570,8 +2564,8 @@ The UMI semantic model owns the judgment about what is an independent human
 outcome. The Host must not reproduce that judgment with verbs, regexes, action
 lists, provider names, or a second LLM reviewer. The primary UMI result therefore
 contains the complete Responsibility inventory and the minimum source-grounding
-evidence needed to validate each item. The same item owns its provider-neutral
-result type, complete natural-language outcome and source span; no parallel
+evidence needed to validate each item. The same item owns its complete contextual natural-language outcome, required
+value review, confidence and source span; no parallel
 `audit_ref`/candidate-mapping representation rewrites those facts.
 
 Trusted validation checks only mechanics:
@@ -2579,7 +2573,7 @@ Trusted validation checks only mechanics:
 - Responsibility identities are closed and unique;
 - source references belong to the authoritative admitted turn;
 - source spans cite known tokens in order (UMI names the first and last token of the words each Responsibility depends on; a start it leaves out is derived from the previous cited end); Responsibilities may share words, and only the same Responsibility repeated over the same span fails closed;
-- result types belong to the closed provider-neutral contract;
+- output categories, body-effect categories and lifetime hints are forbidden on live UMI output;
 - bindings, parameter tables, Goal relationship/identity and execution/provider fields are forbidden on live UMI output; complete material WHAT remains in the outcome;
 - unavailable provider support does not remove the semantic Responsibility.
 

@@ -113,7 +113,7 @@ def test_reentry_retains_failure_without_delegation_or_commit(failure_kind):
                     "evidence_refs": ["weather-result"],
                 }],
                 "new_work": [], "confidence": 1.0, "plan_relation": "exact",
-                "user_confirmation_required": False, 
+                "user_confirmation_required": False,
             })
         model = SimpleNamespace(generate=AsyncMock(side_effect=invalid.value))
         catalog = SimpleNamespace(prompt_entries=AsyncMock(return_value=[]))
@@ -137,7 +137,7 @@ def test_reentry_retains_failure_without_delegation_or_commit(failure_kind):
     assistant.get_http_session = AsyncMock(return_value=object())
     source = InteractionResponse(interaction_id="weather", metadata={
         "user_meaning_interpretation": {"responsibilities": [{"local_ref": "r-weather",
-            "outcome": "Check the weather.", "output_mode": "information", "confidence": 1.0}]},
+            "outcome": "Check the weather.",  "confidence": 1.0}]},
         "goal_association": {"associations": [], "new_goals": [{"goal_id": goal_id,
             "source_responsibility_refs": ["r-weather"], "source_text": "Check the weather."}]},
     })
@@ -402,14 +402,14 @@ class PlannerEvidenceReentryContractTests(unittest.TestCase):
                             "local_ref": "weather-result",
                             "outcome": "Determine whether rain is expected this morning.",
                             "bindings": {},
-                            "output_mode": "information",
+
                             "confidence": 1.0,
                         },
                         {
                             "local_ref": "blink-result",
                             "outcome": "Blink twice.",
                             "bindings": {"count": 2},
-                            "output_mode": "body_action",
+
                             "confidence": 1.0,
                         }
                     ]
@@ -599,7 +599,7 @@ class PlannerEvidenceReentryContractTests(unittest.TestCase):
         responsibility = CognitiveResponsibilityProposal(
             local_ref="resp-reminder",
             outcome="Remind the user at the requested time.",
-            output_mode="stateful_effect",
+
             confidence=1.0,
         )
 
@@ -714,7 +714,7 @@ class PlannerEvidenceReentryContractTests(unittest.TestCase):
         responsibility = CognitiveResponsibilityProposal(
             local_ref="resp-recover",
             outcome="Continue the responsibility safely after the blockage.",
-            output_mode="stateful_effect",
+
             confidence=1.0,
         )
 
@@ -1160,7 +1160,7 @@ class SocialSpeechAuthorityTests(unittest.IsolatedAsyncioTestCase):
                 ledger.record_playback_event(delivered)
                 source = InteractionResponse(interaction_id="mixed", metadata={"turn_id": "turn",
                     "user_meaning_interpretation": {"responsibilities": [{"local_ref": "r1", "outcome": "Blink twice.",
-                        "bindings": {"count": 2}, "output_mode": "body_action", "confidence": 1.0}]},
+                        "bindings": {"count": 2},  "confidence": 1.0}]},
                     "goal_association": {"associations": [], "new_goals": [
                         {"goal_id": goal_id, "source_responsibility_refs": ["r1"], "metadata": {"output_mode": "body_action"}},
                         {"goal_id": "goal-chat", "source_responsibility_refs": ["r2"], "metadata": {"output_mode": "speech"}}]}})
@@ -1193,14 +1193,14 @@ async def test_agent_session_releases_idle_connections_before_the_agent_closes_t
         await session.close()
 
 
-@pytest.mark.parametrize("output_mode,result_kind", [
-    ("stateful_effect", "unseen_effect"), ("information", "requested_information"), ("body_action", None)])
-def test_terminal_evidence_of_an_unseen_effect_reaches_social_cognition(output_mode, result_kind):
-    """Live 2026-10-27 (adult_shopping_list_zh, through the since-removed keep Capability):
-    "帮我记一下，要买鸡蛋和面包。" was kept, nobody planned a word about it, and the Host retained the
-    Evidence without speech. A result the person asked to
-    be told, or an effect they cannot see happen, reaches Social Cognition; a body action they see
-    does not."""
+@pytest.mark.parametrize("outcome", [
+    "帮我记一下，要买鸡蛋和面包。", "告诉我现在的时间。", "请眨眼两次。"])
+@pytest.mark.parametrize("prohibited", [False, True])
+@pytest.mark.parametrize("status", ["completed", "failed"])
+def test_all_requested_terminal_work_evidence_reaches_social_cognition(outcome, prohibited, status):
+    """SC decides whether successful Work needs words; unhandled Evidence is never
+    suppressed using a UMI output category. Failed Work still requires notification.
+    """
     from orchestrator.runtime.planner_reentry_host import requested_result_evidence_social_response
 
     resolve = AsyncMock(return_value=(None, "told"))
@@ -1209,24 +1209,28 @@ def test_terminal_evidence_of_an_unseen_effect_reaches_social_cognition(output_m
         playback_delivery=SimpleNamespace(playback_generation=0), get_http_session=AsyncMock(return_value=object()),
         session_log=Mock(), _outcome_response_is_stale=lambda **_kwargs: False)
     source = InteractionResponse(interaction_id="keep", metadata={
+        "user_turn_envelope": {
+            "turn_id": "source-turn", "normalized_input": {"text": outcome},
+            "admission": "reflex_and_admit" if prohibited else "admit",
+            "reflex": {"action": "interrupt", "should_speak": False},
+        },
         "user_meaning_interpretation": {"responsibilities": [{"local_ref": "r1",
-            "outcome": "帮我记一下，要买鸡蛋和面包。", "output_mode": output_mode, "confidence": 1.0}]},
+            "outcome": outcome, "confidence": 1.0}]},
         "goal_association": {"associations": [], "new_goals": [{"goal_id": "goal-keep",
             "source_responsibility_refs": ["r1"], "source_text": "帮我记一下，要买鸡蛋和面包。"}]},
     })
     plan = CanonicalPlan(plan_id="keep", planner_tier="fast", disposition="execute", coverage="complete",
                          confidence=1.0, goal_ids=["goal-keep"], steps=[CanonicalPlanStep(
                              step_id="mem", capability_id="chromie.memory.keep", args={}, source_goal_ids=["goal-keep"])])
-    data = {"kept": True, "key": "shopping_list", "text": "要买鸡蛋和面包。", "kept_for": "for_now"}
+    data = {"kept": status == "completed", "key": "shopping_list", "text": "要买鸡蛋和面包。", "kept_for": "for_now"}
     response = asyncio.run(requested_result_evidence_social_response(
         host, source_response=source, plan=plan, session_id="s", language="zh-CN",
         user_request="帮我记一下，要买鸡蛋和面包。", goal_ids=["goal-keep"], extra_context={},
-        evidence=[ToolResultEvidence(evidence_id="kept", tool_id="chromie.memory.keep", status="completed",
+        evidence=[ToolResultEvidence(evidence_id="kept", tool_id="chromie.memory.keep", status=status,
                                      data=data, output_sha256=canonical_value_sha256(data))]))
-    if result_kind is None:
-        assert response is None
-        resolve.assert_not_awaited()
-        return
     assert response == "told"
     [need] = resolve.await_args.kwargs["request"].communication_needs
-    assert need.kind == "result" and need.facts["result_kind"] == result_kind
+    assert need.kind == "result" and need.facts["result_kind"] == "requested_work"
+    request = resolve.await_args.kwargs["request"]
+    assert request.context["user_turn_envelope"] == source.metadata["user_turn_envelope"]
+    assert need.facts["status"] == status

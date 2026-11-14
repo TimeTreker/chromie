@@ -22,13 +22,11 @@
         {
           "local_ref": "r1",
           "outcome": "Please tell Dad that the tools are back in the drawer",
-          "output_mode": "speech",
           "confidence": 1.0,
           "source_evidence": {
             "source_start_token_ref": "t0",
             "source_end_token_ref": "t10"
           },
-          "continuity_scope": "goal",
           "value_review": false
         }
       ],
@@ -38,15 +36,13 @@
           "authority": "goal_association",
           "responsibility_refs": [
             "r1"
-          ],
-          "reason_summary": "Preserve canonical continuity for the requested independent outcome."
+          ]
         },
         {
           "authority": "planner",
           "responsibility_refs": [
             "r1"
-          ],
-          "reason_summary": "Determine the Work or information acquisition needed for the requested outcome."
+          ]
         }
       ]
     },
@@ -55,14 +51,14 @@
       "responsibilities": [
         {
           "local_ref": "r1",
-          "output_mode": "speech",
           "outcome_contains_any": [
             "tell"
           ],
           "required_intent_details": {
             "proposition": "the tools are back in the drawer",
             "recipient": "Dad"
-          }
+          },
+          "value_review": false
         }
       ],
       "unresolved": false,
@@ -77,11 +73,14 @@
       "activities",
       "binding_items",
       "bindings",
+      "body_effect_family",
       "capability_id",
+      "continuity_scope",
       "coordination",
       "execution_lane",
       "goal_id",
       "information_gaps",
+      "output_mode",
       "plan",
       "provider_id",
       "relationship",

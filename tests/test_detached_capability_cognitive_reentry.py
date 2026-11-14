@@ -257,14 +257,14 @@ def _response() -> InteractionResponse:
                     {
                         "local_ref": "read-first",
                         "outcome": "Obtain the first requested result.",
-                        "output_mode": "information",
+
                         "relationship": "new",
                         "confidence": 1.0,
                     },
                     {
                         "local_ref": "read-second",
                         "outcome": "Obtain the second requested result.",
-                        "output_mode": "information",
+
                         "relationship": "new",
                         "confidence": 1.0,
                     },
@@ -345,6 +345,77 @@ def _assistant(coordinator: InteractionRuntimeCoordinator) -> VoiceAssistant:
     assistant.get_http_session = MethodType(get_http_session, assistant)
     assistant._close_cognitive_execution = MethodType(close_execution, assistant)
     return assistant
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("corrupt_identity", [False, True])
+@pytest.mark.parametrize("delivery_path,mark_session_done", [
+    ("foreground", False), ("foreground", True), ("reentry", False), ("speech", False),
+])
+async def test_submission_staling_after_publication_cannot_start_providers(corrupt_identity, delivery_path, mark_session_done):
+    spoken = []
+
+    async def speak(args):
+        spoken.append(args["text"])
+        return {"scheduled": True, "playback_started": True}
+
+    coordinator = InteractionRuntimeCoordinator(speak)
+    provider = _TwoResultProvider()
+    for capability_id in ("chromie.test.first", "chromie.test.second"):
+        coordinator.registry.register(CapabilityDefinition(
+            capability_id=capability_id, provider_id=provider.provider_id,
+            output_schema=_SCHEMA, can_run_parallel=True,
+        ))
+    coordinator.runtime.register_provider(provider)
+    assistant = _assistant(coordinator)
+    done = []
+    assistant.maybe_session_done = done.append
+    response = _response()
+    snapshot = await coordinator.runtime.planning_state_snapshot(["goal-first", "goal-second"], "old")
+    response.metadata["planning_commit"] = await coordinator.runtime.reserve_planning_submission(
+        snapshot, covered_goal_ids=snapshot["goal_ids"], plan_id=response.metadata["canonical_plan_id"],
+        fingerprint=response.metadata["canonical_plan_fingerprint"], prepared_activity_ids=[],
+    )
+    await coordinator.runtime.record_planning_submission(response, lambda: None)
+    # Model a different task winning after synchronous Host publication but
+    # before this detached coroutine reaches Runtime admission.
+    newer = await coordinator.runtime.planning_state_snapshot(["goal-first", "goal-second"], "new")
+    await coordinator.runtime.reserve_planning_submission(newer, covered_goal_ids=newer["goal_ids"], plan_id="new", fingerprint="new", prepared_activity_ids=[])
+
+    async def send():
+        if delivery_path == "reentry":
+            return await assistant._apply_planner_reentry_response(response, session_id="sid-detached")
+        if delivery_path == "speech":
+            return await assistant._execute_cognitive_outcome_response(
+                response.model_copy(update={"capabilities": []}), session_id="sid-detached",
+            )
+        return await assistant._dispatch_detached_interaction(
+            response, "sid-detached", confirmed_request_ids=None,
+            reset_playback=False, mark_session_done=mark_session_done,
+        )
+
+    if corrupt_identity:
+        response.metadata["canonical_plan_fingerprint"] = "invalid"
+        if delivery_path == "speech":
+            assert await send() == "speech_runtime_failed"
+        else:
+            with pytest.raises(ValueError, match="identity_mismatch"):
+                await send()
+        assert done == []
+    else:
+        result = await send()
+        assert result == (None if delivery_path == "foreground" else "planning_submission_stale")
+        assert done == (["sid-detached"] if mark_session_done else [])
+        if mark_session_done:
+            assert assistant.sessions.state["sid-detached"]["llm_done"]
+            assert assistant.sessions.state["sid-detached"]["planning_submission_status"] == "stale"
+        else:
+            assert not assistant.sessions.state["sid-detached"].get("llm_done")
+    assert not provider.first_started.is_set()
+    assert not provider.second_started.is_set()
+    assert spoken == []
+    assert assistant.active_cognitive_runtime_tasks == {}
+    assert assistant.conversation_state.goal_status == {"goal-first": "open", "goal-second": "open"}
 
 
 @pytest.mark.asyncio
@@ -759,3 +830,65 @@ async def test_successful_terminal_evidence_waits_before_follow_up_work():
         await asyncio.wait_for(asyncio.shield(task), timeout=1.0)
     assert not follow_up.started.is_set()
     assert assistant.agent_client.requests == []
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize('playback_completed', [True, False])
+@pytest.mark.parametrize('with_work', [False, True])
+async def test_detached_social_answer_enters_next_turn_only_after_playback(monkeypatch, playback_completed, with_work):
+    from orchestrator.runtime import interaction_dispatch_host
+    from orchestrator.runtime.conversation_state import ConversationStateManager
+    from agent.app.cognitive_core.user_meaning_interpreter.model_interpreter import _compact_recent_dialogue
+
+    state = ConversationStateManager()
+    state.record_accepted_user_turn('turn-1', 'Can you help with my question?')
+    response = InteractionResponse(interaction_id='social-answer', speech=[{
+        'id': 'reply', 'text': 'I can help you find the information.',
+        'metadata': {'wording_owner': 'social_cognition', 'turn_id': 'turn-1',
+                     'communicative_activity_ids': ['answer-1']},
+    }])
+    execution = CapabilityRuntimeResult(interaction_id=response.interaction_id, status='completed', results=[
+        CapabilityResult(request_id='reply', capability_id='chromie.speak', status='completed', output={'scheduled': True}),
+    ])
+    entered, release = asyncio.Event(), asyncio.Event()
+
+    async def delivery(sid, receipt):
+        entered.set()
+        await release.wait()
+        return playback_completed
+
+    coordinator = InteractionRuntimeCoordinator(
+        lambda args: {}, speech_delivery_waiter=delivery,
+        communicative_delivery_recorder=lambda sid, text, metadata: state.record_assistant_turn(sid, text, metadata=metadata),
+    )
+    from tests.cognitive_work_test_support import mock_completed_speech_ledger
+    coordinator.interaction_ledger = mock_completed_speech_ledger(
+        response, execution, session_id="turn-1", completed=playback_completed)
+
+    async def wait_dispatch(dispatch):
+        return execution
+
+    coordinator.wait_dispatch = wait_dispatch
+    host = _assistant(coordinator)
+    host.conversation_state = state
+    if with_work:
+        response.capabilities = [CapabilityRequest(request_id='effect', capability_id='chromie.test.effect')]
+        execution.results.append(CapabilityResult(request_id='effect', capability_id='chromie.test.effect', status='completed'))
+    monkeypatch.setattr(interaction_dispatch_host, 'record_execution_experience_safely', lambda **kwargs: None)
+    consumer = (interaction_dispatch_host.consume_detached_cognitive_dispatch if with_work
+                else interaction_dispatch_host.consume_detached_non_cognitive_dispatch)
+    dispatch = SimpleNamespace(source_response=response, runtime_response=response, receipt=None,
+                               preexecuted_results=[], preexecuted_traces=[])
+    task = asyncio.create_task(consumer(host, dispatch, session_id='turn-1', generation=0, confirmed_request_ids=None))
+    await asyncio.wait_for(entered.wait(), 1)
+    assert [x['role'] for x in _compact_recent_dialogue({'history': state.get_history()})] == ['user']
+    release.set()
+    assert await task == execution
+    state.record_accepted_user_turn('turn-2', 'Yes, please.')
+    dialogue = _compact_recent_dialogue({'history': state.get_history()})
+    assert [x['role'] for x in dialogue] == (['user', 'assistant', 'user'] if playback_completed else ['user', 'user'])
+    if playback_completed:
+        assert dialogue[-2]['text'] == response.speech[0].text
+        # Re-observing the same receipt enriches delivery metadata, never duplicates speech.
+        await coordinator.record_social_delivery(response, execution, session_id='turn-1')
+        assert len([x for x in state.get_history() if x['role'] == 'assistant']) == 1

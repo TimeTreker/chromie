@@ -1696,6 +1696,7 @@ class GeneralAbilityAcceptanceTests(unittest.TestCase):
 
         self.assertTrue(result["ok"], result["errors"])
         namespaces = sequence.await_args.args[0]
+        self.assertFalse(sequence.await_args.kwargs["continue_after_failure"])
         self.assertEqual(len(namespaces), 2)
         self.assertEqual(
             namespaces[0].conversation_id,
@@ -1705,6 +1706,11 @@ class GeneralAbilityAcceptanceTests(unittest.TestCase):
         self.assertEqual(namespaces[1].text, "second")
         self.assertEqual(result["diagnostic_evaluation"]["overall_score"], 100)
         self.assertTrue(result["cohort_complete"])
+        args.keep_going = True
+        with patch("scripts.general_ability_acceptance.run_check_sequence", sequence):
+            asyncio.run(_run_live_case(args, case, Path("/tmp/episode-evidence")))
+        self.assertTrue(sequence.await_args.kwargs["continue_after_failure"])
+        args.keep_going = False
         with patch(
             "scripts.general_ability_acceptance.run_check_sequence",
             AsyncMock(return_value=summaries[:1]),
@@ -2010,13 +2016,31 @@ SAFE_IDLE_STATUS = {"active_lanes": {}, "active_task": None, "activity_idle": Tr
                     "emergency_stop": False, "fallen": False, "mode": "sim", "safe_idle": True, "standing": True}
 
 
+@pytest.mark.parametrize("status,reason", [("failed", "provider_error"), ("failed", "provider_timeout"),
+                                         ("failed", "playback_not_started"), ("error", "")])
+def test_execution_failure_stops_even_without_a_failed_cognitive_stage(status, reason):
+    from scripts.general_ability_acceptance import _live_integrity_stop
+
+    summary = {"cognitive_runtime": {"status": "applied"},
+               "execution": {"status": status, "results": [
+                   {"request_id": "work", "status": status, "reason_code": reason}]},
+               "status_before": SAFE_IDLE_STATUS, "status_after": SAFE_IDLE_STATUS}
+    stop = _live_integrity_stop(summary, execute=True)
+    assert stop is not None
+    assert stop["failure_stage"] == "trusted_capability_runtime_completion"
+    case = TextScenarioCase(case_id="execution-failure", text="Help me")
+    validate_live_text_result(case, summary)
+    assert summary["diagnostic_evaluation"]["metrics"]["runtime_integrity_failed"]
+
+
+@pytest.mark.parametrize("workflow_stage_present", [True, False])
 @pytest.mark.parametrize("provider_output,status_after,stops", [
     ({"completed": False, "no_motion": True}, SAFE_IDLE_STATUS, False),
     ({"completed": False, "no_motion": True}, {**SAFE_IDLE_STATUS, "safe_idle": False}, True),
     ({"completed": False, "no_motion": False}, SAFE_IDLE_STATUS, True),
     (None, SAFE_IDLE_STATUS, True),
 ])
-def test_declared_provider_non_completion_is_evidence_not_an_integrity_stop(provider_output, status_after, stops):
+def test_declared_provider_non_completion_is_evidence_not_an_integrity_stop(provider_output, status_after, stops, workflow_stage_present):
     """Live 2026-10-21 (errand_remote_en, multi_thirsty_yes_en): Soridormi saw no such object, did
     not move and said so, and the cohort stopped as if Runtime had failed. Owner decision: such a
     case is judged by its expectations and the cohort continues; anything else still stops it."""
@@ -2035,6 +2059,8 @@ def test_declared_provider_non_completion_is_evidence_not_an_integrity_stop(prov
         "status_before": SAFE_IDLE_STATUS,
         "status_after": status_after,
     }
+    if not workflow_stage_present:
+        summary.pop("session_state")
 
     stop = _live_integrity_stop(summary, execute=True)
 

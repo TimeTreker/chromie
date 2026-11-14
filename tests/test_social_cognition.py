@@ -197,7 +197,7 @@ def test_fresh_turn_prompt_frontloads_social_opportunity_without_duplicate_sourc
     current = SocialCognitionRequest(
         request_id="sc-fresh", trigger="interpretation", source_refs=["turn:1"],
         responsibilities=[CognitiveResponsibilityProposal(
-            local_ref="r1", outcome="turn left", confidence=1.0, output_mode="other",
+            local_ref="r1", outcome="turn left", confidence=1.0,
             source_evidence={"source_start_token_ref": "t0", "source_end_token_ref": "t1"},
         )],
         source_turn={
@@ -249,7 +249,7 @@ def test_fresh_addressed_task_cannot_silently_disappear_while_work_runs_in_paral
     from shared.chromie_contracts.social_cognition import SocialCognitionOutput
 
     responsibility = CognitiveResponsibilityProposal(
-        local_ref="r1", outcome="nod six times", output_mode="body_action", confidence=1.0,
+        local_ref="r1", outcome="nod six times",  confidence=1.0,
     )
     current = SocialCognitionRequest(
         request_id="sc-parallel-ack", trigger="interpretation", source_refs=["turn:1"],
@@ -408,8 +408,8 @@ async def test_an_act_covering_a_need_carries_that_need_s_bindings():
     )
     current = request(
         responsibilities=[CognitiveResponsibilityProposal(
-            local_ref="r1", outcome="Tell my brother the dog ate his cookie.", output_mode="speech",
-            continuity_scope="turn", value_review=True,
+            local_ref="r1", outcome="Tell my brother the dog ate his cookie.",
+             value_review=True,
             source_evidence={"source_start_token_ref": "t0", "source_end_token_ref": "t1"},
         )],
         communication_needs=[need],
@@ -422,7 +422,7 @@ async def test_an_act_covering_a_need_carries_that_need_s_bindings():
     assert (act.source_goal_ids, act.source_responsibility_refs) == (["goal:1"], ["r1"])
 
 
-def test_goal_scoped_speech_is_only_acknowledged_before_its_answer_need():
+def test_pending_planning_prevents_story_fulfillment_until_its_answer_need():
     """Live 2026-10-13 (val_story_en): UMI scoped "Tell me a short story" as goal; the
     decoder still offered a direct answer at ingress, which Host rejects (422). The
     decoder now offers respond/ask only for turn-local speech, and the act's function
@@ -430,10 +430,10 @@ def test_goal_scoped_speech_is_only_acknowledged_before_its_answer_need():
     from shared.chromie_contracts.core_interpretation import CognitiveResponsibilityProposal
 
     def ingress(scope):
-        return request(trigger="interpretation", goal_ids=[], source_turn={"turn_id": "t"}, context={},
+        return request(trigger="interpretation", goal_ids=[], source_turn={"turn_id": "t"}, context={"work_decision_pending": scope == "goal", "pending_work_responsibility_refs": ["r1"] if scope == "goal" else []},
                        responsibilities=[CognitiveResponsibilityProposal(
-                           local_ref="r1", outcome="Tell a short story about a cat.", output_mode="speech",
-                           continuity_scope=scope, value_review=False,
+                           local_ref="r1", outcome="Tell a short story about a cat.",
+                            value_review=False,
                            source_evidence={"source_start_token_ref": "t0", "source_end_token_ref": "t1"})])
 
     def act(function):
@@ -447,7 +447,9 @@ def test_goal_scoped_speech_is_only_acknowledged_before_its_answer_need():
     goal_scoped = social_cognition_response_schema(ingress("goal"), [])
     turn_scoped = social_cognition_response_schema(ingress("turn"), [])
     assert not Draft202012Validator(goal_scoped).is_valid(act("respond"))
-    assert Draft202012Validator(goal_scoped).is_valid(act("acknowledge"))
+    receipt = act("acknowledge")
+    receipt["activities"][0].update(truth_stage="pre_evidence", progress_kind="think")
+    assert Draft202012Validator(goal_scoped).is_valid(receipt)
     assert Draft202012Validator(turn_scoped).is_valid(act("respond"))
     for branch in goal_scoped["$defs"]["SocialCommunicativeAct"]["oneOf"]:
         assert list(branch["properties"])[:2] == ["function", "text"]
@@ -476,6 +478,40 @@ def test_terminal_work_failure_result_need_cannot_choose_silence():
     schema = social_cognition_response_schema(current, [])
     assert "silence" not in schema["properties"]["disposition"]["enum"]
     assert schema["properties"]["need_outcomes"]["properties"][need.need_id]["const"] == "covered"
+
+
+@pytest.mark.parametrize("trigger", ["work_state", "evidence"])
+@pytest.mark.parametrize("prohibited", [False, True])
+def test_terminal_failure_silence_control_matches_native_agent_and_host_checks(trigger, prohibited):
+    from agent.app.social_cognition import validate_social_cognition_output
+    from shared.chromie_contracts.plan import SocialCommunicationNeed
+    from shared.chromie_contracts.social_cognition import SocialCognitionOutput, SocialCognitionResolution
+
+    need = SocialCommunicationNeed(
+        need_id="need:failed", owner="runtime", kind="result", reference_id="plan:1",
+        source_goal_ids=["goal:1"], facts={"status": "failed", "required_result_update": True},
+    )
+    current = request(trigger=trigger, communication_needs=[need], context={
+        "user_turn_envelope": {
+            "admission": "reflex_and_admit" if prohibited else "admit",
+            "reflex": {"action": "interrupt", "should_speak": False},
+        },
+        "work_failure": {"status": "failed"},
+    })
+    raw = {"disposition": "silence", "activities": [], "need_outcomes": {need.need_id: "pending"},
+           "reason_summary": "The failure remains recorded; obey the protective output control."}
+    schema = social_cognition_response_schema(current, [])
+    assert Draft202012Validator(schema).is_valid(raw) is prohibited
+    result = SocialCognitionResolution(
+        **raw, request_id=current.request_id, snapshot_digest=current.snapshot_digest(), model_call_count=1,
+    )
+    if prohibited:
+        validate_social_cognition_output(SocialCognitionOutput.model_validate(raw), current, [])
+        result.validate_request(current)
+        assert result.need_outcomes[need.need_id] == "pending"
+    else:
+        with pytest.raises(ValueError):
+            result.validate_request(current)
 
 
 def test_an_act_binds_its_needs_before_its_words():
@@ -559,7 +595,7 @@ def test_prior_acknowledgement_cannot_cover_later_terminal_failure():
     current = request(
         responsibilities=[CognitiveResponsibilityProposal(
             local_ref="r1", outcome="Bring a bottle of water to the user.",
-            output_mode="body_action", body_effect_family="task_physical_effect",
+
             source_evidence={"source_start_token_ref": "t0", "source_end_token_ref": "t1"},
         )],
         communication_needs=[need],
@@ -1038,14 +1074,14 @@ async def test_state_social_refreshes_continuity_after_previous_speech(state, pa
         policy=CognitiveRuntimePolicy(mode="apply"), context_refresh=refresh, interaction_ledger=ledger,
     )
     coordinator.schedule_social_expression = lambda *args, context, **kwargs: expression_contexts.append(context)
-    coordinator._social_turns["sid"] = ("previous", previous, "turn" if path == "optional" else "sid")
+    coordinator._social_turns[("sid", "turn" if path == "optional" else "sid")] = ("previous", previous, "turn" if path == "optional" else "sid", "sid", False)
     coordinator._social_dispatches["previous"] = "previous-delivery"
     plan = CanonicalPlan(plan_id="plan", planner_tier="fast", disposition="execute", coverage="complete",
         goal_ids=["goal:1"], steps=[{"step_id": "nod", "capability_id": "soridormi.nod_yes", "source_goal_ids": ["goal:1"]}],
         goal_outcomes=[{"goal_id": "goal:1", "disposition": "execute", "coverage": "complete", "step_ids": ["nod"]}],
         communication_needs=[{"need_id": "progress", "owner": "planner", "kind": "answer", "reference_id": "plan", "source_goal_ids": ["goal:1"]}])
     work = CognitiveWorkRequest(sid="sid", text="Nod once", context=copy.deepcopy(original), history=original["history"],
-        responsibilities=[{"local_ref": "r1", "outcome": "Nod once", "output_mode": "body_action", "confidence": 1.0}])
+        responsibilities=[{"local_ref": "r1", "outcome": "Nod once",  "confidence": 1.0}])
     pending = (
         coordinator.start_state_interaction(None, work_request=work, turn_id="turn", plan=plan)
         if path == "optional" else asyncio.create_task(coordinator.resolve_plan_interaction(
@@ -1134,6 +1170,8 @@ async def test_pending_state_social_result_rechecks_actual_work(change):
             await answer.wait()
             return SocialCognitionResolution(
                 **response(text="你好。" if change == "interpretation" else "动作还在进行中。",
+                           truth_stage="context_grounded" if change == "interpretation" else "pre_evidence",
+                           progress_kind=None if change == "interpretation" else "perform_action",
                            source_goal_ids=request.goal_ids),
                 request_id=request.request_id, snapshot_digest=request.snapshot_digest(), model_call_count=1,
             )
@@ -1164,7 +1202,7 @@ async def test_pending_state_social_result_rechecks_actual_work(change):
         }],
     )
     work = CognitiveWorkRequest(sid="sid", text="你好，点一下头", responsibilities=[{
-        "local_ref": "r1", "outcome": "greet", "output_mode": "speech", "confidence": 1.0,
+        "local_ref": "r1", "outcome": "greet",  "confidence": 1.0,
     }])
     pending = coordinator.start_state_interaction(
         None, work_request=work, turn_id="turn", plan=None if change == "interpretation" else plan,
@@ -1454,7 +1492,7 @@ async def test_slow_sc_does_not_hold_validated_body_work_after_gi():
         policy=CognitiveRuntimePolicy(mode="apply"), goal_state_apply=lambda *args, **kwargs: [],
         social_task_tracker=sessions.track_social_task)
     core, envelope = admitted_core("眨一次眼", sid=sid, language="zh-CN", responsibilities=[{
-        "local_ref": "r1", "outcome": "Blink once", "output_mode": "body_action", "confidence": 1,
+        "local_ref": "r1", "outcome": "Blink once",  "confidence": 1,
     }])
     try:
         result = await asyncio.wait_for(coordinator.resolve(None, text="眨一次眼", sid=sid,
@@ -1521,7 +1559,7 @@ async def test_normal_greeting_work_establishes_need_and_sc_authors_the_reply():
     coordinator = GoalDrivenRuntimeCoordinator(agent_client=Agent(), adapter=CanonicalPlanRuntimeAdapter(FakeRuntime()),
         policy=CognitiveRuntimePolicy(mode="apply"), goal_state_apply=lambda *args, **kwargs: [])
     core, envelope = admitted_core("你好", sid="sc-greeting", language="zh-CN", responsibilities=[{
-        "local_ref": "r1", "outcome": "Return greeting", "bindings": {}, "output_mode": "speech", "confidence": 1,
+        "local_ref": "r1", "outcome": "Return greeting", "bindings": {},  "confidence": 1,
     }])
     result = await coordinator.resolve(None, text="你好", sid="sc-greeting", core_interpretation=core,
         turn_envelope=envelope, context=source_context, history=[], language="zh-CN")
@@ -1580,13 +1618,14 @@ def test_initial_sc_cannot_complete_a_task_before_work_establishes_its_need(mean
     from shared.chromie_contracts.social_cognition import SocialCognitionResolution
     from shared.chromie_contracts.core_interpretation import CognitiveResponsibilityProposal
     current = SocialCognitionRequest(request_id="initial", trigger="interpretation", source_refs=["turn"],
+        context={"work_decision_pending": True, "pending_work_responsibility_refs": ["say"]},
         source_turn={"original_text": "先眨眼再说你好"}, meaning_uncertainties=meaning_uncertainties,
         responsibilities=[CognitiveResponsibilityProposal(local_ref="say", outcome="Say hello after blinking",
-            output_mode="speech", bindings={"after": ["blink"]}, confidence=0.8)])
+             bindings={"after": ["blink"]}, confidence=0.8)])
     result = SocialCognitionResolution(request_id=current.request_id, snapshot_digest=current.snapshot_digest(),
         model_call_count=1, disposition="communicate", reason_summary="Premature task answer.", activities=[{
             "activity_id": "too-early", "text": "你好", "function": "respond", "truth_stage": "context_grounded", "source_responsibility_refs": ["say"]}])
-    with pytest.raises(ValueError, match="unestablished"):
+    with pytest.raises(ValueError, match="Planner decision is pending"):
         result.validate_request(current)
 
 
@@ -1636,7 +1675,7 @@ async def test_pending_social_playback_is_cancelled_only_on_interrupt_or_replace
         policy=CognitiveRuntimePolicy(mode="apply"),
     )
     coordinator.schedule_social_expression = lambda *args, **kwargs: None
-    work = CognitiveWorkRequest(sid="sid", text="帮我看看", responsibilities=[{"local_ref": "r1", "outcome": "Check the requested item", "confidence": 1.0}], context={}, history=[])
+    work = CognitiveWorkRequest(sid="sid", text="帮我看看", responsibilities=[{"local_ref": "r1", "outcome": "Check the requested item", "confidence": 1.0}], context={"work_decision_pending": True, "pending_work_responsibility_refs": ["r1"]}, history=[])
     first = coordinator.start_state_interaction(None, work_request=work, turn_id="first")
     await asyncio.wait_for(admitted.wait(), 1)
     if transition.startswith("same_turn"):
@@ -1700,6 +1739,9 @@ async def test_social_dialogue_history_requires_completed_playback(playback_comp
     execution = SimpleNamespace(results=[SimpleNamespace(
         request_id="utterance", capability_id="chromie.speak", status="completed", output={},
     )])
+    from tests.cognitive_work_test_support import mock_completed_speech_ledger
+    runtime.interaction_ledger = mock_completed_speech_ledger(
+        response, execution, session_id="sid", completed=playback_completed)
     complete = await runtime.record_social_delivery(response, execution, session_id="sid")
     assert complete is playback_completed
     assert bool(recorded) is playback_completed
@@ -1745,9 +1787,9 @@ def test_terminal_fast_limitation_establishes_exact_result_need(disposition):
 ])
 def test_decoder_enforces_the_existing_progress_kind_contract(stage, kind, schema_valid, dto_valid):
     from shared.chromie_contracts.core_interpretation import CognitiveResponsibilityProposal
-    current = request(trigger='interpretation', source_turn={'original_text': 'Please check the forecast.'},
+    current = request(context={"work_decision_pending": True, "pending_work_responsibility_refs": ["r1"]}, trigger='interpretation', source_turn={'original_text': 'Please check the forecast.'},
                       responsibilities=[CognitiveResponsibilityProposal(local_ref='r1', outcome='check forecast',
-                          output_mode='information', confidence=1)])
+                           confidence=1)])
     raw = response(function='acknowledge', truth_stage=stage, source_responsibility_refs=['r1'])
     if kind is not None:
         raw['activities'][0]['progress_kind'] = kind
@@ -1891,7 +1933,7 @@ async def test_independent_sc_result_reaches_runtime_expression_queue(spoken, pr
         social_task_tracker=lambda sid, task: tracked_tasks.append((sid, task)),
     )
     work = CognitiveWorkRequest(sid="sid", text="眨两下眼睛", responsibilities=[{
-        "local_ref": "r1", "outcome": "眨两下眼睛", "output_mode": "body_action", "confidence": 1.0,
+        "local_ref": "r1", "outcome": "眨两下眼睛",  "confidence": 1.0,
     }], context={
         "user_turn_envelope": {"turn_id": "turn-user", "original_input": {"text": "眨两下眼睛"}},
     })
@@ -1953,7 +1995,7 @@ async def test_session_joins_social_delivery_and_retains_failed_completion(failu
         policy=CognitiveRuntimePolicy(mode="apply"), social_task_tracker=tracker.track_social_task,
     )
     work = CognitiveWorkRequest(sid=sid, text="你好", responsibilities=[{
-        "local_ref": "r1", "outcome": "greet", "output_mode": "speech", "confidence": 1.0,
+        "local_ref": "r1", "outcome": "greet",  "confidence": 1.0,
     }])
     task = coordinator.start_state_interaction(None, work_request=work, turn_id="turn")
     await asyncio.wait_for(admitted.wait(), 1)
@@ -2023,7 +2065,11 @@ async def test_planner_failure_joins_independent_social_delivery_without_hiding_
                 request_id=request.request_id, snapshot_digest=request.snapshot_digest(), model_call_count=1,
                 disposition="communicate", reason_summary="The greeting is independent of the turn action.",
                 activities=[{"activity_id": "greet", "text": "Hello!", "function": "respond",
-                             "truth_stage": "context_grounded", "source_responsibility_refs": ["hello"]}],
+                             "truth_stage": "context_grounded", "source_responsibility_refs": ["hello"],
+                             "addressed_need_ids": [need.need_id for need in request.communication_needs
+                                                    if need.source_responsibility_refs == ["hello"]]}],
+                need_outcomes={need.need_id: "covered" if need.source_responsibility_refs == ["hello"] else "pending"
+                               for need in request.communication_needs},
             )
 
         async def resolve_goal_association(self, *args, **kwargs):
@@ -2056,10 +2102,9 @@ async def test_planner_failure_joins_independent_social_delivery_without_hiding_
         policy=CognitiveRuntimePolicy(mode="apply"),
     )
     core, envelope = admitted_core("Hello, then turn left.", sid="mixed", language="en-US", responsibilities=[
-        {"local_ref": "hello", "outcome": "Respond to the greeting", "output_mode": "speech", "continuity_scope": "turn", "confidence": 1},
-        {"local_ref": "turn", "outcome": "Turn left", "output_mode": "body_action", "continuity_scope": "goal", "confidence": 1},
+        {"local_ref": "hello", "outcome": "Respond to the greeting",   "confidence": 1},
+        {"local_ref": "turn", "outcome": "Turn left",   "confidence": 1},
     ], cognitive_requests=[
-        {"authority": "social_cognition", "responsibility_refs": ["hello", "turn"], "reason_summary": "Own interaction for the complete admitted turn."},
         {"authority": "planner", "responsibility_refs": ["turn"], "reason_summary": "Plan the requested turn."},
     ])
     task = asyncio.create_task(coordinator.resolve(
@@ -2342,8 +2387,8 @@ def test_social_expression_cardinality_is_semantic_not_schema_policy() -> None:
         responsibilities=[CognitiveResponsibilityProposal(
             local_ref="r1",
             outcome="Greet the person and answer their social question.",
-            output_mode="speech",
-            continuity_scope="turn",
+
+
             confidence=1.0,
         )],
         source_turn={"turn_id": "turn:1", "original_text": "Hello, how are you?"},
@@ -2483,11 +2528,11 @@ def test_social_context_retains_current_umi_routing_without_widening_act_scope(c
     from shared.chromie_contracts.social_cognition import SocialCognitionOutput
 
     greeting = CognitiveResponsibilityProposal(
-        local_ref="greet", outcome="Greet the user", output_mode="speech",
-        continuity_scope="turn", confidence=1,
+        local_ref="greet", outcome="Greet the user",
+         confidence=1,
     )
     body = CognitiveResponsibilityProposal(
-        local_ref="turn", outcome="Turn left", output_mode="body_action", confidence=1,
+        local_ref="turn", outcome="Turn left",  confidence=1,
     )
     core = {
         "authority": "user_meaning_interpretation", "turn_id": core_turn,
@@ -2555,8 +2600,8 @@ def test_interpretation_prompt_keeps_current_turn_foreground_and_hides_unbound_g
         goal_ids=[],
         source_turn={"turn_id": "turn:joke", "original_text": "Tell me a joke."},
         responsibilities=[CognitiveResponsibilityProposal(
-            local_ref="r1", outcome="tell a joke", output_mode="speech",
-            continuity_scope="turn", confidence=1.0,
+            local_ref="r1", outcome="tell a joke",
+             confidence=1.0,
         )],
         context={
             "active_goal_snapshots": [{
@@ -2603,7 +2648,7 @@ def test_interpretation_non_speech_task_cannot_inform_result_before_planner_or_e
         source_turn={"turn_id": "turn:weather", "original_text": "Will it rain tomorrow?"},
         responsibilities=[CognitiveResponsibilityProposal(
             local_ref="r1", outcome="determine whether it will rain tomorrow",
-            output_mode="information", continuity_scope="goal", confidence=1.0,
+              confidence=1.0,
         )],
         context={"work_decision_pending": True, "interaction_context": {
             "events": [], "already_spoken": [], "pending_speech": [], "prior_delivered_speech": [],
@@ -2650,7 +2695,7 @@ def test_interpretation_schema_rejects_non_speech_context_grounded_inform():
         source_turn={"turn_id": "turn:weather", "original_text": "Will it rain tomorrow?"},
         responsibilities=[CognitiveResponsibilityProposal(
             local_ref="r1", outcome="determine whether it will rain tomorrow",
-            output_mode="information", continuity_scope="goal", confidence=1.0,
+              confidence=1.0,
         )],
         context={"work_decision_pending": True, "interaction_context": {
             "events": [], "already_spoken": [], "pending_speech": [], "prior_delivered_speech": [],
@@ -2688,8 +2733,8 @@ def _uncertain_fetch_request(*, uncertain=True, value_review=False):
         trigger="interpretation", source_refs=["turn:that"], goal_ids=[],
         source_turn={"turn_id": "turn:that", "original_text": "把那个拿给我。"},
         responsibilities=[CognitiveResponsibilityProposal(
-            local_ref="r1", outcome="把那个拿给我。", output_mode="body_action",
-            body_effect_family="task_physical_effect", continuity_scope="goal", confidence=1.0,
+            local_ref="r1", outcome="把那个拿给我。",
+              confidence=1.0,
             value_review=value_review,
         )],
         meaning_uncertainties=[UserMeaningUncertainty(
@@ -2825,7 +2870,7 @@ def test_words_said_before_work_evidence_cannot_cover_its_answer(earlier_binding
         evidence_refs=["evidence:clock"], communication_needs=[need],
         source_turn={"turn_id": "turn:date", "original_text": "今天星期几？"},
         responsibilities=[CognitiveResponsibilityProposal(
-            local_ref="r1", outcome="今天星期几", output_mode="information", continuity_scope="goal",
+            local_ref="r1", outcome="今天星期几",
             confidence=1.0)],
         context={"interaction_context": {"events": [said], "already_spoken": [said], "pending_speech": [],
                                          "prior_delivered_speech": []}},
@@ -2880,7 +2925,7 @@ def test_an_earlier_acknowledgement_does_not_become_the_answer(act):
         trigger="goal_state", source_refs=["plan:water"], goal_ids=["goal:water"], communication_needs=[need],
         source_turn={"turn_id": "turn:water", "original_text": "家里还有水吗？"},
         responsibilities=[CognitiveResponsibilityProposal(
-            local_ref="r1", outcome="家里还有水吗", output_mode="information", continuity_scope="goal", confidence=1.0)],
+            local_ref="r1", outcome="家里还有水吗",   confidence=1.0)],
         context={"interaction_context": {"events": [said], "already_spoken": [said], "pending_speech": [],
                                          "prior_delivered_speech": []}},
     )
@@ -2918,7 +2963,7 @@ def _preference_turn(**changes):
         trigger="interpretation", source_refs=["turn:pref"], goal_ids=[],
         source_turn={"turn_id": "turn:pref", "original_text": "以后先用中文回答我，可以吗？"},
         responsibilities=[CognitiveResponsibilityProposal(
-            local_ref="r1", outcome="以后先用中文回答我", output_mode="speech", continuity_scope="turn",
+            local_ref="r1", outcome="以后先用中文回答我",
             confidence=1.0)],
         context={"interaction_context": {"events": [], "already_spoken": [], "pending_speech": [],
                                          "prior_delivered_speech": []}},
@@ -2974,7 +3019,7 @@ def _fact_turn():
     return _preference_turn(
         source_turn={"turn_id": "turn:fact", "original_text": "我在上海上班。"},
         responsibilities=[CognitiveResponsibilityProposal(
-            local_ref="r1", outcome="告诉Chromie我在上海上班", output_mode="speech", continuity_scope="turn",
+            local_ref="r1", outcome="告诉Chromie我在上海上班",
             confidence=1.0)],
     )
 
@@ -3077,6 +3122,9 @@ async def test_a_stated_preference_is_kept_once_its_agreement_is_heard(playback_
     execution = SimpleNamespace(results=[SimpleNamespace(
         request_id=speech.id, capability_id="chromie.speak", status="completed", output={},
     ) for speech in response.speech])
+    from tests.cognitive_work_test_support import mock_completed_speech_ledger
+    runtime.interaction_ledger = mock_completed_speech_ledger(
+        response, execution, session_id="pref", completed=playback_completed)
     assert await runtime.record_social_delivery(response, execution, session_id="pref") is playback_completed
     kept = [item for item in state.session_memory()["active_memory"]["entries"]
             if item.get("kind") == "preference" and item.get("text") == "Answer me in Chinese."]
@@ -3092,8 +3140,8 @@ def _weekday_work_state(**changes):
     return request(
         trigger="work_state", source_refs=["work:clock"], goal_ids=["goal:day"],
         responsibilities=[CognitiveResponsibilityProposal(
-            local_ref="r1", outcome="answer what day it is today", output_mode="information",
-            continuity_scope="goal", confidence=1.0,
+            local_ref="r1", outcome="answer what day it is today",
+             confidence=1.0,
         )],
         context={"work": [{"id": "work:clock", "status": "scheduled"}],
                  "active_goal_snapshots": [{"goal_id": "goal:day", "status": "active"}],
@@ -3155,10 +3203,10 @@ def test_pre_evidence_branches_stay_compilable_with_ordered_and_question_needs()
 
     current = _weekday_work_state(
         responsibilities=[
-            CognitiveResponsibilityProposal(local_ref="r1", outcome="tell a joke", output_mode="speech",
-                                            continuity_scope="turn", confidence=1.0),
-            CognitiveResponsibilityProposal(local_ref="r2", outcome="wave", output_mode="body_action",
-                                            body_effect_family="social_expression", continuity_scope="goal",
+            CognitiveResponsibilityProposal(local_ref="r1", outcome="tell a joke",
+                                             confidence=1.0),
+            CognitiveResponsibilityProposal(local_ref="r2", outcome="wave",
+
                                             confidence=1.0),
         ],
         communication_needs=[
@@ -3317,23 +3365,18 @@ def test_current_turn_output_guard_keeps_task_acknowledgement_precommitment() ->
     from agent.app.social_cognition import _social_current_turn_output_guard
     from shared.chromie_contracts.core_interpretation import CognitiveResponsibilityProposal
 
-    current = request(
+    current = request(context={"work_decision_pending": True, "pending_work_responsibility_refs": ["r1"]},
         trigger="interpretation",
         responsibilities=[CognitiveResponsibilityProposal(
             local_ref="r1", outcome="bring the milk to the user",
-            output_mode="body_action", body_effect_family="task_physical_effect",
-            continuity_scope="goal", confidence=1.0,
+
+             confidence=1.0,
         )],
     )
     guard = _social_current_turn_output_guard(current)
-    assert "acknowledge receipt or understanding only" in guard
-    assert "Do not promise, accept, announce an intention to execute" in guard
-    # The receipt does not agree yet, matching the authority prompt; a suggested '好的'
-    # here preceded later refusals (live 2026-10-21/22).
-    assert "does not agree yet" in guard and "好的" not in guard
-    assert "'I'll do/get/bring it' is a future-Work commitment" in guard
-    assert "ask the one question that settles it" not in guard
-
+    assert "Planner decision" in guard and "still pending" in guard
+    assert "No particular method, accepted task, future execution, started Work or result" in guard
+    assert "A receipt cannot fulfill their requested result" in guard
 
 def test_current_turn_output_guard_keeps_direct_chat_compact() -> None:
     from agent.app.social_cognition import _social_current_turn_output_guard
@@ -3343,7 +3386,7 @@ def test_current_turn_output_guard_keeps_direct_chat_compact() -> None:
         trigger="interpretation",
         responsibilities=[CognitiveResponsibilityProposal(
             local_ref="r1", outcome="answer who I am",
-            output_mode="speech", continuity_scope="turn", confidence=1.0,
+              confidence=1.0,
         )],
     )
     guard = _social_current_turn_output_guard(current)
@@ -3416,7 +3459,7 @@ def _value_review_turn(value_review: bool):
         request_id="sc-value-review", trigger="interpretation", source_refs=["turn:1"],
         responsibilities=[CognitiveResponsibilityProposal(
             local_ref="r1", outcome="Pretend you are hurt so my mom feels guilty.", confidence=1.0,
-            output_mode="speech", continuity_scope="turn", value_review=value_review,
+              value_review=value_review,
             source_evidence={"source_start_token_ref": "t0", "source_end_token_ref": "t1"},
         )],
         source_turn={
@@ -3463,7 +3506,7 @@ def test_a_turn_waiting_for_value_judgment_answers_no_sibling_directly():
         current.responsibilities[0].model_copy(update={"continuity_scope": "goal"}),
         CognitiveResponsibilityProposal(
             local_ref="r2", outcome="Acknowledge the homework is unfinished.", confidence=1.0,
-            output_mode="speech", continuity_scope="turn", value_review=False,
+              value_review=False,
             source_evidence={"source_start_token_ref": "t0", "source_end_token_ref": "t1"},
         ),
     ]})
@@ -3491,7 +3534,7 @@ def test_reviewed_speech_ingress_uses_precommitment_guard_in_actual_model_packet
     if sibling:
         responsibilities.append(reviewed.model_copy(update={
             "local_ref": "r2", "outcome": "acknowledge the person's report",
-            "value_review": False, "continuity_scope": "turn",
+            "value_review": False,
         }))
     current = current.model_copy(update={"responsibilities": responsibilities})
     raw = response(activity_id="receipt", text="Let me think about that.", function="acknowledge",
@@ -3703,7 +3746,7 @@ async def test_work_that_outruns_a_silent_turns_decision_gets_one_more_decision(
         goal_outcomes=[{"goal_id": "goal:1", "disposition": "execute", "coverage": "complete",
                         "step_ids": ["celebrate"]}])
     work = CognitiveWorkRequest(sid="sid", text="快跟我一起庆祝一下！", context={"user_turn_envelope": {"turn_id": "turn"}},
-        responsibilities=[{"local_ref": "r1", "outcome": "celebrate", "output_mode": "body_action", "confidence": 1.0}])
+        responsibilities=[{"local_ref": "r1", "outcome": "celebrate",  "confidence": 1.0}])
     result = await coordinator.start_state_interaction(None, work_request=work, turn_id="turn", plan=plan)
     assert len(calls) == (1 if answered else 2)
     assert (result is None) is answered
@@ -3725,13 +3768,13 @@ def test_a_reply_to_what_the_person_said_answers_that_speech_responsibility(kind
                                    source_goal_ids=["goal:reply"], source_responsibility_refs=["r1"],
                                    facts={"role": "complete_response"})
     said = {"text": "辛苦了，快休息一下吧。", "speech_act": "acknowledge", "metadata": {
-        "communicative_activity_ids": ["ack_tired_01"], "source_responsibility_refs": ["r1"], "addressed_need_ids": []}}
+        "communicative_activity_ids": ["ack_tired_01"], "source_responsibility_refs": ["r1"], "truth_stage": "context_grounded", "addressed_need_ids": []}}
     current = request(
         trigger="work_state", source_refs=["plan:reply"], goal_ids=["goal:reply"], communication_needs=[need],
         source_turn={"turn_id": "turn:tired", "original_text": "我今天好累啊。"},
         responsibilities=[CognitiveResponsibilityProposal(
-            local_ref="r1", outcome="acknowledge that the person is tired", output_mode="speech",
-            continuity_scope="turn", confidence=1.0)],
+            local_ref="r1", outcome="acknowledge that the person is tired",
+             confidence=1.0)],
         context={"interaction_context": {"events": [said], "already_spoken": [said], "pending_speech": [],
                                          "prior_delivered_speech": []}},
     )
@@ -3779,3 +3822,296 @@ def test_an_expression_target_decides_its_source_before_it_claims_anything():
         assert validator.is_valid(value) is accepted, value
         if accepted:
             AuxiliaryActivityTarget.model_validate(value)
+
+
+@pytest.mark.asyncio
+async def test_sc_requested_final_speech_can_wait_after_body_work_without_completing_it():
+    from orchestrator.runtime.canonical_plan_adapter import CanonicalPlanRuntimeAdapter
+    from shared.chromie_contracts.plan import CanonicalPlan
+    from shared.chromie_contracts.core_interpretation import CognitiveResponsibilityProposal
+    from shared.chromie_contracts.planner_response import PlannerResponseProjection
+    from shared.chromie_contracts.social_cognition import SocialCognitionResolution
+    from tests.cognitive_runtime_test_support import FakeRuntime, walk_definition
+
+    plan = CanonicalPlan(plan_id='body-and-story', planner_tier='fast', disposition='execute', coverage='complete',
+        goal_ids=['goal:1'], steps=[{'step_id': 'body', 'capability_id': 'soridormi.walk_forward', 'args': {'duration_s': 1}, 'source_goal_ids': ['goal:1']}],
+        goal_outcomes=[{'goal_id': 'goal:1', 'disposition': 'execute', 'coverage': 'complete', 'step_ids': ['body']}],
+        communication_needs=[{'need_id': 'story', 'owner': 'planner', 'kind': 'answer', 'reference_id': 'body-and-story',
+                              'source_goal_ids': ['goal:1'], 'source_responsibility_refs': ['r1'],
+                              'delivery_phase': 'final', 'after_step_ids': ['body']}])
+    current = request(source_refs=[plan.plan_id], communication_needs=plan.communication_needs,
+                      responsibilities=[CognitiveResponsibilityProposal(local_ref='r1',
+                          outcome='Tell a story after walking',  confidence=1)],
+                      context={'canonical_plan_resolution': plan.prompt_projection()})
+    raw = response(text='Once upon a time...', function='respond', delivery_phase='final',
+                   addressed_need_ids=['story'], source_responsibility_refs=['r1'])
+    result = SocialCognitionResolution(**raw, need_outcomes={'story': 'covered'}, request_id=current.request_id,
+                                      snapshot_digest=current.snapshot_digest(), model_call_count=1)
+    adapter = CanonicalPlanRuntimeAdapter(FakeRuntime([walk_definition()]))
+    build_response = adapter.build_response
+    async def capture(**kwargs):
+        return kwargs['planner_response']
+    adapter.build_response = capture
+    projection = await adapter.build_social_cognition_response(plan=plan, request=current, resolution=result,
+                                                              session_id='sid', language='en')
+    stage = projection.response_plan.activities[0]
+    assert stage.delivery_phase == 'final'
+    assert stage.metadata['communication_after_step_ids'] == ['body']
+    assert stage.metadata['communication_completion_goal_ids'] == ['goal:1']
+    assert stage.must_not_claim_completion and stage.commitment_state == 'none'
+    payload = projection.model_dump()
+    payload['social_cognition_request'] = payload['social_cognition'] = None
+    with pytest.raises(ValueError, match='must not include a final stage'):
+        PlannerResponseProjection.model_validate(payload)
+    payload = projection.model_dump()
+    payload['response_plan']['activities'][0].update(commitment_state='completed', must_not_claim_completion=False)
+    with pytest.raises(ValueError, match='SC projection changed'):
+        PlannerResponseProjection.model_validate(payload)
+    adapter.build_response = build_response
+    interaction = await adapter.build_social_cognition_response(plan=plan, request=current, resolution=result,
+                                                               session_id='sid', language='en')
+    assert interaction.speech[0].timing == 'after_capabilities'
+    assert interaction.speech[0].metadata['ordered_context_grounded_after_work'] is True
+    assert interaction.speech[0].metadata['communication_completion_goal_ids'] == ['goal:1']
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize('split_goal', [False, True])
+@pytest.mark.parametrize('auxiliary', [False, True])
+async def test_primary_concurrent_answer_preserves_prepared_start_and_optional_containment(split_goal, auxiliary):
+    from orchestrator.runtime.canonical_plan_adapter import CanonicalPlanRuntimeAdapter
+    from orchestrator.runtime.capability_runtime import CapabilityRuntime
+    from shared.chromie_contracts.plan import CanonicalPlan
+    from shared.chromie_contracts.core_interpretation import CognitiveResponsibilityProposal
+    from shared.chromie_contracts.social_cognition import SocialCognitionResolution
+    from tests.cognitive_runtime_test_support import FakeRuntime, walk_definition
+    from tests.auxiliary_activity_test_support import social_capability_definition
+
+    speech_goal = 'goal:story' if split_goal else 'goal:1'
+    plan = CanonicalPlan(plan_id='concurrent-story', planner_tier='fast', disposition='mixed' if split_goal else 'execute', coverage='complete',
+        goal_ids=list(dict.fromkeys(['goal:1', speech_goal])),
+        steps=[{'step_id': 'body', 'capability_id': 'soridormi.walk_forward', 'args': {'duration_s': 1},
+                'timing': 'parallel', 'source_goal_ids': ['goal:1']}],
+        goal_outcomes=[{'goal_id': 'goal:1', 'disposition': 'execute', 'coverage': 'complete', 'step_ids': ['body']}]
+            + ([{'goal_id': speech_goal, 'disposition': 'respond', 'coverage': 'complete'}] if split_goal else []),
+        communication_needs=[{'need_id': 'story', 'owner': 'planner', 'kind': 'answer', 'reference_id': 'concurrent-story',
+                              'source_goal_ids': [speech_goal], 'source_responsibility_refs': ['r1'],
+                              'delivery_phase': 'immediate', 'facts': {'timing': 'parallel'}}])
+    current = request(source_refs=[plan.plan_id], goal_ids=plan.goal_ids, communication_needs=plan.communication_needs,
+        responsibilities=[CognitiveResponsibilityProposal(local_ref='r1', outcome='Walk while telling a story',
+                           confidence=1)],
+        context={'canonical_plan_resolution': plan.prompt_projection()})
+    raw = response(text='Once upon a time...', function='respond', addressed_need_ids=['story'],
+                   source_goal_ids=[speech_goal], source_responsibility_refs=['r1'],
+                   auxiliary_activities=[{'auxiliary_activity_id': 'blink', 'capability_id': 'soridormi.blink_eyes',
+                       'args': {'count': 1}, 'timing': 'parallel',
+                       'anchor_kind': 'communicative_act', 'anchor_id': 'sc-act',
+                       'reason_summary': 'A small expression.'}] if auxiliary else [])
+    result = SocialCognitionResolution(**raw, need_outcomes={'story': 'covered'}, request_id=current.request_id,
+                                      snapshot_digest=current.snapshot_digest(), model_call_count=1)
+    definition = walk_definition().model_copy(update={'can_run_parallel': True, 'metadata': {
+        'effects': ['physical_motion'], 'parallel_metadata_declared': True, 'resource_claims': ['legs']}})
+    adapter = CanonicalPlanRuntimeAdapter(FakeRuntime([definition, social_capability_definition()]))
+    packet = await adapter.build_social_cognition_response(plan=plan, request=current, resolution=result,
+                                                         session_id='sid', language='en')
+    assert len(packet.capabilities) == len(packet.speech) == 1
+    body, speech = packet.capabilities[0], packet.speech[0]
+    assert body.timing == 'parallel'
+    assert body.metadata['coordination_id'] == speech.metadata['coordination_id']
+    assert body.metadata['lane_start_policy'] == speech.metadata['lane_start_policy'] == 'prepared_start'
+    assert body.metadata['source_goal_ids'] == ['goal:1']
+    scheduled = CapabilityRuntime._scheduled_requests(SimpleNamespace(_speech_request=lambda item:
+        CapabilityRuntime._speech_request(None, item)), packet)
+    assert len(scheduled) == 2 and all(item.timing == 'parallel' for item in scheduled)
+    if auxiliary:
+        assert packet.metadata['social_expression_admission']['materialized_count'] == 0
+        assert any('primary_coordination_reserved' in reason for reason in
+                   packet.metadata['social_expression_admission']['reasons'])
+
+
+@pytest.mark.parametrize("mode,scope", [("speech", "turn"), ("speech", "goal"), ("information", "goal")])
+def test_pending_planner_facts_override_result_category_at_every_validation_boundary(mode, scope):
+    from agent.app.social_cognition import validate_social_cognition_output
+    from shared.chromie_contracts.core_interpretation import CognitiveResponsibilityProposal
+    from shared.chromie_contracts.social_cognition import SocialCognitionOutput, SocialCognitionResolution
+
+    current = SocialCognitionRequest(
+        request_id="pending", trigger="interpretation", source_refs=["turn"],
+        source_turn={"turn_id": "turn", "original_text": "Please help me."},
+        responsibilities=[CognitiveResponsibilityProposal(local_ref="r1", outcome="Help with the stated need.",
+                              confidence=1)],
+        context={"work_decision_pending": True, "pending_work_responsibility_refs": ["r1"]},
+    )
+    schema = social_cognition_response_schema(current, [])
+    receipt = response(function="acknowledge", truth_stage="pre_evidence", progress_kind="think",
+                       source_goal_ids=[], source_responsibility_refs=["r1"], text="Let me see.")
+    Draft202012Validator(schema).validate(receipt)
+    validate_social_cognition_output(SocialCognitionOutput.model_validate(receipt), current, [])
+    SocialCognitionResolution(**receipt, request_id=current.request_id,
+                             snapshot_digest=current.snapshot_digest(), model_call_count=1).validate_request(current)
+    for changes in ({"function": "respond", "truth_stage": "context_grounded", "progress_kind": None},
+                    {"progress_kind": "perform_action"}):
+        wrong = copy.deepcopy(receipt)
+        wrong["activities"][0].update(changes)
+        assert not Draft202012Validator(schema).is_valid(wrong)
+        with pytest.raises(ValueError):
+            validate_social_cognition_output(SocialCognitionOutput.model_validate(wrong), current, [])
+        with pytest.raises(ValueError):
+            SocialCognitionResolution(**wrong, request_id=current.request_id,
+                                     snapshot_digest=current.snapshot_digest(), model_call_count=1).validate_request(current)
+
+
+def test_pending_planner_does_not_mint_an_umi_answer_need():
+    from orchestrator.runtime.response_plan import initial_social_response_needs
+    from shared.chromie_contracts.core_interpretation import CognitiveResponsibilityProposal, CognitiveWorkRequest
+
+    current = CognitiveWorkRequest(sid="pending", text="Please help me.", interpretation_confidence=1,
+        responsibilities=[CognitiveResponsibilityProposal(local_ref="r1", outcome="Help with the stated need.",
+                              confidence=1)],
+        cognitive_requests=[{"authority": "planner", "responsibility_refs": ["r1"],
+                             "reason_summary": "Fulfillment needs reasoning."}])
+    assert initial_social_response_needs(current, "pending") == []
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize('same_turn',[False,True])
+@pytest.mark.parametrize('submitted',[False,True])
+@pytest.mark.parametrize('service_failed',[False,True])
+async def test_plan_social_replacement_is_scoped_to_its_source_turn(same_turn,submitted,service_failed):
+    from orchestrator.runtime.cognitive_runtime import GoalDrivenRuntimeCoordinator, CognitiveRuntimePolicy, CognitiveStageFailure
+    from orchestrator.runtime.capability_runtime import CapabilityRuntime, CapabilityDefinitionRegistry
+    from shared.chromie_contracts.core_interpretation import CognitiveWorkRequest
+    from shared.chromie_contracts.plan import CanonicalPlan
+
+    class DownstreamReached(Exception):pass
+    calls=[];cancelled=[];release=asyncio.Event()
+    previous=asyncio.create_task(release.wait());await asyncio.sleep(0)
+    class Agent:
+        async def resolve_social_cognition(self,*args,**kwargs):
+            calls.append(kwargs['request'])
+            if service_failed:raise RuntimeError('retained cognitive service failure')
+            raise DownstreamReached
+    runtime=CapabilityRuntime(CapabilityDefinitionRegistry())
+    async def cancel(interaction_id):cancelled.append(interaction_id)
+    runtime.cancel_interaction=cancel
+    coordinator=GoalDrivenRuntimeCoordinator(agent_client=Agent(),adapter=SimpleNamespace(interaction_runtime=SimpleNamespace(runtime=runtime)),policy=CognitiveRuntimePolicy(mode='apply'))
+    context={'conversation_id':'conversation','source_turn_provenance':{'turn_id':'source','original_text':'Retained request'}}
+    work=CognitiveWorkRequest(sid='source',text='Retained request',context=context,responsibilities=[{'local_ref':'r1','outcome':'Retained request','confidence':1.0}])
+    plan=CanonicalPlan(plan_id='plan',planner_tier='fast',disposition='respond',coverage='complete',goal_ids=['goal'],goal_outcomes=[{'goal_id':'goal','disposition':'respond','coverage':'complete'}],communication_needs=[{'need_id':'need','owner':'planner','kind':'answer','reference_id':'plan','source_goal_ids':['goal']}])
+    entry=('previous-request',previous,'source' if same_turn else 'independent-source','source' if same_turn else 'independent-source',True)
+    entry_key=('conversation',entry[2])
+    coordinator._social_turns[entry_key]=entry
+    if submitted:coordinator._social_dispatches['previous-request']='prior-delivery'
+    pending=asyncio.create_task(coordinator.resolve_plan_interaction(None,plan=plan,work_request=work,session_id='source',language='en',context=context))
+    try:
+        if same_turn and submitted:
+            await asyncio.sleep(0);await asyncio.sleep(0)
+            assert not calls and not pending.done() and not previous.cancelled()
+            release.set()
+        with pytest.raises(CognitiveStageFailure if service_failed else DownstreamReached):
+            await asyncio.wait_for(pending,1)
+        assert len(calls)==1
+        if same_turn:
+            assert previous.cancelled() is (not submitted)
+            assert entry_key not in coordinator._social_turns
+            assert cancelled==[]
+        else:
+            assert not previous.done()
+            assert coordinator._social_turns[entry_key] is entry
+            assert cancelled==[]
+            # The explicit protective output control still owns cross-turn interruption.
+            await coordinator.cancel_social_interaction()
+            assert previous.cancelled()
+            assert cancelled==(['prior-delivery'] if submitted else [])
+            assert not coordinator._social_turns and not coordinator._social_dispatches
+    finally:
+        release.set()
+        pending.cancel()
+        await asyncio.gather(pending,previous,return_exceptions=True)
+        await coordinator.cancel_social_interaction()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("episode", ["late_old", "late_old_first", "inflight_old", "required_old", "unknown_source", "foreign_conversation", "immediate_stop"])
+async def test_social_state_uses_admission_order_and_retains_required_independent_turns(episode):
+    from orchestrator.runtime.cognitive_runtime import GoalDrivenRuntimeCoordinator, CognitiveRuntimePolicy
+    from shared.chromie_contracts.core_interpretation import CognitiveWorkRequest
+    from shared.chromie_contracts.plan import SocialCommunicationNeed
+
+    history = [{"role": "user", "sid": "old", "text": "Earlier request"}]
+    live = {"conversation_id": "conversation", "history": history}
+    calls = []
+    started = {sid: asyncio.Event() for sid in ("old", "new")}
+    cancelled = []
+
+    class Agent:
+        async def resolve_social_cognition(self, session, *, request, **kwargs):
+            sid = request.context["session_id"]
+            calls.append(request)
+            started[sid].set()
+            try:
+                await asyncio.Event().wait()
+            finally:
+                cancelled.append(sid)
+
+    async def cancel_interaction(_interaction_id):
+        raise AssertionError("No speech has been submitted at this inference boundary")
+
+    coordinator = GoalDrivenRuntimeCoordinator(
+        agent_client=Agent(),
+        adapter=SimpleNamespace(interaction_runtime=SimpleNamespace(
+            runtime=SimpleNamespace(cancel_interaction=cancel_interaction))),
+        policy=CognitiveRuntimePolicy(mode="apply"), context_refresh=lambda sid: live,
+    )
+    def start(sid, *, needs=None):
+        work = CognitiveWorkRequest(sid=sid, text=f"{sid} request", context={
+            "session_id": sid, "conversation_id": "conversation",
+            "source_turn_provenance": {"turn_id": sid, "original_text": f"{sid} request"}},
+            responsibilities=[{"local_ref": "r1", "outcome": f"{sid} request", "confidence": 1.0}])
+        return coordinator.start_state_interaction(None, work_request=work, turn_id=sid,
+            communication_needs=needs, work_decision_pending=not bool(needs))
+
+    try:
+        if episode in {"late_old", "late_old_first", "required_old"}:
+            history.append({"role": "user", "sid": "new", "text": "Later admitted request"})
+        if episode == "unknown_source":
+            history[:] = [{"role": "user", "sid": "unknown", "text": "Unmatched provenance"}]
+        if episode == "foreign_conversation":
+            live["conversation_id"] = "other-conversation"
+            history.append({"role": "user", "sid": "new", "text": "Other scope"})
+        if episode in {"late_old", "late_old_first"}:
+            if episode == "late_old_first":
+                assert start("old") is None
+            newer = start("new")
+            await asyncio.wait_for(started["new"].wait(), 1)
+            assert start("old") is None
+            assert len(calls) == 1 and not newer.done() and not cancelled
+        else:
+            needs = [SocialCommunicationNeed(need_id="required-result", owner="runtime", kind="result",
+                reference_id="failed-work", source_responsibility_refs=["r1"], facts={
+                    "status": "failed", "required_result_update": True})] if episode == "required_old" else None
+            older = start("old", needs=needs)
+            await asyncio.wait_for(started["old"].wait(), 1)
+            if episode in {"inflight_old", "required_old", "immediate_stop"}:
+                if episode in {"inflight_old", "immediate_stop"}:
+                    history.append({"role": "user", "sid": "new", "text": "Later admitted request"})
+                newer = start("new")
+                if episode == "immediate_stop":
+                    await coordinator.cancel_social_interaction()
+                    assert older.cancelled() and newer.cancelled()
+                    assert len(calls) == 1
+                    return
+                await asyncio.wait_for(started["new"].wait(), 1)
+                assert not newer.done()
+                if episode == "inflight_old":
+                    assert older.cancelled() and cancelled == ["old"]
+                else:
+                    assert not older.done() and not cancelled
+                    assert calls[0].communication_needs == needs
+            else:
+                assert not older.done() and len(calls) == 1
+        await coordinator.cancel_social_interaction()
+        assert not coordinator._social_turns and not coordinator._social_dispatches
+        assert set(cancelled) == {request.context["session_id"] for request in calls}
+    finally:
+        await coordinator.cancel_social_interaction()

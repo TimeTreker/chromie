@@ -3,6 +3,8 @@ from __future__ import annotations
 import asyncio
 from types import SimpleNamespace
 
+import pytest
+
 from orchestrator.orchestrator import VoiceAssistant
 from orchestrator.runtime import planner_reentry_host
 
@@ -33,11 +35,11 @@ def _host():
     return host, runtime
 
 
-def _handover_request(host, observation=None):
+def _handover_request(host, observation=None, *, envelope=None):
     return asyncio.run(planner_reentry_host.optional_completed_resource_social_response(
         host,
         source_response=SimpleNamespace(metadata={
-            "user_turn_envelope": {
+            "user_turn_envelope": envelope or {
                 "turn_id": "turn-water",
                 "normalized_input": {"text": "Bring me some water."},
             }
@@ -79,6 +81,37 @@ def test_completed_resource_handover_becomes_optional_social_completion_need() -
         "result_kind": "resource_delivery_handover",
         "optional_completion_update": True,
     }
+
+
+@pytest.mark.parametrize("prohibited", [False, True])
+def test_handover_preserves_the_originating_turn_control_through_speech_transport(prohibited):
+    from orchestrator.runtime.response_plan import build_social_interaction_response
+    from shared.chromie_contracts.social_cognition import SocialCognitionResolution
+
+    envelope = {
+        "turn_id": "turn-water", "normalized_input": {"text": "Bring me water without speaking."},
+        "admission": "reflex_and_admit" if prohibited else "admit",
+        "reflex": {"action": "interrupt", "should_speak": False},
+    }
+    host, runtime = _host()
+    _handover_request(host, envelope=envelope)
+    request = runtime.request
+    assert request.context["user_turn_envelope"] == envelope
+    need = request.communication_needs[0]
+    result = SocialCognitionResolution(
+        request_id=request.request_id, snapshot_digest=request.snapshot_digest(), model_call_count=1,
+        disposition="communicate", reason_summary="Handover completed.",
+        need_outcomes={need.need_id: "covered"}, activities=[{
+            "activity_id": "handover", "function": "respond", "text": "Here you are.",
+            "truth_stage": "post_evidence", "delivery_phase": "immediate",
+            "source_goal_ids": request.goal_ids, "evidence_refs": request.evidence_refs,
+            "addressed_need_ids": [need.need_id],
+        }],
+    )
+    response = build_social_interaction_response(request, result, session_id="sid-water", interaction_context=None)
+    assert [speech.text for speech in response.speech] == ([] if prohibited else ["Here you are."])
+    assert response.metadata["user_turn_envelope"] == envelope
+    assert response.metadata["goal_completion_authority"] is False
 
 
 def test_non_resource_completion_does_not_create_handover_social_need() -> None:

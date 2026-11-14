@@ -829,6 +829,7 @@ class PreparedLaneStartTests(unittest.IsolatedAsyncioTestCase):
                             ),
                             "coordination_id": f"expression-{suffix}",
                             "lane_start_policy": "prepared_start",
+                            **({"execution_group": 0 if suffix == "a" else 1} if lane == "body" else {}),
                         },
                     )
                 )
@@ -867,10 +868,13 @@ class PreparedLaneStartTests(unittest.IsolatedAsyncioTestCase):
         response = InteractionResponse(interaction_id="prepared", capabilities=[CapabilityRequest(
             request_id=name, capability_id="test." + name, timing="parallel", metadata={
                 "execution_lane": lane, "coordination_id": "same-expression", "lane_start_policy": "prepared_start",
+                **({"execution_group": 0} if name == "body" else {}),
             }) for name, lane in [("voice", "vocal"), ("body", "activity")]])
         execution = await submit_and_wait_terminal(runtime, response)
         self.assertEqual(execution.status, "completed")
         self.assertLess(abs(starts["voice"] - starts["body"]), 0.04)
+        self.assertEqual(len({item.metadata["coordination_start"]["release_monotonic_s"]
+                              for item in execution.results}), 1)
 
     async def test_preparation_failure_timeout_and_optional_lateness(self):
         for mode in ("required_failure", "required_timeout", "optional_failure", "optional_late"):

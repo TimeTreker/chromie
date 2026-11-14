@@ -186,7 +186,6 @@
           "confidence": 0.99,
           "local_ref": "r1",
           "outcome": "继续已有的一次眨眼 Goal，且不产生重复 Work。",
-          "output_mode": "body_action",
           "schema_version": 1,
           "source_evidence": {
             "source_end_token_ref": "t999",

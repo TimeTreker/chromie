@@ -136,8 +136,9 @@ def expose_intersection_shapes(node: Any, *, _seen: set[int] | None = None) -> N
     elif isinstance(node, dict):
         # Visit existing children first; the redundant branch must not recurse
         # into another copy of itself.
-        for value in list(node.values()):
-            expose_intersection_shapes(value, _seen=seen)
+        for key, value in list(node.items()):
+            if key not in {"const", "enum", "default", "examples"}:
+                expose_intersection_shapes(value, _seen=seen)
         # JSON Schema defaults absent items to accepting every item. XGrammar
         # treats a bounded refinement without items as a closed empty tuple.
         # Spell out the equivalent default before exposing the intersection.

@@ -64,7 +64,6 @@ from .goal_association_validation import (
     non_verbatim_explicit_location_bindings,
     normalize_resource_binding_branches,
     resource_source_binding_contract_conflicts,
-    responsibility_output_mode_conflicts,
     inherited_goal_outcomes,
     validation_error_json,
 )
@@ -151,20 +150,6 @@ class GoalAssociationResolver:
             discourse_referents(request),
             responsibility_count=len(request.responsibilities),
             responsibility_refs=[item.local_ref for item in request.responsibilities],
-            responsibility_output_modes={
-                item.local_ref: item.output_mode
-                for item in request.responsibilities
-                if item.output_mode != "unspecified"
-            },
-            responsibility_continuity_scopes={
-                item.local_ref: item.continuity_scope
-                for item in request.responsibilities
-            },
-            responsibility_information_refs={
-                item.local_ref
-                for item in request.responsibilities
-                if item.output_mode == "information"
-            },
             responsibility_bindings={
                 item.local_ref: {
                     str(name): value
@@ -526,21 +511,11 @@ class GoalAssociationResolver:
         for relation in model_output.new_goals:
             source_ref = relation.source_responsibility_refs[0]
             responsibility = by_ref[source_ref]
-            # Every accepted Responsibility may have Goal identity. ``turn`` means
-            # the Goal is interaction-lifetime/ephemeral; it does not mean absence
-            # of a Goal and never removes Planner authority. Persistent storage is a
-            # later lifecycle decision, not GA semantics.
-            output_mode = (
-                responsibility.output_mode
-                if responsibility.output_mode != "unspecified"
-                else "other"
-            )
             # Complete media intent is sufficient here. Planner owns operation
             # extraction and Capability arguments; GA must not require them from UMI.
             mechanical_new_goals.append(
                 GoalAssociationModelGoal(
                     source_responsibility_refs=[source_ref],
-                    output_mode=output_mode,
                     bindings=[],
                     related_goal_ids=list(relation.related_goal_ids),
                     supersedes_goal_ids=list(relation.supersedes_goal_ids),
@@ -559,16 +534,6 @@ class GoalAssociationResolver:
                 "new Goal bindings cannot contain action collections; emit one "
                 "new_goals item for every independently observable responsibility: "
                 + ", ".join(collection_bindings)
-            )
-        output_mode_conflicts = responsibility_output_mode_conflicts(
-            model_output,
-            request=request,
-        )
-        if output_mode_conflicts:
-            raise ValueError(
-                "new Goal output_mode must preserve User Meaning Interpretation's "
-                "provider-neutral completion modality: "
-                + ", ".join(output_mode_conflicts)
             )
         binding_conflicts = binding_semantic_contract_conflicts(model_output)
         if binding_conflicts:
@@ -1142,25 +1107,12 @@ class GoalAssociationResolver:
                     metadata={
                         "model_boundary": type(model_output).__name__,
                         "goal_materialization_owner": "trusted_runtime_from_umi",
-                        "goal_lifetime": (
-                            "interaction"
-                            if all(
-                                responsibility_by_ref[ref].continuity_scope == "turn"
-                                for ref in item.source_responsibility_refs
-                            )
-                            else "working"
-                        ),
                         "requirement_sources": [
                             {"origin": "umi", "turn_id": turn_id,
                              "responsibility": responsibility_by_ref[ref].model_dump(mode="json")}
                             for ref in item.source_responsibility_refs
                         ],
-                        "output_mode": item.output_mode,
-                        "body_effect_families": sorted({
-                            responsibility_by_ref[ref].body_effect_family
-                            for ref in item.source_responsibility_refs
-                            if responsibility_by_ref[ref].body_effect_family is not None
-                        }),
+                        **({"output_mode": item.output_mode} if item.output_mode is not None else {}),
                         "media_operation": item.media_operation,
                         "resolved_references": [
                             reference.model_dump(mode="json", exclude_none=True)

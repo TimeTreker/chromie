@@ -82,7 +82,7 @@ microphone -> host VAD -> ASR -> Cognitive Gateway
   -> local suppression: record the envelope and start no ordinary cognition
   -> explicit text: transport-addressed admission -> admitted UserTurnEnvelope
   -> otherwise: attention review -> admitted UserTurnEnvelope
-  -> User Meaning Interpretation: complete intent + result type + source evidence + unresolved meaning
+  -> User Meaning Interpretation: complete contextual intent + source evidence + unresolved meaning
   -> same UMI result, concurrent fan-out
        |-> SC: complete interaction + optional expression -> validated delivery
        |-> Planner: input resolution + exact Capability Work + communication Needs

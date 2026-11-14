@@ -66,7 +66,7 @@ or alter Soridormi safety.
 
 ## Mechanical structural baseline
 
-Blocking ownership rules and size ratchets are owned by
+Blocking ownership rules and informational size baselines are owned by
 `config/runtime_structure_ratchets.json` and checked by:
 
 ```bash
@@ -78,9 +78,9 @@ initialized-attribute baselines, and line baselines for `orchestrator.py`, the
 other runtime files over 3,000 lines and the split former god files
 `capability_runtime.py` and `conversation_state.py`, measured at its
 `size_baseline_revision`.
-Each run reports current values and signed deltas, and fails if a value grows
-above its baseline. Staying under the baselines does not prove that structural
-simplification is complete. Missing collaborators,
+Each run reports current values and signed deltas for review. Counts alone do
+not decide correctness or require extraction; ownership, testability, configuration
+authority and failure semantics govern that review. Missing collaborators,
 returned lifecycle state, forbidden compatibility methods and any direct legacy
 Host model call remain blocking. The Host makes no model call. When an owner
 explicitly sets `ORCH_RUNTIME_READY_GREETING_SPEECH_ENABLED=1` and leaves

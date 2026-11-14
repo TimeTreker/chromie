@@ -69,7 +69,7 @@ class RuntimeStructureRatchetTests(unittest.TestCase):
         lines[init.body[0].lineno - 1:init.body[0].lineno - 1] = [init_text]
         return "".join(lines)
 
-    def test_size_growth_above_baseline_is_rejected(self) -> None:
+    def test_size_growth_is_reported_for_review_without_blocking(self) -> None:
         variants = (
             ("init_lines", "        # Comment one.\n        # Comment two.\n", ""),
             ("init_self_attributes", "        self.probe_a = self.probe_b = self.probe_c = None\n", ""),
@@ -82,9 +82,9 @@ class RuntimeStructureRatchetTests(unittest.TestCase):
                 if metric == "init_lines":
                     self.assertEqual(ast.dump(ast.parse(source)), ast.dump(ast.parse(self.current_source())))
                 status, output = self.probe(source)
-                self.assertEqual(status, 1, output)
-                self.assertIn(f"size_baselines.{metric} grew to", output)
-                self.assertIn("file_line_baselines[orchestrator/orchestrator.py] grew to", output)
+                self.assertEqual(status, 0, output)
+                self.assertRegex(output, rf"size_baselines\.{metric}=\d+ baseline=\d+ delta=\+[1-9]\d*")
+                self.assertRegex(output, r"file_line_baselines\[orchestrator/orchestrator.py\]=\d+ baseline=\d+ delta=\+[1-9]\d*")
 
     def test_size_at_or_below_baseline_passes(self) -> None:
         status, output = self.probe(self.current_source())

@@ -126,7 +126,6 @@
           "confidence": 0.99,
           "local_ref": "r1",
           "outcome": "Walk forward for five seconds as one atomic member.",
-          "output_mode": "body_action",
           "schema_version": 1,
           "source_evidence": {
             "source_end_token_ref": "t999",
@@ -141,7 +140,6 @@
           "confidence": 0.99,
           "local_ref": "r2",
           "outcome": "Create an 8:00 p.m. reminder as the other atomic member.",
-          "output_mode": "stateful_effect",
           "schema_version": 1,
           "source_evidence": {
             "source_end_token_ref": "t999",

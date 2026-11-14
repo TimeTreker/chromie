@@ -413,9 +413,12 @@ def test_every_exposed_plan_shape_ties_its_disposition_to_its_steps():
     rejects. The aggregate assignment lived only in allOf, which native decoders ignore,
     so the visible shape offered every disposition with up to four steps."""
     from agent.app.planner_native_schema import native_goal_outcome_branches
+    from agent.app.planner_model_contract import need_first_response_schema
     from agent.app.planner_schema import (
-        canonical_plan_response_schema, need_first_response_schema,
-        planner_readiness_response_schema, readiness_first_response_schema)
+        canonical_plan_response_schema,
+        planner_readiness_response_schema,
+        readiness_first_response_schema,
+    )
 
     def exposed(node):
         yield node

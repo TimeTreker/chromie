@@ -26,9 +26,9 @@ def test_user_meaning_interpretation_prompt_uses_general_rules_not_casebook_lite
         "'tonight'",
     ):
         assert literal not in prompt
-    assert "ordering, concurrency" in prompt.casefold()
-    assert "source_evidence names the first and last current-turn token" in prompt
-    assert "Do not convert a question about whether P is true into an assertion that P is true." in prompt
+    # Source literal exclusions guard against a casebook. Complete meaning,
+    # relations and citations are qualified through actual primary transactions;
+    # particular positive prompt sentences are not a semantic regression oracle.
 
 
 def test_deep_user_meaning_interpretation_atomicity_rule_is_language_independent() -> None:

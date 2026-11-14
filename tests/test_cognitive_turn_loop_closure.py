@@ -186,7 +186,8 @@ class _Runtime:
         event = lifecycle.register_turn_speech_event(session_id=session_id,
             origin_session_id=speech.metadata.get("origin_session_id"),
             generation=generation, orders=[order], normalized_text=speech.text,
-            stage="result", purpose="answer", communicative_activity_ids=[speech.id])
+            stage="result", purpose="answer",
+            communicative_activity_ids=list(speech.metadata.get("communicative_activity_ids") or [speech.id]))
         lifecycle.update_turn_speech_event_for_playback(generation=generation, order=order,
             session_id=session_id, started=True, reason="scripted_start")
         lifecycle.complete_turn_speech_order(generation=generation, order=order,

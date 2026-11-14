@@ -128,7 +128,6 @@
           "confidence": 0.99,
           "local_ref": "r1",
           "outcome": "Create a recurring weekday reminder, or propose the explicitly permitted one-time September 4, 2099 alternative.",
-          "output_mode": "stateful_effect",
           "schema_version": 1,
           "source_evidence": {
             "source_end_token_ref": "t999",

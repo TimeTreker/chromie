@@ -1035,7 +1035,57 @@ def reconcile_communicative_goal_completion(
         goal = state._semantic_goal_from_context(context)
         goal_metadata = goal.metadata if isinstance(goal.metadata, dict) else {}
         output_mode = str(goal_metadata.get("output_mode") or "").strip()
-        if output_mode == "information":
+        current_metadata = context.get("metadata") or {}
+        supplied_needs = current_metadata.get("communication_needs") or evidence.get("communication_needs") or []
+        required_needs = {item["need_id"] for item in supplied_needs if isinstance(item, dict)
+                          and item.get("kind") == "answer"
+                          and (goal_id in (item.get("source_goal_ids") or [])
+                               or bool(set(goal.source_responsibility_refs) & set(item.get("source_responsibility_refs") or [])))}
+        addressed = set(evidence.get("addressed_need_ids") or [])
+        stages = set(evidence.get("truth_stages") or [evidence.get("truth_stage")])
+        existing_summary = context.get("evidence_summary") or {}
+        recorded_delivery = existing_summary.get("communicative_completion") or {}
+        if required_needs and evidence.get("playback_completed") is True and stages and stages <= {"context_grounded", "post_evidence"}:
+            prior_ids = set(recorded_delivery.get("addressed_need_ids") or [])
+            proof = {**evidence, "addressed_need_ids": sorted(prior_ids | (addressed & required_needs)),
+                     "evidence_ref": evidence_ref, "goal_id": goal_id}
+            existing_summary["communicative_completion"] = proof
+            context["evidence_summary"] = existing_summary
+            changed = True
+            addressed = set(proof["addressed_need_ids"])
+        else:
+            addressed = set(recorded_delivery.get("addressed_need_ids") or [])
+        work_ids = set(current_metadata.get("communication_work_step_ids") or [])
+        execution = existing_summary.get("execution_outcome") or {}
+        work_complete = not work_ids or (execution.get("status") == "completed"
+                         and work_ids <= set(execution.get("completed_step_ids") or [])
+                         and not execution.get("unresolved_step_ids"))
+        planned_satisfaction = current_metadata.get("planned_satisfaction") or {}
+        pending_effects = any(item.get("capability_id") != "chromie.speak"
+                              and item.get("request_id") in set(current_metadata.get("remaining_request_ids") or [])
+                              for item in current_metadata.get("planned_capabilities") or [] if isinstance(item, dict))
+        if (planned_satisfaction.get("unmet_requirements")
+                or goal_id in (planned_satisfaction.get("unmet_goal_ids") or [])
+                or current_metadata.get("time_conditions")
+                or pending_effects and execution.get("status") != "completed"):
+            work_complete = False
+        bound_goal = any(goal_id in (item.get("source_goal_ids") or []) and item.get("need_id") in addressed
+                         for item in supplied_needs if isinstance(item, dict))
+        delivered_sources = {ref for item in supplied_needs if isinstance(item, dict) and item.get("need_id") in addressed
+                             for ref in item.get("source_responsibility_refs") or []}
+        source_coverage = bound_goal or bool(goal.source_responsibility_refs) and set(goal.source_responsibility_refs) <= delivered_sources
+        if "pre_evidence" in stages or (required_needs and not required_needs <= addressed) or not work_complete:
+            results.append({"goal_id": goal_id, "changed": False,
+                            "reason": "goal_requires_complete_work_and_delivered_need_evidence"})
+            continue
+        if not output_mode:
+            if (not required_needs or not required_needs <= addressed or not source_coverage or not work_complete
+                    or evidence.get("playback_completed") is not True
+                    or not stages <= {"context_grounded", "post_evidence"}):
+                results.append({"goal_id": goal_id, "changed": False,
+                                "reason": "goal_requires_complete_work_and_delivered_need_evidence"})
+                continue
+        elif output_mode == "information":
             if not social_delivery:
                 results.append(
                     {
@@ -1112,7 +1162,7 @@ def reconcile_communicative_goal_completion(
         if not isinstance(evidence_summary, dict):
             evidence_summary = {}
         evidence_summary["communicative_completion"] = {
-            **evidence,
+            **evidence, "addressed_need_ids": sorted(addressed),
             "evidence_ref": evidence_ref,
             "goal_id": goal_id,
         }
@@ -1198,6 +1248,10 @@ def reconcile_execution_outcome_responsibilities(
                 or qualification["established"]
             )
         )
+        declared_needs = {item["need_id"] for item in (context.get("metadata") or {}).get("communication_needs") or []
+                          if isinstance(item, dict) and item.get("kind") == "answer"}
+        delivered_needs = set((evidence_summary.get("communicative_completion") or {}).get("addressed_need_ids") or [])
+        completion_established = completion_established and declared_needs <= delivered_needs
         current = "satisfied" if completion_established else "open"
         if current != previous:
             state._set_goal_responsibility_status(

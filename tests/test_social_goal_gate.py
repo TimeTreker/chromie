@@ -34,8 +34,8 @@ def _speech(ref: str = "r1") -> CognitiveResponsibilityProposal:
     return CognitiveResponsibilityProposal(
         local_ref=ref,
         outcome="Maintain the current conversation.",
-        output_mode="speech",
-        continuity_scope="turn",
+
+
         confidence=1.0,
     )
 
@@ -43,7 +43,7 @@ def _speech(ref: str = "r1") -> CognitiveResponsibilityProposal:
 def test_ga_maps_turn_speech_without_authorship_or_implicit_planner_request() -> None:
     schema = goal_association_response_schema(
         GoalSegmentationModelOutput, [], [], responsibility_count=1,
-        responsibility_refs=["r1"], responsibility_output_modes={"r1": "speech"},
+        responsibility_refs=["r1"],
         responsibility_bindings={"r1": {}},
     )
     valid = {
@@ -189,8 +189,8 @@ async def test_conversational_ping_wakes_planner_only_after_ga_finds_goal() -> N
         responsibilities=[{
             "local_ref": "r1",
             "outcome": "Re-engage the current conversation.",
-            "output_mode": "speech",
-            "continuity_scope": "turn",
+
+
             "confidence": 1.0,
         }],
     )
@@ -304,15 +304,15 @@ async def test_mixed_greeting_and_work_plans_only_work_concurrently_with_ga() ->
             {
                 "local_ref": "greet",
                 "outcome": "Greet Chromie.",
-                "output_mode": "speech",
-                "continuity_scope": "turn",
+
+
                 "confidence": 1.0,
             },
             {
                 "local_ref": "blink",
                 "outcome": "Blink once.",
-                "output_mode": "body_action",
-                "continuity_scope": "goal",
+
+
                 "confidence": 1.0,
             },
         ],
@@ -321,11 +321,6 @@ async def test_mixed_greeting_and_work_plans_only_work_concurrently_with_ga() ->
                 "authority": "goal_association",
                 "responsibility_refs": ["greet", "blink"],
                 "reason_summary": "Check continuity for the complete accepted turn.",
-            },
-            {
-                "authority": "social_cognition",
-                "responsibility_refs": ["greet", "blink"],
-                "reason_summary": "Consider immediate interaction while Work is planned.",
             },
             {
                 "authority": "planner",
@@ -460,10 +455,10 @@ async def test_goal_scope_beyond_the_first_plan_is_planned_once_over_ga_goals() 
     core, envelope = admitted_core(
         "Tell my teacher I was sick. I just didn't want to go.", sid="scope", language="en-US",
         responsibilities=[
-            {"local_ref": "r1", "outcome": "tell my teacher I was sick", "output_mode": "speech",
-             "continuity_scope": "turn", "confidence": 1.0},
-            {"local_ref": "r2", "outcome": "I just didn't want to go", "output_mode": "speech",
-             "continuity_scope": "turn", "confidence": 1.0},
+            {"local_ref": "r1", "outcome": "tell my teacher I was sick",
+              "confidence": 1.0},
+            {"local_ref": "r2", "outcome": "I just didn't want to go",
+              "confidence": 1.0},
         ],
         cognitive_requests=[
             {"authority": "goal_association", "responsibility_refs": ["r1", "r2"], "reason_summary": "Continuity."},
@@ -535,10 +530,10 @@ async def test_a_scope_extension_replaces_the_speculative_prepared_work() -> Non
     core, envelope = admitted_core(
         "Blink, and cheer with me!", sid="extend", language="en-US",
         responsibilities=[
-            {"local_ref": "r1", "outcome": "Blink.", "output_mode": "body_action",
-             "continuity_scope": "goal", "confidence": 1.0},
-            {"local_ref": "r2", "outcome": "Cheer with me.", "output_mode": "speech",
-             "continuity_scope": "goal", "confidence": 1.0},
+            {"local_ref": "r1", "outcome": "Blink.",
+              "confidence": 1.0},
+            {"local_ref": "r2", "outcome": "Cheer with me.",
+              "confidence": 1.0},
         ],
         cognitive_requests=[
             {"authority": "goal_association", "responsibility_refs": ["r1", "r2"], "reason_summary": "Continuity."},

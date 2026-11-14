@@ -18,12 +18,10 @@
       "confidence": 0.94,
       "responsibilities": [
         {
-          "schema_version": 1,
           "local_ref": "r1",
           "outcome": "answer whether the user is correct that the sun is hot and round",
           "confidence": 0.94,
-          "output_mode": "information",
-          "continuity_scope": "goal"
+          "value_review": false
         }
       ],
       "meaning_uncertainties": [],
@@ -32,8 +30,7 @@
           "authority": "planner",
           "responsibility_refs": [
             "r1"
-          ],
-          "reason_summary": "Explicit authored fixture requests the existing cognitive owner."
+          ]
         }
       ]
     }
@@ -49,8 +46,7 @@
       {
         "local_ref": "r1",
         "outcome": "answer whether the user is correct that the sun is hot and round",
-        "confidence": 0.94,
-        "output_mode": "information"
+        "confidence": 0.94
       }
     ]
   },

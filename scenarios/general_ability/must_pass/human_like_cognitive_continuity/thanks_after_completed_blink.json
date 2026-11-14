@@ -17,20 +17,37 @@
       "safety_authorization_capability_and_execution_evidence",
       "provenance_and_llm_integrity"
     ],
-    "semantic_dimensions": ["dialogue_continuity", "social_understanding", "naturalness"],
+    "semantic_dimensions": [
+      "dialogue_continuity",
+      "social_understanding",
+      "naturalness"
+    ],
     "semantic_blocking": true
   },
   "review_rubric": {
     "judge_meaning_not_exact_wording": true,
-    "dimensions": ["dialogue_continuity", "social_understanding", "naturalness"],
-    "primary_outcomes": ["Acknowledge the user's thanks naturally without repeating the already completed blink."],
-    "acceptable_auxiliary": ["A brief response such as 不客气 or a natural equivalent is sufficient."],
+    "dimensions": [
+      "dialogue_continuity",
+      "social_understanding",
+      "naturalness"
+    ],
+    "primary_outcomes": [
+      "Acknowledge the user's thanks naturally without repeating the already completed blink."
+    ],
+    "acceptable_auxiliary": [
+      "A brief response such as 不客气 or a natural equivalent is sufficient."
+    ],
     "forbidden_semantic_outcomes": [
       "Replay or re-propose the completed blink action.",
       "Treat the thank-you as a new physical command.",
       "Expose internal completion, Goal, Planner, or provider terminology."
     ],
-    "verdicts": ["pass", "partial", "fail", "insufficient_evidence"]
+    "verdicts": [
+      "pass",
+      "partial",
+      "fail",
+      "insufficient_evidence"
+    ]
   },
   "description": "Common social closure must not reactivate completed physical work.",
   "turns": [
@@ -38,8 +55,12 @@
       "id": "completed_blink_before_thanks",
       "text": "眨两下眼睛。",
       "language": "zh-CN",
-      "expected_capabilities": ["soridormi.blink_eyes"],
-      "expected_args": ["0:count=2"],
+      "expected_capabilities": [
+        "soridormi.blink_eyes"
+      ],
+      "expected_args": [
+        "0:count=2"
+      ],
       "require_speech": false
     },
     {
@@ -47,7 +68,9 @@
       "text": "谢谢你。",
       "language": "zh-CN",
       "expect_no_capabilities": true,
-      "forbidden_capabilities": ["soridormi.blink_eyes"],
+      "forbidden_capabilities": [
+        "soridormi.blink_eyes"
+      ],
       "require_speech": true
     }
   ],
@@ -58,7 +81,13 @@
         "title": "Human-like Cognitive Continuity",
         "general_rule": "Chromie should remain one continuous interlocutor while work progresses: preserve recent meaning, avoid duplicate acknowledgements, keep conversation available, and let follow-up turns revise only the relevant unfinished responsibility.",
         "rationale": "A routine thank-you after completed work should receive a social acknowledgement and must not replay the completed gesture.",
-        "root_cause_boundaries": ["Cognitive Gateway", "User Meaning Interpretation/Goal Association", "Planner", "Host interaction state", "Test evidence"]
+        "root_cause_boundaries": [
+          "Cognitive Gateway",
+          "User Meaning Interpretation/Goal Association",
+          "Planner",
+          "Host interaction state",
+          "Test evidence"
+        ]
       }
     ]
   }

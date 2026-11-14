@@ -126,7 +126,6 @@
           "confidence": 0.99,
           "local_ref": "r1",
           "outcome": "向前走五秒，作为原子请求的一项。",
-          "output_mode": "body_action",
           "schema_version": 1,
           "source_evidence": {
             "source_end_token_ref": "t999",
@@ -141,7 +140,6 @@
           "confidence": 0.99,
           "local_ref": "r2",
           "outcome": "创建20:00提醒，作为原子请求的另一项。",
-          "output_mode": "stateful_effect",
           "schema_version": 1,
           "source_evidence": {
             "source_end_token_ref": "t999",

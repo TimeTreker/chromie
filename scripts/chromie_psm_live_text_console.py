@@ -340,7 +340,10 @@ async def _wait_for_session_done(
     while time.monotonic() < deadline:
         publish()
         state = assistant.sessions.state.get(sid) or {}
-        if state.get("done_logged") or state.get("interrupted"):
+        social_pending = bool(state.get("pending_social_tasks", 0))
+        if not social_pending and state.get("social_task_failures"):
+            raise RuntimeError(f"session {sid} social work failed: {state['social_task_failures']}")
+        if (state.get("done_logged") or state.get("interrupted")) and not social_pending:
             return
         await asyncio.sleep(0.05)
     raise TimeoutError(f"session {sid} did not finish within {timeout_s:.1f}s")

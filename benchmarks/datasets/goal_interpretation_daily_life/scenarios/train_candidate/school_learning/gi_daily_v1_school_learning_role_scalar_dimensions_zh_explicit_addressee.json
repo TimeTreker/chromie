@@ -22,13 +22,11 @@
         {
           "local_ref": "r1",
           "outcome": "询问小林小组作业周五交是否属实 (请问小林，小组作业周五交是不是真的)",
-          "output_mode": "speech",
           "confidence": 1.0,
           "source_evidence": {
             "source_start_token_ref": "t0",
             "source_end_token_ref": "t16"
           },
-          "continuity_scope": "goal",
           "value_review": false
         }
       ],
@@ -38,15 +36,13 @@
           "authority": "goal_association",
           "responsibility_refs": [
             "r1"
-          ],
-          "reason_summary": "Preserve canonical continuity for the requested independent outcome."
+          ]
         },
         {
           "authority": "planner",
           "responsibility_refs": [
             "r1"
-          ],
-          "reason_summary": "Determine the Work or information acquisition needed for the requested outcome."
+          ]
         }
       ]
     },
@@ -55,7 +51,6 @@
       "responsibilities": [
         {
           "local_ref": "r1",
-          "output_mode": "speech",
           "outcome_contains_any": [
             "询问",
             "问"
@@ -63,7 +58,8 @@
           "required_intent_details": {
             "addressee": "小林",
             "proposition": "小组作业周五交"
-          }
+          },
+          "value_review": false
         }
       ],
       "unresolved": false,
@@ -78,11 +74,14 @@
       "activities",
       "binding_items",
       "bindings",
+      "body_effect_family",
       "capability_id",
+      "continuity_scope",
       "coordination",
       "execution_lane",
       "goal_id",
       "information_gaps",
+      "output_mode",
       "plan",
       "provider_id",
       "relationship",

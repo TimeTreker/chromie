@@ -4,7 +4,7 @@
       "lexical overlap selects the wrong Goal",
       "terminal or paused lifecycle is ignored",
       "one GI Responsibility is dropped or duplicated",
-      "GA changes GI output_mode or invents Planner HOW",
+      "GA changes accepted UMI WHAT or invents Planner HOW",
       "mixed continuity is dropped or duplicated across association and creation"
     ],
     "phenomena": [
@@ -116,13 +116,13 @@
       "history": [],
       "interpretation_confidence": 1.0,
       "language": "zh-CN",
+      "meaning_uncertainties": [],
       "planner_reentry_scope": null,
       "responsibilities": [
         {
           "confidence": 1.0,
           "local_ref": "r1",
           "outcome": "First separated outcome for 用简单的话说明竖式除法。 (把这个目标拆成两个分别负责的结果。)",
-          "output_mode": "information",
           "schema_version": 1,
           "source_evidence": {
             "source_end_token_ref": "tok_r1_end",
@@ -133,7 +133,6 @@
           "confidence": 1.0,
           "local_ref": "r2",
           "outcome": "Second separated outcome for 用简单的话说明竖式除法。 (把这个目标拆成两个分别负责的结果。)",
-          "output_mode": "information",
           "schema_version": 1,
           "source_evidence": {
             "source_end_token_ref": "tok_r2_end",
@@ -143,8 +142,7 @@
       ],
       "schema_version": 1,
       "sid": "ga_daily_v1_07_09_split_existing_goal",
-      "text": "把这个目标拆成两个分别负责的结果。",
-      "meaning_uncertainties": []
+      "text": "把这个目标拆成两个分别负责的结果。"
     }
   },
   "invariants": {
@@ -166,13 +164,53 @@
   "split": "frozen_test",
   "target": {
     "contract_gap": null,
+    "reference_model_output": {
+      "associations": [
+        {
+          "confidence": 1.0,
+          "reason_summary": "The source-grounded continuity relationship is split.",
+          "relationship": "split",
+          "resolved_gap_ids": [],
+          "source_responsibility_refs": [
+            "r1",
+            "r2"
+          ],
+          "target_goal_ids": [
+            "goal_07_09_a"
+          ]
+        }
+      ],
+      "cognitive_requests": [
+        {
+          "authority": "social_cognition",
+          "reason_summary": "Decide interaction using the established canonical continuity facts.",
+          "responsibility_refs": [
+            "r1",
+            "r2"
+          ]
+        },
+        {
+          "authority": "planner",
+          "reason_summary": "Determine the remaining Work or control delta from the accepted Goal continuity.",
+          "responsibility_refs": [
+            "r1",
+            "r2"
+          ]
+        }
+      ],
+      "confidence": 1.0,
+      "new_goals": [],
+      "reason_summary": "Map every accepted GI Responsibility exactly once.",
+      "referent_updates": [],
+      "resolved_references": []
+    },
     "schema_expectation": "accept",
     "semantic_expectations": {
       "candidate_goal_ids": [
         "goal_07_09_a"
       ],
       "must_map_every_responsibility_exactly_once": true,
-      "must_preserve_gi_output_mode": true,
+      "must_preserve_umi_what": true,
       "responsibility_count": 2,
       "responsibility_map": [
         {
@@ -192,46 +230,6 @@
           ]
         }
       ]
-    },
-    "reference_model_output": {
-      "associations": [
-        {
-          "confidence": 1.0,
-          "reason_summary": "The source-grounded continuity relationship is split.",
-          "relationship": "split",
-          "resolved_gap_ids": [],
-          "source_responsibility_refs": [
-            "r1",
-            "r2"
-          ],
-          "target_goal_ids": [
-            "goal_07_09_a"
-          ]
-        }
-      ],
-      "confidence": 1.0,
-      "reason_summary": "Map every accepted GI Responsibility exactly once.",
-      "referent_updates": [],
-      "resolved_references": [],
-      "cognitive_requests": [
-        {
-          "authority": "social_cognition",
-          "responsibility_refs": [
-            "r1",
-            "r2"
-          ],
-          "reason_summary": "Decide interaction using the established canonical continuity facts."
-        },
-        {
-          "authority": "planner",
-          "responsibility_refs": [
-            "r1",
-            "r2"
-          ],
-          "reason_summary": "Determine the remaining Work or control delta from the accepted Goal continuity."
-        }
-      ],
-      "new_goals": []
     }
   }
 }

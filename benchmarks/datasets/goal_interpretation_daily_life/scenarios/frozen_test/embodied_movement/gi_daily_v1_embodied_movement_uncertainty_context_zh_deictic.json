@@ -22,14 +22,12 @@
         {
           "local_ref": "r1",
           "outcome": "把那个拿给教练",
-          "output_mode": "body_action",
           "confidence": 0.75,
           "source_evidence": {
             "source_start_token_ref": "t0",
             "source_end_token_ref": "t6"
           },
-          "continuity_scope": "goal",
-          "body_effect_family": "task_physical_effect"
+          "value_review": false
         }
       ],
       "meaning_uncertainties": [
@@ -47,8 +45,7 @@
           "authority": "goal_association",
           "responsibility_refs": [
             "r1"
-          ],
-          "reason_summary": "Preserve canonical continuity for the requested independent outcome."
+          ]
         }
       ]
     },
@@ -57,7 +54,6 @@
       "responsibilities": [
         {
           "local_ref": "r1",
-          "output_mode": "body_action",
           "outcome_contains_any": [
             "拿",
             "递",
@@ -67,7 +63,7 @@
             "entity": "那个",
             "recipient": "教练"
           },
-          "body_effect_family": "task_physical_effect"
+          "value_review": false
         }
       ],
       "unresolved": true,
@@ -82,11 +78,14 @@
       "activities",
       "binding_items",
       "bindings",
+      "body_effect_family",
       "capability_id",
+      "continuity_scope",
       "coordination",
       "execution_lane",
       "goal_id",
       "information_gaps",
+      "output_mode",
       "plan",
       "provider_id",
       "relationship",

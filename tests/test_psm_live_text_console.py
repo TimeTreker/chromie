@@ -478,3 +478,20 @@ def test_text_console_starts_ambient_perception_with_capabilities() -> None:
         assert done_callbacks == [task]
 
     asyncio.run(exercise())
+
+
+@pytest.mark.parametrize("terminal", ["done_logged", "interrupted"])
+def test_console_completion_waits_for_social_task_and_retains_its_failure(terminal):
+    async def exercise():
+        state = {terminal: True, "pending_social_tasks": 1, "social_task_failures": []}
+        assistant = SimpleNamespace(sessions=SimpleNamespace(state={"sid": state}))
+        published = []
+        waiting = asyncio.create_task(console._wait_for_session_done(
+            assistant, "sid", 1, lambda: published.append(True)))
+        await asyncio.sleep(0)
+        assert not waiting.done()
+        state.update(pending_social_tasks=0, social_task_failures=[{"error": "retained delivery failure"}])
+        with pytest.raises(RuntimeError, match="social work failed"):
+            await waiting
+        assert published
+    asyncio.run(exercise())

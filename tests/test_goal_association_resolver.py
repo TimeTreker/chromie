@@ -509,7 +509,7 @@ class GoalExecutionContractTests(unittest.TestCase):
                             "entity": "bottle of milk",
                             "recipient": "me",
                         },
-                        "output_mode": "body_action",
+
                         "confidence": 1.0,
                     }
                 )
@@ -551,7 +551,7 @@ class GoalExecutionContractTests(unittest.TestCase):
                             "location": location,
                             "object": "bottle of milk",
                         },
-                        "output_mode": "body_action",
+
                         "confidence": 0.98,
                     }
                 )
@@ -592,14 +592,14 @@ class GoalExecutionContractTests(unittest.TestCase):
                         "local_ref": "r1",
                         "outcome": "singing",
                         "bindings": {},
-                        "output_mode": "singing",
+
                         "confidence": 0.98,
                     },
                     {
                         "local_ref": "r2",
                         "outcome": "blinking eyes simultaneously",
                         "bindings": {"simultaneously": "simultaneously"},
-                        "output_mode": "body_action",
+
                         "confidence": 0.98,
                     },
                 )
@@ -646,7 +646,7 @@ class GoalExecutionContractTests(unittest.TestCase):
                             "duration": "15 seconds",
                             "speed": "quickly",
                         },
-                        "output_mode": "body_action",
+
                         "confidence": 1.0,
                     }
                 )
@@ -744,14 +744,14 @@ class GoalExecutionContractTests(unittest.TestCase):
                         "local_ref": "r1",
                         "outcome": "Look at me",
                         "bindings": {},
-                        "output_mode": "body_action",
+
                         "confidence": 0.99,
                     },
                     {
                         "local_ref": "r2",
                         "outcome": "blink twice",
                         "bindings": {},
-                        "output_mode": "body_action",
+
                         "confidence": 0.99,
                     },
                 )
@@ -1092,25 +1092,23 @@ if __name__ == "__main__":
 
 class GoalMeaningInheritanceTests(unittest.TestCase):
 
-    def test_body_effect_family_is_preserved_into_goal_metadata(self):
+    def test_fresh_goal_does_not_reintroduce_umi_result_classification(self):
         req = request("bring the milk to me", language="en-US").model_copy(
             update={
                 "responsibilities": typed_responsibilities({
                     "local_ref": "r1",
                     "outcome": "bring the milk to me",
                     "bindings": {"entity": "milk", "recipient": "me"},
-                    "output_mode": "body_action",
-                    "body_effect_family": "task_physical_effect",
+
+
                     "confidence": 1.0,
                 })
             }
         )
         raw = create_goals(intent_goal("unused", "body_action"))
         result = asyncio.run(GoalAssociationResolver(ScriptedOllama([raw])).resolve(req))
-        self.assertEqual(
-            result.new_goals[0].metadata["body_effect_families"],
-            ["task_physical_effect"],
-        )
+        self.assertNotIn("body_effect_families", result.new_goals[0].metadata)
+        self.assertNotIn("output_mode", result.new_goals[0].metadata)
 
     def test_minimal_ga_new_goal_preserves_structured_umi_binding_losslessly(self):
         structured = {"room": "desk", "offset": [1, 2]}
@@ -1121,7 +1119,7 @@ class GoalMeaningInheritanceTests(unittest.TestCase):
                         "local_ref": "r1",
                         "outcome": "Arrange them in this region.",
                         "bindings": {"region": structured},
-                        "output_mode": "body_action",
+
                         "confidence": 0.97,
                     }
                 )
@@ -1356,8 +1354,7 @@ class GoalAssociationRepairPreservationTests(unittest.TestCase):
             goal = {"goal_id": "goal-a", "open_information_gaps": [{"gap_id": "act:location"}] if gaps else [],
                     "goal": {"description": "x", "success_criteria": ["A"], "metadata": {"output_mode": "information"}}}
             schema = goal_association_response_schema(
-                GoalAssociationModelOutput, [goal], [], responsibility_refs=["r1"],
-                responsibility_output_modes={"r1": mode})
+                GoalAssociationModelOutput, [goal], [], responsibility_refs=["r1"])
             wire = _openai_response_format(schema)["json_schema"]["schema"]
             association = wire["$defs"]["GoalAssociationModelAssociation"]
             assert "anyOf" not in association and "allOf" not in association
@@ -1370,7 +1367,7 @@ class GoalAssociationRepairPreservationTests(unittest.TestCase):
         for mode, gaps in (("information", True), ("information", False), ("speech", True), ("speech", False)):
             with self.subTest(mode=mode, gaps=gaps):
                 decoded = decoder(mode, gaps)
-                self.assertIs(decoded.is_valid(change), mode == "information")
+                self.assertFalse(decoded.is_valid(change))
                 self.assertFalse(decoded.is_valid({**row, "relationship": "modify"}))
                 self.assertIs(decoded.is_valid({**row, "relationship": "clarify", "resolved_gap_ids": ["act:location"]}), gaps)
                 self.assertTrue(decoded.is_valid({**row, "relationship": "reference"}))
@@ -1463,7 +1460,6 @@ class GoalAssociationOnlyContractTests(unittest.TestCase):
         return ga_schema.goal_association_response_schema(
             output, candidates, [], responsibility_count=len(refs),
             responsibility_refs=list(refs),
-            responsibility_output_modes={ref: "speech" for ref in refs},
         )
 
     def test_live_model_schema_has_no_new_goal_authorship(self):
@@ -1576,7 +1572,7 @@ class GoalAssociationOnlyContractTests(unittest.TestCase):
             "local_ref": "r1",
             "outcome": "Establish whether it will rain tomorrow in Chongqing.",
             "bindings": {"location": "Chongqing", "time": "tomorrow"},
-            "output_mode": "information", "continuity_scope": "goal", "confidence": 1.0,
+              "confidence": 1.0,
         })})
         output = GoalSegmentationModelOutput.model_validate({
             "decision": "create_goals", "new_goals": [{"source_responsibility_refs": ["r1"], "related_goal_ids": [], "supersedes_goal_ids": []}],
@@ -1593,15 +1589,15 @@ class GoalAssociationOnlyContractTests(unittest.TestCase):
             {name: value["value"] for name, value in created.object["bindings"].items()},
             req.responsibilities[0].bindings,
         )
-        self.assertEqual(created.metadata["output_mode"], "information")
-        self.assertEqual(created.metadata["goal_lifetime"], "working")
+        self.assertNotIn("output_mode", created.metadata)
+        self.assertNotIn("goal_lifetime", created.metadata)
         self.assertEqual(created.metadata["goal_materialization_owner"], "trusted_runtime_from_umi")
 
     def test_trusted_materialization_creates_short_lived_interaction_goal_for_joke(self):
         req = request("Tell me a joke.")
         req = req.model_copy(update={"responsibilities": typed_responsibilities({
             "local_ref": "r1", "outcome": "Tell the user a joke.",
-            "bindings": {}, "output_mode": "speech", "continuity_scope": "turn", "confidence": 1.0,
+            "bindings": {},   "confidence": 1.0,
         })})
         output = GoalSegmentationModelOutput.model_validate({
             "decision": "no_goal", "new_goals": [{"source_responsibility_refs": ["r1"], "related_goal_ids": [], "supersedes_goal_ids": []}],
@@ -1613,7 +1609,7 @@ class GoalAssociationOnlyContractTests(unittest.TestCase):
         ))
         self.assertEqual(result.non_goal_responsibility_refs, [])
         self.assertEqual(len(result.new_goals), 1)
-        self.assertEqual(result.new_goals[0].metadata["goal_lifetime"], "interaction")
+        self.assertNotIn("goal_lifetime", result.new_goals[0].metadata)
         self.assertEqual(result.new_goals[0].description, "Tell the user a joke.")
 
     def test_existing_goal_continuity_produces_no_new_goal(self):
@@ -1621,8 +1617,8 @@ class GoalAssociationOnlyContractTests(unittest.TestCase):
         req = request("Add ice to it.", active_goals=[retained])
         req = req.model_copy(update={"responsibilities": typed_responsibilities({
             "local_ref": "r1", "outcome": "Add ice to the coffee being prepared.",
-            "bindings": {"modifier": "ice"}, "output_mode": "body_action",
-            "body_effect_family": "task_physical_effect", "continuity_scope": "goal", "confidence": 1.0,
+            "bindings": {"modifier": "ice"},
+              "confidence": 1.0,
         })})
         output = GoalAssociationModelOutput.model_validate({
             "associations": [{
@@ -1727,8 +1723,8 @@ def test_ga_primary_relationships_survive_without_downstream_inference(relations
 def test_ga_preserves_complete_media_intent_without_planner_arguments(with_candidate):
     req = request("Play some music.", active_goals=[active_goal("goal-old", "Walk forward.")] if with_candidate else [])
     req = req.model_copy(update={"responsibilities": typed_responsibilities({
-        "local_ref": "r1", "outcome": "Play some music.", "output_mode": "media_playback",
-        "continuity_scope": "goal", "bindings": {}, "confidence": 1.0,
+        "local_ref": "r1", "outcome": "Play some music.",
+         "bindings": {}, "confidence": 1.0,
     })})
     raw = {"new_goals": [{"source_responsibility_refs": ["r1"],
                          "related_goal_ids": [], "supersedes_goal_ids": []}],
@@ -1742,7 +1738,7 @@ def test_ga_preserves_complete_media_intent_without_planner_arguments(with_candi
     assert result.resolution_status == "resolved", result.metadata
     assert len(model.prompts) == 1
     assert result.new_goals[0].description == "Play some music."
-    assert result.new_goals[0].metadata["output_mode"] == "media_playback"
+    assert "output_mode" not in result.new_goals[0].metadata
     assert result.new_goals[0].object == {}
     assert result.cognitive_requests == []
 
@@ -1787,3 +1783,62 @@ def test_live_ga_schema_exposes_existing_goal_admission_threshold():
     association = schema["$defs"]["GoalAssociationModelAssociation"]
 
     assert association["properties"]["confidence"]["minimum"] == 0.65
+
+
+def _ga_decoder_shapes_only(schema):
+    """Diagnostic view of conditions omitted by the pinned native decoder."""
+    if isinstance(schema, list):
+        return [_ga_decoder_shapes_only(value) for value in schema]
+    if not isinstance(schema, dict):
+        return schema
+    ignored = {"allOf", "if", "then", "else", "not", "contains", "minContains", "maxContains", "uniqueItems"}
+    return {key: value if key in {"enum", "const", "default", "examples"} else _ga_decoder_shapes_only(value)
+            for key, value in schema.items() if key not in ignored}
+
+
+@pytest.mark.parametrize("candidate_count", [0, 1, 2, 8])
+def test_native_single_source_chooses_exactly_one_continuity_owner(candidate_count):
+    from agent.app.clients.sglang_protocol import _openai_response_format
+    schema = ga_schema.goal_association_response_schema(GoalAssociationModelOutput,
+        [active_goal(f"goal-{index}", "Retained task") for index in range(candidate_count)], [],
+        responsibility_count=1, responsibility_refs=["r1"])
+    original = copy.deepcopy(schema)
+    wire = _openai_response_format(schema)["json_schema"]["schema"]
+    native = Draft202012Validator(_ga_decoder_shapes_only(wire))
+    base = {"associations": [], "new_goals": [], "referent_updates": [], "resolved_references": [],
+            "cognitive_requests": [], "confidence": 1.0, "reason_summary": "One complete continuity decision."}
+    new = {"source_responsibility_refs": ["r1"], "related_goal_ids": [], "supersedes_goal_ids": []}
+    association = {"relationship": "continue", "source_responsibility_refs": ["r1"],
+                   "target_goal_ids": ["goal-0"], "confidence": 1.0}
+    assert native.is_valid({**base, "new_goals": [new]})
+    assert native.is_valid({**base, "associations": [association]}) is bool(candidate_count)
+    assert not native.is_valid(base)
+    assert not native.is_valid({**base, "associations": [association], "new_goals": [new]})
+    assert schema == original
+
+
+@pytest.mark.parametrize("candidate_count", [1, 2, 3, 8])
+@pytest.mark.parametrize("source_count", [1, 2])
+def test_native_merge_requires_two_distinct_available_targets(candidate_count, source_count):
+    from agent.app.clients.sglang_protocol import _openai_response_format
+    refs = [f"r{index + 1}" for index in range(source_count)]
+    schema = ga_schema.goal_association_response_schema(GoalAssociationModelOutput,
+        [active_goal(f"goal-{index}", "Retained task") for index in range(candidate_count)], [],
+        responsibility_count=source_count, responsibility_refs=refs)
+    wire = _openai_response_format(schema)["json_schema"]["schema"]
+    native = Draft202012Validator(_ga_decoder_shapes_only(wire))
+    def output(targets):
+        return {"associations": [{"relationship": "merge", "source_responsibility_refs": refs,
+                                  "target_goal_ids": targets, "confidence": 1.0}],
+                "new_goals": [], "referent_updates": [], "resolved_references": [],
+                "cognitive_requests": [], "confidence": 1.0, "reason_summary": "Combine retained Goals."}
+    assert not native.is_valid(output(["goal-0"]))
+    assert not native.is_valid(output(["goal-0", "goal-0"]))
+    if candidate_count >= 2:
+        for targets in (["goal-0", "goal-1"], ["goal-1", "goal-0"]):
+            valid = output(targets)
+            assert native.is_valid(valid)
+            assert Draft202012Validator(schema).is_valid(valid)
+            GoalAssociationModelOutput.model_validate(valid)
+        if candidate_count >= 3:
+            assert native.is_valid(output(["goal-2", "goal-0", "goal-1"]))

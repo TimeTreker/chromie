@@ -723,13 +723,10 @@ async def wait_for_session_done(
             raise RuntimeError(f"session {sid} social work failed: {state['social_task_failures']}")
         if state.get("done_logged") and not social_pending:
             return "done"
-        if (
-            allow_interrupted
-            and state.get("interrupted")
-            and state.get("llm_done")
-            and not social_pending
-        ):
-            return "interrupted"
+        if state.get("interrupted") and state.get("llm_done") and not social_pending:
+            if allow_interrupted:
+                return "interrupted"
+            raise RuntimeError(f"session {sid} interrupted before completion")
         await asyncio.sleep(0.05)
     raise TimeoutError(f"session {sid} did not finish within {timeout_s:.1f}s")
 
@@ -1766,14 +1763,15 @@ async def run_check_sequence(
     turn_args: list[argparse.Namespace],
     *,
     evidence_dir: Path,
+    continue_after_failure: bool = False,
 ) -> list[dict[str, Any]]:
     """Run multiple retained turns through one live conversation state.
 
     The first turn configures and owns the shared Host runtime. Each later turn
     gets a fresh SID and artifact directory while reusing the same bounded
     conversation, Goal snapshots, tool evidence, and deployed service clients.
-    A basic runner failure stops the episode so later turns cannot disguise the
-    earliest failed boundary.
+    A basic runner failure stops the episode by default. Diagnostic callers may
+    attempt later turns through their normal preflight, retaining every failure.
     """
 
     if not turn_args:
@@ -1788,13 +1786,29 @@ async def run_check_sequence(
     summaries: list[dict[str, Any]] = []
     try:
         for args in turn_args:
-            summary = await run_check(
-                args,
-                assistant=assistant,
-                configure_environment=False,
-            )
+            try:
+                summary = await run_check(
+                    args,
+                    assistant=assistant,
+                    configure_environment=False,
+                )
+            except Exception as exc:
+                if not continue_after_failure:
+                    raise
+                summary = {
+                    "ok": False,
+                    "text": args.text,
+                    "evidence_dir": str(args.evidence_dir),
+                    "errors": [_exception_text(exc)],
+                    "harness_failure": {
+                        "failure_domain": "harness",
+                        "failure_class": type(exc).__name__,
+                        "failure_stage": "live_turn",
+                    },
+                }
+                _write_json(Path(args.evidence_dir) / "summary.json", summary)
             summaries.append(summary)
-            if not summary.get("ok"):
+            if not summary.get("ok") and not continue_after_failure:
                 break
     finally:
         await shutdown_voice_assistant(

@@ -5,6 +5,55 @@ remains available in Git history.
 
 ## Unreleased
 
+### WHAT-only UMI and downstream contract repairs (qualification in progress)
+
+- Deliver the owner-authorized WHAT-only migration with fixed model/budgets: UMI owns
+  complete contextual intent/provenance/uncertainty, GA identity, Planner HOW/Skills and
+  SC wording. Preserve need-first meaning through lookup, fitting-need validation,
+  provider concurrency, truthful Work/Need/Playback completion and exact source re-entry.
+- Share equivalent grounded Schema branches before native expansion; retain pinned compiler
+  backports and native GA ownership/merge-shape repairs. Keep visited objects alive during
+  projection so allocator address reuse cannot create unstable wire/cache identities.
+- Preserve admitted dialogue order, qualified stale-proposal containment, source-scoped
+  asynchronous SC lifecycle, required notifications and exact played-word Memory. Carry
+  trusted quiet controls through both terminal SC paths and response transport; quiet+nod
+  now completes with zero speech. Retain non-quiet failure notifications.
+- Propagate existing diagnostic keep-going through the multi-turn loop; preserve failures,
+  attempt all later inputs, and report abandoned interrupted sessions promptly. Honor an
+  outstanding ambient-poll cancellation even when a dependency swallows its first cancel;
+  the old native teardown's precise blocked await remains unknown.
+- Finish before/current126-case cohorts and original10. Current main cohort attempts163/163
+  main inputs plus stop; automatic108/126, Codex53 pass/9 partial/64 fail. Two additional
+  parked cases also finish4/4 admitted inputs and fail semantics; a failed startup attempt
+  is retained separately. Local gates, strict6,000 and45 Level A pass; native qualification
+  fails. Reject all GA/Planner prompt candidates rather than adopting score-only gains.
+- Retain exact-case native admission failure for terminal supersede, forecast TLS timeouts,
+  absent Memory proposals, ignored supplied preference, unbacked commitments, duplicate speech,
+  stale independent clock delivery and missing time/Skill contracts. Do not diagnose these as
+  model-weight defects alone. Branch-only diagnostic delivery is authorized; no main merge,
+  physical acceptance or release is claimed.
+- Apply existing ownership and size-review policy consistently; keep safety/configuration
+  checks blocking and treat length/count deltas as review measurements.
+
+
+### Delivered dialogue and execution-order repairs (2026-11-11)
+
+- Retain fully played SC dialogue in both detached consumers, conserve compound meaning,
+  require primary mixed-Work answer Needs/timing, and preserve before/after/concurrent
+  execution through native Schema, canonical projection, SC joining and Runtime batching.
+- Correct playback chronology, reused chunk identities and scripted fixture encoding/phase
+  projections. Withdraw prior count-only compound verdicts; freeze51 preserves all reference
+  responses/expectations and exact replay matching. Keep model and budgets unchanged.
+- Retain an unqualified UMI result-versus-response-form clarification, following the owner's
+  UMI-first direction without expanding Planner permissions or changing model/budgets.
+  Ten candidates yield no qualified fix; private wire alternatives are rejected.
+- Local gates, all 45 Level A cases and strict 6,000-case replay pass on current Role2.
+  Native cohort stops at seven complete (six pass / one parallel-contract failure), 119
+  unstarted. Original ten inputs: nine complete (seven manual pass / one partial / one
+  unsupported-promise fail), tenth interrupted for physical Work on a correct information
+  Goal. Final private UMI batch: 76 structural passes, two type regressions. Target,
+  full native regression, physical and release qualification remain open; no new delivery.
+
 ### Context-budget and workflow qualification repairs (2026-11-07)
 
 - Share repeated Social Cognition identity and Planner ability-needs contracts; verify full SC

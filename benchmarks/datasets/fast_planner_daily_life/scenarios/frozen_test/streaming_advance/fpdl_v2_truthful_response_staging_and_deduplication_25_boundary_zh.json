@@ -40,7 +40,6 @@
           "confidence": 0.99,
           "local_ref": "r1",
           "outcome": "眨眼一次，并且只在有可信结果 Evidence 后报告完成。",
-          "output_mode": "body_action",
           "schema_version": 1,
           "source_evidence": {
             "source_end_token_ref": "t999",

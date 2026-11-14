@@ -38,7 +38,7 @@ class ControlPlaneSmokeContractTests(unittest.TestCase):
                     "local_ref": "r1",
                     "outcome": "socially reciprocate the user's greeting",
                     "bindings": {},
-                    "output_mode": "speech",
+
                     "confidence": 0.99,
                 }
             ],

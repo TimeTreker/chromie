@@ -28,25 +28,21 @@
               "local_ref": "r1",
               "outcome": "你点点头",
               "confidence": 0.98,
-              "output_mode": "body_action",
               "source_evidence": {
                 "source_start_token_ref": "t0",
                 "source_end_token_ref": "t3"
               },
-              "continuity_scope": "goal",
-              "body_effect_family": "social_expression"
+              "value_review": false
             },
             {
               "local_ref": "r2",
               "outcome": "再 眨两下眼睛",
               "confidence": 0.98,
-              "output_mode": "body_action",
               "source_evidence": {
                 "source_start_token_ref": "t5",
                 "source_end_token_ref": "t9"
               },
-              "continuity_scope": "goal",
-              "body_effect_family": "social_expression"
+              "value_review": false
             }
           ],
           "meaning_uncertainties": [],
@@ -56,8 +52,7 @@
               "responsibility_refs": [
                 "r1",
                 "r2"
-              ],
-              "reason_summary": "Explicit authored fixture requests the existing cognitive owner."
+              ]
             }
           ]
         }
@@ -75,16 +70,12 @@
       {
         "local_ref": "r1",
         "outcome": "你点点头",
-        "confidence": 0.98,
-        "output_mode": "body_action",
-        "body_effect_family": "social_expression"
+        "confidence": 0.98
       },
       {
         "local_ref": "r2",
         "outcome": "再 眨两下眼睛",
-        "confidence": 0.98,
-        "output_mode": "body_action",
-        "body_effect_family": "social_expression"
+        "confidence": 0.98
       }
     ]
   },

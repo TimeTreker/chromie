@@ -187,6 +187,13 @@ Context Assembly does not decide that a turn belongs to an active goal. It
 provides bounded active-goal candidates and evidence; Goal Association in the
 Core decides the semantic relationship.
 
+Overlapping ordinary inputs serialize their context capture, attention/admission
+and accepted-dialogue publication in the existing Host input lifecycle. A later
+snapshot therefore includes earlier admitted input even while its UMI or planning
+is unfinished. Suppressed or cancelled-before-admission input is not promoted into
+accepted dialogue. The admission lock is released before ordinary Core cognition;
+protective reflexes run before it and never wait behind attention review.
+
 ### 4.5 Turn Admission and `UserTurnEnvelope` / 话轮准入与用户话轮封装
 
 Turn Admission creates one stable record for every received input, including a

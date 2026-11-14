@@ -377,7 +377,7 @@ class InferenceProviderQualificationTests(unittest.TestCase):
             start = case["text"].index(outcome, cursor)
             cursor = start + len(outcome)
             wire["responsibilities"].append({"local_ref": f"r{i+1}", "outcome": outcome,
-                "output_mode": "body_action", "confidence": 1.0,
+                 "confidence": 1.0,
                 "source_evidence": {"source_start_token_ref": next(t["ref"] for t in tokens if t["start"] == start),
                     "source_end_token_ref": next(t["ref"] for t in tokens if t["end"] == cursor)}})
         self.assertEqual(_evaluate_user_meaning_interpreter_case(case, wire, wire), [])

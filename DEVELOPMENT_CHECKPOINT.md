@@ -13,208 +13,82 @@ proof, then default target-evidence closure.
 
 ## Active Issue — everyday live-cohort root-cause repairs
 
-Run the everyday live-text cohort (`scenarios/everyday/`, 124 cases; `scenarios/model_limited/` holds cases the
-owner skips as local-model limits) against
-Soridormi MuJoCo, judge every case, and repair each failure at its earliest
-responsible owner. One invocation and one debug bundle per run; a hard failure in
-the 15-case `must_pass` smoke stage stops `core` and `challenge` (owner rule).
-Current retained evidence: `.chromie/acceptance/optimize-20261106-extended/` (frozen 124-case
-corpus, seven additional candidates, final original-input replay and judgments),
-`optimize-20261106/` (the earlier three candidates) and `sc-context-budget-20261102/`
-(originating dialogue and Schema/budget repair). Historical evidence is context only;
-cleanup manifests under `.chromie/cleanup/` identify removed artifacts.
+Qualify the complete owner-authorized WHAT-only pipeline against the directory-discovered
+124 everyday cases plus2 frozen order contrasts:17 smoke,98 core,11 challenge. The owner
+explicitly requests full diagnostic continuation through failures; keep failures and hard
+integrity verdicts failed. Finish every input, review every case and collect exactly one
+bundle after each aggregate. This is not permission to bypass safety or release gates.
 
-## Resume point — branch delivery; target qualification remains open
+## Resume point — engineering repairs verified; semantic qualification fails
 
-- Branch `codex/sc-context-budget-failure-notice`, pre-delivery base `55f5587d4`.
-  The owner authorized commit/push of this branch; main merge still requires approval.
-  Expected resume revision is the latest commit containing all three delivery owners.
-- The ten-total-iteration limit is exhausted (earlier three plus seven additional).
-  Retain additional candidate 5; candidates 6/7 changed UMI guidance but failed their
-  frozen effect-conservation contrasts and were exactly reverted. No further behavior
-  iteration is in progress, and no production UMI change is part of this delivery.
-- Retained original repair: shared fresh-ID Schema definitions; lossless complete SC
-  snapshot/contract admission using serving tokens, output reserve and margin; explicit
-  failure when budget cannot be verified; separate text-client Host failure notice.
-  No context truncation, increased limits, model substitution or semantic retry.
-- Existing speech WHAT is projected as answer Needs. SC alone owns primary coverage;
-  Host joins complete delivered coverage to each fresh speech Goal, requires all grouped
-  sources, composes acts, and cannot hide pending answers behind broad act source scope.
-- Pending-value-review speech uses the whole-turn ingress guard rather than a conflicting
-  direct-chat guard. Planner distinguishes ordinary SC speech from executable abilities
-  before need-first search. Its repeated ability-needs contract is shared losslessly.
-- Four existing Schema transformations now visit shared Python objects once per pass;
-  the diagnostic fingerprint hashes the actual provider contract. Reconstructed request
-  wire bytes are unchanged; timing observations are not controlled production causality.
-  Intentional prefix-consumer closure logs cancelled, not failed; true truncation/timeout
-  remains failed. The acceptance harness records existing `cognitive_core_done`, including
-  queue time. Two inherited release-provenance test oracles now bind their intended profile.
-- Canonical local gate is green on the retained exact source: 172 benchmark tests;
-  4,168 main tests / 5 skipped / 1,007 subtests; 20 legacy Agent tests. Four Level A classes
-  have 16 unique passing checks. Strict 6,000-case architecture replay passes with zero
-  native model calls. These do not establish fixed-model ability or robot qualification.
-- Freeze 49 explicitly recaptures only reviewed Planner request changes. Five prototypes
-  and 6,000 expanded references keep all inputs, responses, provider results, expectations
-  and splits unchanged outside the request. Strict matching is unchanged. Freeze 50 was
-  not published; the rejected UMI capture was incomplete. Retained artifacts and hashes
-  are in [Handoff](HANDOFF.md).
-- Native milk/rain focus passes: two planned concurrent activities, simulated delivery and
-  real weather lookup completed, truthful result speech delivered, both Goals done.
-  Full candidate-5 cohort is NOT qualified: six cases completed, one interrupted,
-  117 unstarted; six automatic passes but manual five pass/one sequence failure.
-  The user requested wave then joke; joke was delivered first. UMI omitted the relation;
-  Planner omitted its response Activity and Host supplied a parallel response. Existing
-  ResponseNeed can express order, so this is not proof the DTO cannot represent it.
-- The ten original user inputs replayed completely: 10 automatic passes, manual six pass,
-  two partial/two fail. No SC overflow or silent turn occurred. Food context is still lost
-  in UMI WHAT despite appearing in its rationale; subsequent planning declares a generic
-  finding ability unavailable and SC mixes that question with prior drink delivery.
-  New assistant replies differed from the historical transcript (no food-search offer),
-  so this does not qualify that exact original promise chain or overlapping input timing.
-- Remaining blockers include semantic order/concurrency conservation, missing-answer
-  default timing, food/offer context, unselected drink alternatives, SC need-binding
-  consistency, refused-Goal lifecycle and prior milk-position grounding. Do not fix these
-  with phrase routing, another semantic model critic, mode-based Work routing or larger
-  deadlines. See the single ordered [open-work list](docs/STATUS.md#current-open-work).
-- Fixed Gemma4 12B/SGLang container and all budgets remained unchanged. Evidence ceiling:
-  text ingress, real services, discarded TTS and pinned MuJoCo with mocked handover.
-  Physical microphone/speaker/robot and release qualification remain open.
+- Branch `codex/sc-context-budget-failure-notice`, pre-delivery HEAD `cd038af616b7`;
+  upstream was fetched before development and delivery preparation. Expected resume
+  revision is the latest commit containing all three delivery owners. Branch-only push
+  is authorized when this review is finished; main merge still requires owner approval.
+- UMI owns complete contextual WHAT, sources, uncertainty and value review, with no
+  output_mode/body_effect_family/continuity_scope. GA owns identity, Planner HOW/Skills,
+  SC expression. Keep the same Gemma4 12B, all budgets and existing Planner rules.
+- Preserve the initial dirty patch and16-path this-turn repair delta under
+  `.chromie/acceptance/semantic-full-review-20261114/`. Most changed fixture paths belong
+  to the earlier explicit WHAT-only frozen-corpus migration, not16 new runtime repairs.
+  Never restore old snapshots over current source.
 
 ## Repairs in force from this Issue
 
-- Asking Chromie to remember what the person tells her is speech for UMI; a reminder stays a future effect
-  (freeze 48). The applied output stop is a trusted fact in UMI's turn message, so it is never planned again.
-- A turn whose Work-state Social Cognition decision was dropped only because Work moved on, and that has no reply
-  yet, gets one decision on the newer state.
-- `deliberate` leaves `social_skill` empty in every state; while the skill runs, deciding responses keep, change or
-  stop it.
-- An earlier acknowledgement that replied to speech Responsibilities only may cover their answer need by exact
-  identity and words; fresh activity IDs never extend a retained one. An expression target states its source
-  first. A request the Runtime never ran keeps its Host-owned provenance.
-- The Planner decoder exposes each permitted disposition/step assignment as a native
-  branch: clarify, respond and unavailable carry no steps and execute carries at
-  least one. The assignment previously lived only in `allOf`, which native decoders
-  ignore, so the DTO rejected shapes the decoder allowed.
-- An unsettled referent ("把那个拿给我") is clarified, never reported as a missing
-  ability or limitation; the decoder requires a clarify state's Activity and lets an
-  `unresolved_meaning` gap cite only the exact UMI wording.
-- UMI decodes `meaning_uncertainties` before its Responsibilities and `confidence`
-  after them; a bare demonstrative names a perceived object only when the conversation
-  or trusted target evidence singles it out. Known cost: a "那个" named by the previous
-  turn is also flagged; Goal Association may resolve it from history
-  (`multi_that_water_zh` measures that live).
-- While a speech Responsibility UMI marked `value_review` waits for Value Judgment, SC
-  ingress offers and Host admits only an acknowledgement for the whole turn; sibling speech
-  is answered after Value Judgment through its Planner need. A value-reviewed Capability
-  alone does not hold back sibling speech.
-- An information Responsibility with citable current perception states `observed_refs`
-  before its decision; only a non-empty list opens `answer_from_perception`, which Host
-  binds as a cited response need.
-- SC receives a fresh request or question without agreeing ("嗯，我看看。") and shares
-  in news; it no longer says "好的。" before a limitation.
-- The local clock provider declares `prompt_tier: common` (a provider declaration wins
-  over the owner preset).
-- Mandatory members are serialized first for native decoders, which ignore `contains`.
-  Each Responsibility decided work or clarify opens the Planner's counted Activities with
-  its own Activity (live: "我考了满分！快跟我一起庆祝一下！" spent its one Activity on the
-  sibling answer). Social Cognition's first act names every result need that must be
-  said now (live: "我不会后空翻" said the limitation but named only the answer need).
-- Before validation, a byte-identical idempotent, side-effect-free read the Planner wrote again
-  for another Responsibility is merged into the first, which then serves both and is validated
-  (owner decision 2026-10-23; live: "我要不要带伞？" got a second weather read citing the
-  first question's "北京"). Both read merges require the same state snapshot: identical reads
-  merge only when they wait for the same state-changing Activities, and a read with an unknown
-  dependency is never merged (second review 2026-10-23).
-- Social Cognition's model snapshot points each repeated subtree at its first copy, and a
-  Goal-bound call keeps its bound Goals' canonical snapshots, Plan, Evidence and GA resolution,
-  not GA's association inputs or the legacy task views (owner choice 2026-10-24, performance;
-  live: a 165k-character prompt exceeded the context budget).
-- The interactive playback-start wait is 6 s, above TTS first-audio p95 (owner choice
-  2026-10-24; at 3.5 s three of four answer chunks were cancelled).
-- A Planner argument's turn-span citation is offered only inside the source words of a
-  Responsibility its Capability can serve, which the Host requires (live 2026-10-23:
-  "瓶水，" ran past the fetch's words into the comma and stopped the cohort).
-- A Responsibility that could be a limitation states `needed_abilities_fit` right before its
-  decision; only `false` opens `unavailable` (live 2026-10-22: every ability need fit, yet
-  "把那个拿给我" named the uncertain referent as missing and was decided unavailable, so SC
-  had to say it could not fetch right after asking which one). An answer from perception
-  states no fit.
-- An information Responsibility that perception could answer first states `answer_source`
-  ("a current observation shows it" or "a Capability or what Chromie knows answers it"),
-  then `observed_refs`, then its decision (live: "帮我拿瓶水，顺便告诉我现在几点。" cited the
-  scene for the time). Observations-first alone failed that; decision-first let "现在几点了？"
-  cite the scene.
-- Host playback waits take a waiter settled at the deadline as settled (live: playback
-  started 7 ms before the 3.5 s timeout fired and played speech was reported undelivered).
-- Evidence re-entry with up to two Goals: each decision assignment is a native decoder
-  state in Goal order. An execute opens `new_work` owned only by the executing Goals, and no
-  execute closes it (live: executed Work re-listed under respond decisions).
-- Situation: a newer perception observation from the same owner replaces the one it
-  supersedes, and the caller's sources and interpretations outrank inherited ones in the
-  bounds (live: ambient perception kept stale objects, then stopped updating).
-- A Soridormi scene object is two interpretations of one subject: what it is
-  (`scene.simulated_object`, "bottle of milk") and where it is (`scene.simulated_position`).
-  The fused "bottle of milk, 9.899 meters to Chromie's left (simulated)" was copied whole into
-  a resource description that Soridormi could not match.
-- UMI understands a bodily need told without a request ("I'm really thirsty") as asking for
-  help Chromie could give now; its speech Responsibility addresses the need and asks whether the
-  person wants that help. A turn that also asks for something keeps that request as its only
-  Responsibility.
-- Ingress Social Cognition may ask about a task Responsibility only when UMI listed a meaning
-  uncertainty for it: the decoder offers that question branch and Host and the DTO admit it
-  only then. Its task receipt no longer suggests "好的", matching the authority prompt's
-  "嗯，我看看。" (live 2026-10-22: "好的，请问是哪一个？" was rejected as an acknowledgement).
-- A question Social Cognition asked about a Responsibility's uncertain meaning stands as the
-  turn's reply until the person answers: a later goal_state wake-up for only those
-  Responsibilities in the same turn returns that delivered result and is not sent to SC (live
-  2026-10-22: a goal_state SC read "你是说那个牛奶瓶吗？" as the answer, "是的，就是那个。").
-  The Planner's clarify need for the same meaning may stay pending or reuse the question:
-  a prior act may cover a later input need only when the ledger records it as a question
-  about that uncertain meaning and every gap of the need is that meaning (the 2026-10-11
-  relabelled "Okay." stays rejected).
-- After ingress, an informing, answering, asking or repairing act about task Work needs that
-  Work's Evidence (post_evidence), a supplied need, or only speech Responsibilities; otherwise it
-  is pre_evidence. The decoder offers pre_evidence at every trigger with task Work, and Host and
-  the DTO enforce the same rule.
-- Model JSON parsing accepts raw control characters inside strings, which the native decoder's
-  string rule admits (live: a tab ending a Planner reason_summary failed the contract after
-  decoding).
-- Value Judgment writes who is affected, then the concern, then the decision, and each fact
-  narrows what follows in the decoder and the DTO: a concern about someone else's things,
-  privacy, consent, deception or family needs someone besides the person asking, and no concern
-  decides proceed (live: "nobody_else" with "others_property" asked whose a household TV remote
-  was; with no concern it asked where to wait).
+| Existing owner | Implemented mechanism and proof limit |
+| --- | --- |
+| UMI / contracts | Owner-authorized WHAT-only migration; current original09/10 retain food/hunger. Original10's water substitution is downstream Planner, not demonstrated classification-removal causality. Wider migration effects remain unqualified. |
+| Planner / GA contracts | Freeze accepted needs across lookup, require fitting realization and provider concurrency; native GA single-source complete ownership and distinct merge targets. Do not infer semantic qualification from valid grammar/DTOs; multi-source grammar coverage remains incomplete. |
+| Source Schema / compiler | Share equivalent grounded contracts and backport sparse FSM/end-state plus bounded repetition to pinned XGrammar0.2.1. Historical real-vocabulary compile11.400s compressed vs31.751s original is a preprocessing proof, not generation speed or target qualification. |
+| Projection object lifetime | Hold actual visited objects during replacement; old16 projections have2 wire hashes, repaired16 have1, with identical ordered expanded schema. Current native4-positive/9-negative controls pass; controlled full-transaction comparison is retained, not a performance claim. |
+| Gateway / canonical reservation | Publish immutable admitted inputs in order; suppress stale proposals only with qualified successor/satisfaction proof; preserve current Work, uncovered Goals and exact provenance. |
+| SC / Playback / Memory | Preserve source-scoped asynchronous lifecycle, required notifications, truth stages and exact confirmed played words. Terminal result/resource SC requests and responses now retain trusted user_turn_envelope; quiet permits pending failure Needs without forcing speech, ordinary failure notices remain required. |
+| Ambient poll / diagnostic runner | Honor outstanding owner-task cancellation even when a dependency swallows the first cancellation; both dependency phases are independently tested. The old native41 precise blocked await is unknown; current41 exits normally. Existing keep-going reaches all later episode inputs and promptly reports abandoned interrupted sessions. It does not repair failed semantics or long speech delivery. |
 
-- The Fast decoder writes every argument a Capability declares as realizing what the person said
-  (`argument_realization`) or as its repetition count; its own default needs no span (live: four reads of
-  "明天" omitted date and read today; "点两下头" omitted count). Host still removes an unowned exact default.
-- A Plan whose every step acquires information starts no Work-state Social Cognition call; its Evidence speaks next
-  (live: a progress call after the clock read said "Monday" on a Saturday).
-- An act said before Work Evidence reached Social Cognition cannot be reused to cover a need that reports that
-  Evidence (`completed_work_dependencies`); the Agent decoder offers no such reuse and Host rejects it.
-- Social Cognition's stated preference is kept once its words have played (`record_social_delivery`), also when Work
-  ends the turn; the reply-language guard defers to a kept language preference (live: a kept "以后先用中文回答我",
-  then the last guard line "Reply language: en-US" won).
-- A Planner `respond` outcome that leaves its own Goal unmet with no Work, unresolved need or named unmet requirement
-  is a contract failure (`validate_unmet_response_accounting`), so a failed GA revision keeps the first Plan (live:
-  the GA-requested Plan for "那上海呢？" planned no read and replaced the first Plan's valid read).
-- The live-text harness keeps Capability contracts on the reflex path too, so acceptance reads declared defaults.
-- The SGLang transport decodes Goal Association's requirement replacement indices as exact unique subsets (up to
-  four requirements) or a bounded list; the native decoder ignores `uniqueItems` (live: `[0, 0, ...]` until the
-  output truncated). The DTO schema and the recorded replay requests are unchanged.
-- A GA result whose new Goal only links to finished Goals (no association, supersession or referent change, no link
-  to a still-open Goal) leaves the running UMI Plan in force instead of re-planning from scratch (live: such re-plans
-  erased a correct weather read and failed the Planner contract; acc1 had 7 of 8 GA re-plans of this shape).
-- An outcome citation whose tokens miss its value moves to that value's single verbatim run in the same outcome
-  (extends the 2026-10-23 re-anchoring decision; a value the outcome does not hold still fails closed).
-- An acknowledgement or wordless act said before an answer existed cannot be reused to cover that answer or a
-  result: its reuse variant does not offer the need and the Agent and Host validators reject it (live: the ingress
-  "嗯，我看看。" covered the answer need). A fresh act may report a result in its own words ("Here you are!").
+Current evidence, all retained under `semantic-full-review-20261114`:
+
+- Local required gates:176 benchmarks /4,361 main /1,042 subtests /20 legacy pass;
+  5 host xgrammar skips have30 supplemental native controls. Policy/docs pass,
+  strict6,000 passes,45 Level A pass. These are source/contract evidence.
+- Frozen before-repair126:automatic105/126, Codex 50 pass /6 partial /70 fail (26 hard-gate failures included);
+  156/163 main inputs attempted plus1 extra stop;7 later turns were skipped by the old loop.
+- Current126:automatic108/126, Codex 53 pass /9 partial /64 fail (26 hard-gate failures included).
+  All163 main inputs plus1 extra stop attempted,17/98/11 stages complete. Current source
+  remains unchanged throughout the cohort. Bundle: `/home/chromie/Downloads/chromie_debug_bundle_20261114_200858.tar.gz`.
+- Current original10:10 completion notifications,57 complete accepted role calls, no
+  observed compile timeout. Semantic fail remains: unrelated GA identity at06, late or
+  duplicated speech, Planner10 explicitly calls water another food item and delivers it.
+  Turn09 delivers milk; do not misreport it as the same water substitution. Final10 stored
+  Goal state is not retained, so proposed satisfaction alone does not prove closure.
+- GA four68-case complete batches:20/60,20/60,39/60,28/60 valid-reference strict scores;
+  each retains8 reference/current-contract gaps. The39/60 candidate still fails all12
+  unrelated-new probes; tagged wire has35 ReadTimeouts. No candidate adopted.
+- Planner baseline/candidate20 complete transactions score5/20 and3/20; candidate regresses
+  and is rejected. Controlled projection/repeat arms: current_1 7/20 strict, 20/20 contract; before_fix 7/20 strict, 19/20 contract; current_2 7/20 strict, 19/20 contract. All retain exact inputs,
+  actual full results and lossless ordered-schema checks; no final Skill/Runtime claim.
+- Current quiet51 completes nod2 with0 speech; current clock41 still speaks a215.44s-old
+  reading. SC fact proposals are absent before new-conversation memory failures77/80;
+  source Schema/DTO/Host and actual native grammar accept correct fact alternatives. Singing, future reminders,
+  result readiness, duplicates, known-fact grounding, temporal/provider contracts and
+  Skill methods remain unqualified. Additional2 historically parked scenarios were rerun
+  as one complete ready-service batch:4/4 admitted turns,22 accepted model calls,0/2
+  semantic passes. The shopping-list case has an additional obsolete memory.keep
+  expectation absent from the current catalog; its actual retention/recall still fails.
+  Current121 correctly refuses supervision but SC
+  promises before that decision; the old partial-look substitution does not reproduce.
+  Four post-cohort weather probes all resolve cities/TCP then time out in forecast TLS.
+  The lower network cause and each historical timeout phase remain unproven.
+  Exact-case native grammar9 controls have1 failure: terminal-supersede enum leakage;
+  both legal SC fact proposals pass the real grammar. Current126 retains993 raw calls,
+  0 unparseable;369 primary SC prompts peak34,471 tokens,37,543 with fixed reserves,
+  below65,536. See the retained complete review for limits and source-bound details.
 
 ## Owner decisions in force
 
-- Current repair authorization supersedes earlier loop delivery permissions: work on the repair branch,
-  keep the model fixed, do not commit or push, and merge main only after explicit owner approval.
+- The owner directs WHAT-only UMI, Planner-owned HOW/Skills and SC-owned expression.
+  No Planner rule relaxation is authorized. Keep model and budgets fixed; branch
+  commit/push is authorized when work is complete. Main merge requires explicit approval.
+  Full current diagnostic coverage is delivered; native semantic qualification still fails.
 
 - 2026-10-26: personality and social expression are one configurable character style; the factory Chromie is
   lively and cute (`lively_cute`, `lively` preset). SC orchestrates Soridormi skills, never motions (2026-10-25).
@@ -240,7 +114,7 @@ cleanup manifests under `.chromie/cleanup/` identify removed artifacts.
   excluded (owner decision 2026-10-17).
 - UMI never authors `bindings`; Planner alone extracts Capability parameters.
 - Wanting to know a changing fact ("告诉我现在几点", also beside another request) is understood
-  by UMI as information. The Planner reads it; SC only communicates: it may say it will check
+  by UMI as the requested information, without an execution/output category. The Planner reads it; SC only communicates: it may say it will check
   and tells the result after Evidence. Speech never reads and SC never checks (owner decision
   2026-10-21).
 - Chromie offers help a family member would offer when the person tells a need she can meet
@@ -280,7 +154,8 @@ cleanup manifests under `.chromie/cleanup/` identify removed artifacts.
 - A provider that declared it did not complete and did not move, with a safe-idle final
   state, reported honest Evidence: the acceptance runner judges that case by its expectations
   and keeps collecting (owner decision 2026-10-21). Safety, service, provenance, contract and
-  LLM-integrity failures still stop the cohort.
+  LLM-integrity failures remain hard gates. The current owner-authorized diagnostic run uses
+  keep-going to retain all cases without treating those failures as passes.
 - A person beyond the head's turning range is looked at by turning the body first, inside
   Soridormi (owner decision 2026-10-20). A standalone `look_at_person` turns on a walking
   arc at the slowest gait pace, because pure in-place yaw barely turns this gait. It keeps

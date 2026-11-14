@@ -119,6 +119,9 @@ class PlaybackDeliveryLifecycle:
         addressed_need_ids: list[str] | None = None,
         source_responsibility_refs: list[str] | None = None,
         wording_owner: str = "",
+        truth_stage: str | None = None,
+        truth_stages: list[str] | None = None,
+        progress_kind: str | None = None,
         turn_id: str | None = None,
         source_goal_ids: list[str] | None = None,
         canonical_plan_id: str = "",
@@ -154,6 +157,9 @@ class PlaybackDeliveryLifecycle:
             "addressed_need_ids": self._normalized_text_values(addressed_need_ids),
             "source_responsibility_refs": self._normalized_text_values(source_responsibility_refs),
             "wording_owner": str(wording_owner or "").strip(),
+            **({"truth_stage": truth_stage} if truth_stage is not None else {}),
+            **({"truth_stages": list(truth_stages)} if truth_stages else {}),
+            **({"progress_kind": progress_kind} if progress_kind is not None else {}),
         }
         normalized_claims = self._normalized_text_values(claims)
         normalized_subject_refs = self._normalized_text_values(subject_refs)

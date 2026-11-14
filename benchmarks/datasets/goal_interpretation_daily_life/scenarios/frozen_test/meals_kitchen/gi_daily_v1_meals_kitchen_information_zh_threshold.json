@@ -22,13 +22,12 @@
         {
           "local_ref": "r1",
           "outcome": "判断现在冰箱冷藏室的温度是否超过5度 (现在冰箱冷藏室的温度会超过5度吗)",
-          "output_mode": "information",
           "confidence": 1.0,
           "source_evidence": {
             "source_start_token_ref": "t0",
             "source_end_token_ref": "t15"
           },
-          "continuity_scope": "goal"
+          "value_review": false
         }
       ],
       "meaning_uncertainties": [],
@@ -37,15 +36,13 @@
           "authority": "goal_association",
           "responsibility_refs": [
             "r1"
-          ],
-          "reason_summary": "Preserve canonical continuity for the requested independent outcome."
+          ]
         },
         {
           "authority": "planner",
           "responsibility_refs": [
             "r1"
-          ],
-          "reason_summary": "Determine the Work or information acquisition needed for the requested outcome."
+          ]
         }
       ]
     },
@@ -54,7 +51,6 @@
       "responsibilities": [
         {
           "local_ref": "r1",
-          "output_mode": "information",
           "outcome_contains_any": [
             "查询",
             "判断",
@@ -65,7 +61,8 @@
             "location": "冰箱冷藏室",
             "threshold": "5度",
             "time": "现在"
-          }
+          },
+          "value_review": false
         }
       ],
       "unresolved": false,
@@ -80,11 +77,14 @@
       "activities",
       "binding_items",
       "bindings",
+      "body_effect_family",
       "capability_id",
+      "continuity_scope",
       "coordination",
       "execution_lane",
       "goal_id",
       "information_gaps",
+      "output_mode",
       "plan",
       "provider_id",
       "relationship",

@@ -6,7 +6,6 @@
   "expected": {
     "responsibilities": [
       {
-        "output_mode": "information",
         "outcome_contains_any": [
           "temperature",
           "exceed",
@@ -41,14 +40,13 @@
     "responsibilities": [
       {
         "local_ref": "r1",
-        "output_mode": "information",
         "outcome": "重庆今天会超过30度吗？",
         "confidence": 1.0,
         "source_evidence": {
           "source_start_token_ref": "t0",
           "source_end_token_ref": "t10"
         },
-        "continuity_scope": "goal"
+        "value_review": false
       }
     ],
     "meaning_uncertainties": [],
@@ -57,8 +55,7 @@
         "authority": "planner",
         "responsibility_refs": [
           "r1"
-        ],
-        "reason_summary": "Explicit authored fixture requests the existing cognitive owner."
+        ]
       }
     ]
   },

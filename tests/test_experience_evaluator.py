@@ -164,7 +164,7 @@ class ExperienceEpisodeEvaluatorTests(unittest.TestCase):
                             {
                                 "local_ref": "blink",
                                 "outcome": "Blink five times.",
-                                "output_mode": "body_action",
+
                                 "confidence": 0.82,
                             }
                         ],
@@ -208,7 +208,7 @@ class ExperienceEpisodeEvaluatorTests(unittest.TestCase):
                             {
                                 "local_ref": "blink",
                                 "outcome": "Blink five times.",
-                                "output_mode": "body_action",
+
                                 "confidence": 0.82,
                             }
                         ],

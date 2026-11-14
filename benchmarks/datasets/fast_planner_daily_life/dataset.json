@@ -957,7 +957,7 @@
     "path_pattern": "scenarios/<split>/<category>/<scenario-id>.json",
     "scenario_count": 204,
     "contrast_set_size": 4,
-    "scenario_tree_sha256": "bd44cb8096a149afff7162b01325ff7ae98ec625a008775cae3cbab6b52ef469"
+    "scenario_tree_sha256": "8bbceae13a6d0ec22ba239261112484622b49b96563a4313e335227e3e105ab5"
   },
   "split_policy": {
     "unit": "contrast_set",
@@ -969,6 +969,7 @@
     "id": "issue51-stage-and-issue58-readiness-20260912",
     "authority": "Delivered Issue 51 plus owner-authorized Issue 58 correction of reproduced early dispatch",
     "input_changes": false,
-    "historical_outputs_reclassified": false
+    "historical_outputs_reclassified": false,
+    "wire_migration": "Owner-authorized WHAT-only UMI protocol: remove retired result/lifetime fields on accepted Responsibilities only; complete outcomes, source spans, retained typed Goal constraints, targets and reference outputs unchanged. Not native qualification."
   }
 }

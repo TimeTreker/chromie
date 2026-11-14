@@ -17,24 +17,43 @@
       "safety_authorization_capability_and_execution_evidence",
       "provenance_and_llm_integrity"
     ],
-    "semantic_dimensions": ["evidence_grounding", "truthfulness", "answer_completeness"],
+    "semantic_dimensions": [
+      "evidence_grounding",
+      "truthfulness",
+      "answer_completeness"
+    ],
     "semantic_blocking": true
   },
   "review_rubric": {
     "judge_meaning_not_exact_wording": true,
-    "dimensions": ["evidence_grounding", "truthfulness", "answer_completeness"],
-    "primary_outcomes": ["Read the trusted local clock, then answer with both the current local date and weekday."],
-    "acceptable_auxiliary": ["Date formatting and weekday wording may follow the user's language naturally."],
+    "dimensions": [
+      "evidence_grounding",
+      "truthfulness",
+      "answer_completeness"
+    ],
+    "primary_outcomes": [
+      "Read the trusted local clock, then answer with both the current local date and weekday."
+    ],
+    "acceptable_auxiliary": [
+      "Date formatting and weekday wording may follow the user's language naturally."
+    ],
     "forbidden_semantic_outcomes": [
       "Guess the date or weekday without matching trusted clock Evidence.",
       "Answer only one of the two requested facts.",
       "Claim to have inspected a phone, screen, or network source."
     ],
-    "verdicts": ["pass", "partial", "fail", "insufficient_evidence"]
+    "verdicts": [
+      "pass",
+      "partial",
+      "fail",
+      "insufficient_evidence"
+    ]
   },
   "text": "今天几号，星期几？",
   "language": "zh-CN",
-  "expected_capabilities": ["chromie.clock.local"],
+  "expected_capabilities": [
+    "chromie.clock.local"
+  ],
   "require_evidence_bound_claims": true,
   "require_speech": true,
   "require_fast_planner_evidence_reentry": true,
@@ -46,7 +65,12 @@
         "title": "Evidence Coverage And Claim Discipline",
         "general_rule": "Tests should prove the user-visible boundary being claimed and should retain enough trace detail to locate the earliest wrong component.",
         "rationale": "A date-and-weekday question must use the trusted local clock and cover both requested facts rather than guessing from model knowledge.",
-        "root_cause_boundaries": ["Test evidence", "Cognitive Core/user meaning interpretation", "Agent contract", "Orchestrator policy"]
+        "root_cause_boundaries": [
+          "Test evidence",
+          "Cognitive Core/user meaning interpretation",
+          "Agent contract",
+          "Orchestrator policy"
+        ]
       }
     ]
   }

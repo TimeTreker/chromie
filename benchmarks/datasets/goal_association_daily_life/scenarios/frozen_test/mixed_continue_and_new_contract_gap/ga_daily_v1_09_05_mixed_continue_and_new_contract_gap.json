@@ -4,7 +4,7 @@
       "lexical overlap selects the wrong Goal",
       "terminal or paused lifecycle is ignored",
       "one GI Responsibility is dropped or duplicated",
-      "GA changes GI output_mode or invents Planner HOW",
+      "GA changes accepted UMI WHAT or invents Planner HOW",
       "mixed continuity is dropped or duplicated across association and creation"
     ],
     "phenomena": [
@@ -92,13 +92,13 @@
       "history": [],
       "interpretation_confidence": 1.0,
       "language": "zh-CN",
+      "meaning_uncertainties": [],
       "planner_reentry_scope": null,
       "responsibilities": [
         {
           "confidence": 1.0,
           "local_ref": "r1",
           "outcome": "Continue: 在用户谈论“我在学校犯了错”时给予倾听和支持。 (继续原来的目标，同时眨两下眼睛。)",
-          "output_mode": "speech",
           "schema_version": 1,
           "source_evidence": {
             "source_end_token_ref": "tok_r1_end",
@@ -109,7 +109,6 @@
           "confidence": 1.0,
           "local_ref": "r2",
           "outcome": "继续原来的目标，同时眨两下眼睛。",
-          "output_mode": "body_action",
           "schema_version": 1,
           "source_evidence": {
             "source_end_token_ref": "tok_r2_end",
@@ -119,8 +118,7 @@
       ],
       "schema_version": 1,
       "sid": "ga_daily_v1_09_05_mixed_continue_and_new_contract_gap",
-      "text": "继续原来的目标，同时眨两下眼睛。",
-      "meaning_uncertainties": []
+      "text": "继续原来的目标，同时眨两下眼睛。"
     }
   },
   "invariants": {
@@ -142,34 +140,6 @@
   "split": "frozen_test",
   "target": {
     "contract_gap": null,
-    "schema_expectation": "accept",
-    "semantic_expectations": {
-      "candidate_goal_ids": [
-        "goal_09_05_a"
-      ],
-      "must_map_every_responsibility_exactly_once": true,
-      "must_preserve_gi_output_mode": true,
-      "responsibility_count": 2,
-      "responsibility_map": [
-        {
-          "operation": "association",
-          "relationship": "continue",
-          "source_ref": "r1",
-          "target_goal_ids": [
-            "goal_09_05_a"
-          ]
-        },
-        {
-          "operation": "new_goal",
-          "output_mode": "body_action",
-          "relationship": "new",
-          "source_ref": "r2",
-          "supersedes_goal_ids": [],
-          "target_goal_ids": [],
-          "related_goal_ids": []
-        }
-      ]
-    },
     "reference_model_output": {
       "associations": [
         {
@@ -185,35 +155,63 @@
           ]
         }
       ],
-      "confidence": 1.0,
-      "reason_summary": "Map every accepted GI Responsibility exactly once.",
-      "referent_updates": [],
-      "resolved_references": [],
       "cognitive_requests": [
         {
           "authority": "social_cognition",
+          "reason_summary": "Decide interaction using the established canonical continuity facts.",
           "responsibility_refs": [
             "r1",
             "r2"
-          ],
-          "reason_summary": "Decide interaction using the established canonical continuity facts."
+          ]
         },
         {
           "authority": "planner",
+          "reason_summary": "Determine the remaining Work or control delta from the accepted Goal continuity.",
           "responsibility_refs": [
             "r1",
             "r2"
-          ],
-          "reason_summary": "Determine the remaining Work or control delta from the accepted Goal continuity."
+          ]
         }
       ],
+      "confidence": 1.0,
       "new_goals": [
         {
+          "related_goal_ids": [],
           "source_responsibility_refs": [
             "r2"
           ],
-          "related_goal_ids": [],
           "supersedes_goal_ids": []
+        }
+      ],
+      "reason_summary": "Map every accepted GI Responsibility exactly once.",
+      "referent_updates": [],
+      "resolved_references": []
+    },
+    "schema_expectation": "accept",
+    "semantic_expectations": {
+      "candidate_goal_ids": [
+        "goal_09_05_a"
+      ],
+      "must_map_every_responsibility_exactly_once": true,
+      "must_preserve_umi_what": true,
+      "responsibility_count": 2,
+      "responsibility_map": [
+        {
+          "operation": "association",
+          "relationship": "continue",
+          "source_ref": "r1",
+          "target_goal_ids": [
+            "goal_09_05_a"
+          ]
+        },
+        {
+          "operation": "new_goal",
+          "outcome": "继续原来的目标，同时眨两下眼睛。",
+          "related_goal_ids": [],
+          "relationship": "new",
+          "source_ref": "r2",
+          "supersedes_goal_ids": [],
+          "target_goal_ids": []
         }
       ]
     }

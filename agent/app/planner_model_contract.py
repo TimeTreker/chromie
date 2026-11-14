@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import copy
 import hashlib
 from typing import Any, Literal
 
@@ -70,11 +71,138 @@ def parse_ability_needs(items: Any, *, loaded_capability_ids: list[str]) -> list
     return needs
 
 
-def take_ability_needs(raw: dict[str, Any], *, loaded_capability_ids: list[str]) -> list[PlannerAbilityNeed]:
+def take_ability_needs(
+    raw: dict[str, Any], *, loaded_capability_ids: list[str],
+    retained_need_texts: list[str] | None = None,
+) -> list[PlannerAbilityNeed]:
     """Remove and validate the need-first prefix of one Work object."""
     if "ability_needs" not in raw:
         raise ValueError("Planner Work must begin with ability_needs")
-    return parse_ability_needs(raw.pop("ability_needs"), loaded_capability_ids=loaded_capability_ids)
+    needs = parse_ability_needs(raw.pop("ability_needs"), loaded_capability_ids=loaded_capability_ids)
+    if retained_need_texts is not None and [item.need for item in needs] != retained_need_texts:
+        raise PlannerDTOContractError("Capability contract loading cannot change accepted ability needs")
+    return needs
+
+def validate_ability_need_realization(needs: list[PlannerAbilityNeed], capability_ids: list[str], *, completes_without_work: bool = False) -> None:
+    """Work uses only the capabilities accepted as fitting its declared needs."""
+    if completes_without_work and needs:
+        raise PlannerDTOContractError("A response cannot fulfill declared Work abilities")
+    fitting = {need.closest_loaded for need in needs if not need.unmet}
+    undeclared = sorted(set(capability_ids) - fitting)
+    if undeclared:
+        raise PlannerDTOContractError(
+            "Capability Work lacks an accepted fitting ability need: " + ", ".join(undeclared)
+        )
+
+
+def need_first_response_schema(
+    schema: dict[str, Any], loaded_capability_ids: list[str], *,
+    retained_need_texts: list[str] | None = None,
+) -> dict[str, Any]:
+    """Require ability_needs before Work in the object and in every exposed shape.
+
+    Native decoders follow the exposed oneOf/anyOf shapes, so each shape carries the
+    field first. closest_loaded names only Capabilities loaded for this decision.
+    Share its contract: copying it into every Work alternative multiplies the
+    decoder grammar without adding a decision or a constraint.
+    """
+    needs = {
+        "type": "array", "maxItems": ABILITY_NEEDS_MAX,
+        "items": {
+            "type": "object", "additionalProperties": False,
+            "required": ["need", "closest_loaded", "closest_loaded_does", "fits"],
+            "properties": {
+                "need": {"type": "string", "minLength": 3, "maxLength": 100},
+                "closest_loaded": {"type": "string", "enum": [*dict.fromkeys(loaded_capability_ids), ABILITY_NEED_NONE]},
+                "closest_loaded_does": {"type": "string", "minLength": 3, "maxLength": 80},
+                "fits": {"type": "boolean"},
+            },
+        },
+    }
+    if retained_need_texts is not None:
+        # Loading contracts does not reopen the already accepted semantic need.
+        # Only matching and fit are new decisions; native decoding and Host agree.
+        item = needs["items"]
+        needs["prefixItems"] = []
+        for text in retained_need_texts:
+            fixed = copy.deepcopy(item)
+            fixed["properties"]["need"] = {"type": "string", "const": text}
+            needs["prefixItems"].append(fixed)
+        needs["items"] = False
+        needs["minItems"] = needs["maxItems"] = len(retained_need_texts)
+    result = copy.deepcopy(schema)
+    result.setdefault("$defs", {})["PlannerAbilityNeeds"] = needs
+
+    def attach(node: Any, *, root: bool = False) -> bool:
+        if not isinstance(node, dict):
+            return node is not False
+        closed = isinstance(node.get("properties"), dict) and node.get("additionalProperties") is False
+        if root or closed:
+            node["properties"] = {"ability_needs": {"$ref": "#/$defs/PlannerAbilityNeeds"}, **node.get("properties", {})}
+            node["required"] = ["ability_needs", *[name for name in node.get("required", []) if name != "ability_needs"]]
+        # Exposed Work shapes live only under combinators, never inside property schemas.
+        for key in ("oneOf", "anyOf", "allOf"):
+            if isinstance(node.get(key), list):
+                children = [(item, attach(item)) for item in node[key]]
+                if key == "allOf" and not all(valid for _, valid in children):
+                    return False
+                node[key] = [item for item, valid in children if valid]
+                if not node[key]:
+                    return False
+        for key in ("then", "else"):
+            if isinstance(node.get(key), dict) and not attach(node[key]):
+                node[key] = False
+        properties = node.get("properties") or {}
+        disposition = properties.get("disposition") or {}
+        if not closed or not (disposition.get("enum") == ["respond"] or disposition.get("const") == "respond"):
+            return True
+        condition = properties.get("time_conditions")
+        if isinstance(condition, dict) and condition.get("minItems", 0) >= 1:
+            return True
+        # Mirror validate_ability_need_realization, including its canonical future
+        # exception. A no-Work response cannot discharge a declared Work ability.
+        # Native decoding ignores conditionals, so expose disjoint complete shapes.
+        definitions = node.get("$defs")
+        base = {key: value for key, value in node.items() if key != "$defs"}
+        alternatives = []
+        if not retained_need_texts:
+            present = copy.deepcopy(base)
+            present["properties"]["ability_needs"] = {"type": "array", "maxItems": 0}
+            if isinstance(condition, dict):
+                present["properties"]["time_conditions"]["maxItems"] = 0
+            alternatives.append(present)
+        if isinstance(condition, dict) and condition.get("maxItems", 1) > 0:
+            future = copy.deepcopy(base)
+            future["properties"]["time_conditions"]["minItems"] = 1
+            future["required"] = list(dict.fromkeys([*future.get("required", []), "time_conditions"]))
+            alternatives.append(future)
+        if not alternatives:
+            return False
+        node.clear()
+        node.update(alternatives[0] if len(alternatives) == 1 else {"oneOf": alternatives})
+        if definitions is not None:
+            node["$defs"] = definitions
+        return True
+
+    if not attach(result, root=True):
+        raise PlannerDTOContractError("No response state can realize the accepted Work ability needs")
+    return result
+
+
+NEED_TIMING_WIRE_VALUES = {"ordered_with_work": "sequential", "concurrent_with_work": "parallel"}
+
+
+def decode_need_timings(raw: dict[str, Any]) -> None:
+    """Translate the primary model's Work-relative labels without choosing timing."""
+    for activity in raw.get("activities") or []:
+        if not isinstance(activity, dict) or activity.get("role") not in {"complete_response", "clarification"}:
+            continue
+        if "timing" in activity:
+            value = activity["timing"]
+            if not isinstance(value, str) or value not in NEED_TIMING_WIRE_VALUES:
+                raise PlannerDTOContractError("Need timing must use an explicit Work-relative wire value")
+            activity["timing"] = NEED_TIMING_WIRE_VALUES[value]
+
 
 def take_activity_count(raw: dict[str, Any]) -> int | None:
     """Remove the declared Activity count; it must equal the Activities written."""

@@ -137,13 +137,10 @@ schedules turn-wide GA so eventual Work can obtain canonical Goal binding. Runti
 Planner readiness from `continuity_scope`, `output_mode`, bindings, keywords, or task classes.
 An explicitly requested Planner scope is preserved even for conversational speech: Planner may
 reason about HOW/`respond`, while Social Cognition remains the sole exact wording owner.
-`continuity_scope` is a lifetime hint, not a routing or importance label. `turn` means the accepted
-Responsibility is expected to complete within the current interaction and any mechanically
-materialized Goal has interaction lifetime; it does not mean "no Goal" or "no Planner". `goal`
-means the Responsibility must remain open beyond the immediate interaction or explicitly changes
-retained Goal meaning. GA associates the current Responsibility with retained Goal history or
-decides that it starts a new Goal; trusted lifecycle code then records that new canonical Goal,
-materializing its fields from UMI-owned WHAT without another semantic interpretation. Optional
+UMI does not author lifetime or output categories under the 2026-11-12 owner amendment.
+GA associates the complete Responsibility with retained Goal history or decides that it
+starts a new Goal; trusted code materializes its meaning unchanged. Runtime retains
+lifecycle from actual Work, communication Needs and delivery facts. Optional
 communication does not gate already-requested planning or safe dispatch, and Work completion does
 not gate an already-grounded conversational answer.
 Not every turn requires GA and Planner in addition to the standing initial SC call. Missing canonical Goal identity alone does not
@@ -331,19 +328,13 @@ They are requirements, not new runtime modules, managers, DTOs, or execution sta
   maintained configuration and owns only addressedness/speech-act admission evidence.
   A disabled or unavailable review may fail open to cognition, but it is explicitly
   unreviewed/unknown evidence and must not fabricate high-confidence addressedness.
-- **TURN-GOAL-BOUNDARY-001** — `turn` is a conversational lifetime boundary, not a
-  declaration that no Goal or Planner exists. An admitted Responsibility expected to finish in
-  the current interaction may still have a short-lived interaction Goal and may still receive
-  Planner HOW cognition when UMI requests it. GA performs bounded historical association only:
-  it may associate the current Responsibility with a retained open Goal when accepted meaning
-  supports continuity, or decide that it starts a new Goal (exactly one Responsibility per new
-  Goal, so GA never regroups UMI's segmentation). GA does **not** model-author a new
-  Goal WHAT. Trusted lifecycle code only records the new Goal GA decided exists, mechanically
-  materializing its identity and semantic fields from the accepted UMI Responsibility and marking turn-scoped Goals as
-  interaction lifetime and longer obligations as working/persistent according to lifecycle
-  policy. Social Cognition may complete conversational Responsibilities immediately and remains
-  the sole wording owner. `continuity_scope` never wakes or suppresses Planner by itself. The
-  distinction comes from bounded meaning and context, never phrase tables or hardware profiles.
+- **TURN-GOAL-BOUNDARY-001** — An immediate interaction may still have a canonical Goal
+  and Planner HOW cognition. UMI preserves complete contextual WHAT without output or
+  lifetime categories. GA decides retained continuity or a new Goal, never resegments
+  or re-authors the accepted intention. Trusted code materializes the new Goal from
+  UMI; Runtime derives lifecycle from actual outstanding Work, communication Needs
+  and verified delivery. SC owns exact wording. An early receipt establishes neither
+  fulfilled Work nor completion, and no missing category grants execution permission.
 - **SPEECH-OWNER-001** — Social Cognition is the interface between the user and Chromie.
   Chromie uses SC to express herself (speech, gestures, gaze and other social expression),
   and every communication with the user goes through it, including the optional startup
@@ -1401,7 +1392,7 @@ Gateway admission, Host authorization, execution, safety, or provider evidence.
    No later model may confirm, criticize, resegment or repair an accepted UMI result.
 
    **Owner-approved intent and communication amendment (2026-09-16).** UMI's model
-   output contains complete outcomes, local refs, the provider-neutral requested result type, confidence,
+   output contains complete contextual outcomes, local refs, required value review, confidence,
    source evidence and genuine unresolved meaning. It does not author `binding_items`, `bindings`,
    Goal relationships, activation timestamps or execution fields.
    Durations, directions, counts, speed, units and sequencing remain attached to
@@ -1518,14 +1509,21 @@ Gateway admission, Host authorization, execution, safety, or provider evidence.
    Development must improve the primary prompt, schema, model choice, or
    deterministic mechanics when that primary result is unreliable instead of
    inserting a semantic confirmation or repair chain into the live robot path.
-   UMI retains its existing provider-neutral `output_mode` as the requested result
-   type. It does not choose Capabilities or execution lanes. New Goals inherit that
-   type and complete intention text without a second GA-authored category or
-   parameter table. Ordinary communication cannot stand in for a requested physical
-   effect; compound intent preserves every requested result. Older retained typed Goal constraints remain authoritative for
-   their exact revisions; an unspecified internal projection grants no semantic
-   permission. Planner judges whether supplied context/Evidence can satisfy an
-   intent through communication, or which Activities are needed.
+   Under the owner's UMI authority amendment (2026-11-12), UMI understands the
+   complete contextual human intention, provenance and unresolved meaning; it does
+   not author `output_mode`, `body_effect_family` or `continuity_scope`. Explicit
+   requested form, effect, condition and relations remain in the intention itself.
+   New Goals inherit that complete meaning without a GA-authored category or
+   parameter table. Planner owns the methods, Skills, necessary Work and response
+   Needs; SC owns communication. Neither a result category nor an unspecified
+   default grants execution, fulfillment or completion authority. Ordinary
+   communication cannot stand in for a requested physical effect; compound intent
+   preserves every requested result. Older retained typed Goal constraints remain
+   authoritative for their exact revisions and must not be silently deleted or
+   reclassified. Runtime owns lifecycle from actual Work, Needs and delivery facts.
+   A planning receipt never fulfills pending Work. After the need-first contract
+   lookup, the already accepted ability needs remain fixed; only matching the
+   newly loaded contracts and their fit may change.
 
    Goal WHAT is inherited, not summarized again by Goal Association. New Goal
    descriptions and success criteria are Host projections of the exact accepted UMI

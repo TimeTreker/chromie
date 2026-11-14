@@ -1135,6 +1135,24 @@ uncached one segfaults. The upstream 0.2.1 wheel fails the same way. The image b
 compiles a 39,900-rule decoder through the patched backend with its cache enabled. It
 checks that a declared instance is accepted and an over-length string is rejected.
 Remove this backport together with the #716 one.
+The image also backports the sparse end-state change from
+[XGrammar #702](https://github.com/mlc-ai/xgrammar/commit/c9268816dc8c61bbf725fa5ac82fca65781a7c97),
+without changing the package/API or model. The retained two-Responsibility Planner
+request stalled inside `GrammarFSMBuilder` copying `std::vector<bool>`: each rule's
+FSM view stored a bitmap covering the complete grammar's state space. That made
+construction time and memory grow with rules times total states, even without a
+compiler cache. Views now retain only their actual terminal-state IDs; the existing
+sparse serialized representation is unchanged. The native image test checks accepted
+and rejected input plus terminal storage for 256 and 4,096 leaf rules. The upstream
+change also corrects shared-FSM memory accounting; neither cache budget is raised.
+Remove this backport when a reviewed pinned runtime includes that change.
+Its companion [repetition-expansion repair](https://github.com/mlc-ai/xgrammar/commit/a012826cfa647478f9a7332332f051a45d970c9b)
+shares identical repeated expressions with the same lower and upper bounds. Without
+it, repeated string/whitespace bounds generate separate rule chains, amplifying FSM
+construction and token-mask work after Schema-level sharing. The native test checks
+that 128 and 2,048 identical ranges add one bounded chain and still accept lengths
+1–4 while rejecting 0 and 5. The separate large-rule test continues to exceed 32,767
+rules after deduplication. Remove this companion backport with its upstream inclusion.
 The pinned image also bounds XGrammar's retained compiler cache to 512 MiB and
 bounds the scheduler's backend grammar cache. That bound lives on SGLang's
 `BaseGrammarBackend` because the scheduler uses the backend returned by
@@ -1146,8 +1164,7 @@ killed the SGLang scheduler, and the memory pressure also stalled the Soridormi
 simulator. The backend now retains a grammar only after its exact key recurs, so a
 one-off Planner schema is never kept and recurring stage schemas still hit. Retention
 is least recently used first out, at most 64 grammars within 4 GiB of XGrammar's
-estimated size. That estimate exceeds the measured resident growth, so the budget is
-conservative. In-flight requests retain their grammars, so this is a retained-cache
+reported size. In-flight requests retain their grammars, so this is a retained-cache
 budget, not a hard cap on total process or peak compilation memory. The same bound
 applies to both maintained SGLang profiles; model weights, context/KV budgets and
 request concurrency remain profile-owned. The image build drives the reasoner-wrapped

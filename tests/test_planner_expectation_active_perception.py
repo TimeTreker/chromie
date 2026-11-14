@@ -216,7 +216,7 @@ def test_terminal_evidence_reentry_exposes_prior_expectation_without_promoting_i
                 CognitiveResponsibilityProposal(
                     local_ref="resp-find-cup",
                     outcome="Bring the user's referenced cup.",
-                    output_mode="stateful_effect",
+
                     confidence=1.0,
                 )
             ],

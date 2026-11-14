@@ -1,5 +1,6 @@
 from __future__ import annotations
 import json
+import copy
 from typing import Any
 import pytest
 from jsonschema import Draft202012Validator
@@ -56,7 +57,7 @@ class _StreamingModel:
         return value
 
 def _request() -> CognitiveWorkRequest:
-    return CognitiveWorkRequest(sid='turn-stream', text='你好', language='zh-CN', responsibilities=[CognitiveResponsibilityProposal(local_ref='reply', outcome='reply to the greeting', output_mode='speech', confidence=0.98)], interpretation_confidence=0.98, context={})
+    return CognitiveWorkRequest(sid='turn-stream', text='你好', language='zh-CN', responsibilities=[CognitiveResponsibilityProposal(local_ref='reply', outcome='reply to the greeting',  confidence=0.98)], interpretation_confidence=0.98, context={})
 
 
 def test_capability_argument_decoder_order_matches_sorted_catalog_recursively():
@@ -104,10 +105,18 @@ def _counted(payload):
     Each work, clarify or unavailable decision also states whether the needed abilities
     fit (2026-10-23), false exactly for unavailable.
     """
+    # Fixture-only one-to-one wire encoding; the semantic timing choice is unchanged.
+    if isinstance(payload, dict) and isinstance(payload.get("activities"), list):
+        from agent.app.planner_model_contract import NEED_TIMING_WIRE_VALUES
+        payload = copy.deepcopy(payload)
+        encoded = {value: wire for wire, value in NEED_TIMING_WIRE_VALUES.items()}
+        for activity in payload["activities"]:
+            if activity.get("role") in {"complete_response", "clarification"} and activity.get("timing") in encoded:
+                activity["timing"] = encoded[activity["timing"]]
     if isinstance(payload, dict) and isinstance(payload.get("responsibility_decisions"), dict):
         payload = {**payload, "responsibility_decisions": {
             ref: ({"needed_abilities_fit": item["decision"] != "unavailable", **item}
-                  if isinstance(item, dict) and item.get("decision") in {"work", "clarify", "unavailable"}
+                  if isinstance(item, dict) and item.get("decision") in {"work", "answer", "clarify", "unavailable"}
                   and "needed_abilities_fit" not in item else item)
             for ref, item in payload["responsibility_decisions"].items()}}
     if not isinstance(payload, dict) or "activity_count" in payload or not isinstance(payload.get("activities"), list):
@@ -122,7 +131,11 @@ def _counted(payload):
 
 def _uncounted(payload):
     """Production takes the count before the DTO (``take_activity_count``)."""
-    return {key: value for key, value in payload.items() if key != "activity_count"}
+    from agent.app.planner_model_contract import decode_need_timings
+    result = copy.deepcopy({key: value for key, value in payload.items() if key != "activity_count"})
+    if "activity_count" in payload:
+        decode_need_timings(result)
+    return result
 
 
 def _wire_output(payload):
@@ -139,13 +152,13 @@ def _wire_output(payload):
 ])
 def test_native_clarification_requires_owned_resolution_sources(source_kind, sources, with_needs):
     from agent.app.clients.sglang_protocol import build_sglang_chat_payload
-    from agent.app.planner_schema import need_first_response_schema
+    from agent.app.planner_model_contract import need_first_response_schema
     from agent.app.inference_compute import CognitionComputeClass
     from shared.chromie_contracts.core_interpretation import UserMeaningUncertainty
     from shared.chromie_contracts.plan import PlannerInformationGap
 
     responsibility = CognitiveResponsibilityProposal(local_ref="r1", outcome="Get weather for the requested place",
-        output_mode="information", confidence=0.9)
+         confidence=0.9)
     uncertainty = UserMeaningUncertainty(local_ref="u1", kind="referent", description="Which place", responsibility_refs=["r1"])
     capability = {"capability_id": "test.weather", "input_schema": {"type": "object",
         "properties": {"location": {"type": "string"}}, "required": ["location"]}}
@@ -191,7 +204,7 @@ def test_native_clarification_requires_owned_resolution_sources(source_kind, sou
 @pytest.mark.parametrize('preserve_gap', [False, True])
 async def test_terminal_cannot_drop_gi_meaning_gap(gap: str, preserve_gap: bool) -> None:
     """Replay the laptop's accepted shake plan with unresolved WHAT contrasts."""
-    responsibility = CognitiveResponsibilityProposal(local_ref='r1', outcome='shake head twice', output_mode='body_action', bindings={'count': 2}, confidence=0.5)
+    responsibility = CognitiveResponsibilityProposal(local_ref='r1', outcome='shake head twice',  bindings={'count': 2}, confidence=0.5)
     request = CognitiveWorkRequest(sid='unresolved-shake', text='摇两下头。', language='zh-CN', responsibilities=[responsibility], meaning_uncertainties=[{"local_ref": "u1", "kind": "referent", "description": gap, "responsibility_refs": ["r1"]}], interpretation_confidence=0.5)
     output = {'disposition': 'execute', 'coverage': 'complete', 'covered_responsibility_refs': ['r1'], 'activities': [{'role': 'capability', 'capability_id': 'soridormi.shake_no', 'activity_id': 'act_shake_head_twice', 'args': {'count': 2}, 'depends_on': [], 'source_responsibility_refs': ['r1']}], 'confidence': 1.0, 'unresolved': [], 'reason_summary': 'Execute head shake twice as requested'}
     if preserve_gap:
@@ -215,10 +228,10 @@ async def test_terminal_cannot_drop_gi_meaning_gap(gap: str, preserve_gap: bool)
 @pytest.mark.parametrize('preserve_all', [False, True])
 @pytest.mark.parametrize('independent', [False, True])
 def test_meaning_gaps_preserve_independent_terminal_work(preserve_all: bool, independent: bool) -> None:
-    responsibilities = [CognitiveResponsibilityProposal(local_ref=ref, outcome=outcome, output_mode='body_action', bindings={'count': 2}, confidence=0.9) for ref, outcome in [('r1', 'shake the indicated head twice'), ('r2', 'nod twice')]]
+    responsibilities = [CognitiveResponsibilityProposal(local_ref=ref, outcome=outcome,  bindings={'count': 2}, confidence=0.9) for ref, outcome in [('r1', 'shake the indicated head twice'), ('r2', 'nod twice')]]
     request = CognitiveWorkRequest(sid='mixed-meaning', text='让那个摇两下头，你点两下头。', responsibilities=responsibilities, meaning_uncertainties=[{'local_ref': f'u{i}', 'kind': 'referent', 'description': name, 'responsibility_refs': ['r1']} for i, name in enumerate(['actor', 'target_identity'])])
     gaps = [{'gap_id': f'gap-{name}', 'description': name, 'blocking': True, 'resolved': False, 'required_for': [name], 'preferred_resolution': 'ask_user', 'source_kind': 'unresolved_meaning', 'source_reference': name, 'resolution_sources_considered': ['authoritative_context']} for name in ([item.description for item in request.meaning_uncertainties] if preserve_all else ['actor'])]
-    raw = {'responsibility_decisions': {'r1': {'decision': 'clarify', 'missing': []}, 'r2': {'decision': 'work', 'missing': []}}, 'disposition': 'mixed', 'coverage': 'complete', 'covered_responsibility_refs': ['r1', 'r2'], 'activities': [{'activity_id': 'ask-meaning', 'role': 'clarification', 'source_responsibility_refs': ['r1'], 'information_gaps': gaps}, {'activity_id': 'nod', 'role': 'capability', 'capability_id': 'soridormi.nod_yes', 'args': {'count': 2}, 'depends_on': [], 'source_responsibility_refs': ['r2'] if independent else ['r1', 'r2']}], 'confidence': 0.9, 'unresolved': [item.description for item in request.meaning_uncertainties], 'reason_summary': 'Clarify the first request; perform the independent nod.'}
+    raw = {'responsibility_decisions': {'r1': {'decision': 'clarify', 'missing': []}, 'r2': {'decision': 'work', 'missing': []}}, 'disposition': 'mixed', 'coverage': 'complete', 'covered_responsibility_refs': ['r1', 'r2'], 'activities': [{'activity_id': 'ask-meaning', 'role': 'clarification', 'timing': 'sequential', 'source_responsibility_refs': ['r1'], 'information_gaps': gaps}, {'activity_id': 'nod', 'role': 'capability', 'capability_id': 'soridormi.nod_yes', 'args': {'count': 2}, 'depends_on': [], 'source_responsibility_refs': ['r2'] if independent else ['r1', 'r2']}], 'confidence': 0.9, 'unresolved': [item.description for item in request.meaning_uncertainties], 'reason_summary': 'Clarify the first request; perform the independent nod.'}
     capabilities = [_nod_catalog_capability().model_dump(mode='json')]
     output = FastPlannerAdvanceModelOutput.model_validate(raw)
     if preserve_all and independent:
@@ -235,20 +248,20 @@ def test_needed_abilities_fit_selects_the_decision_before_it_is_written() -> Non
     Whether the needed abilities fit is stated first: true opens work or clarify, false only
     unavailable. A speech-only Responsibility, which cannot be a limitation, states nothing.
     """
-    nod = CognitiveResponsibilityProposal(local_ref='r1', outcome='nod at the indicated person twice', output_mode='body_action', bindings={'count': 2}, confidence=0.9)
-    reply = CognitiveResponsibilityProposal(local_ref='r2', outcome='say hello', output_mode='speech', continuity_scope='turn', confidence=0.9)
+    nod = CognitiveResponsibilityProposal(local_ref='r1', outcome='nod at the indicated person twice',  bindings={'count': 2}, confidence=0.9)
+    reply = CognitiveResponsibilityProposal(local_ref='r2', outcome='say hello',   confidence=0.9)
     uncertainty = [UserMeaningUncertainty(local_ref='u1', kind='referent', description='which person 那个 is', responsibility_refs=['r1'])]
     schema = fast_streaming_advance_response_schema(['r1', 'r2'], responsibilities=[nod, reply], capabilities=[_nod_catalog_capability().model_dump(mode='json')], meaning_uncertainties=uncertainty)
     decisions = schema['properties']['responsibility_decisions']['properties']
     offered = {(branch['properties']['needed_abilities_fit'].get('enum') or [branch['properties']['needed_abilities_fit'].get('const')])[0]: branch['properties']['decision']['enum'] for branch in decisions['r1']['oneOf']}
-    assert offered == {True: ['work', 'clarify'], False: ['unavailable']}
+    assert offered == {True: ['work', 'answer', 'clarify'], False: ['unavailable']}
     assert all(list(branch['properties'])[:2] == ['needed_abilities_fit', 'decision'] for branch in decisions['r1']['oneOf'])
-    assert 'needed_abilities_fit' not in json.dumps(decisions['r2'])
+    assert 'needed_abilities_fit' in json.dumps(decisions['r2'])
     # The live shape: one fetch-like Responsibility whose referent UMI left uncertain.
     alone = fast_streaming_advance_response_schema(['r1'], responsibilities=[nod], capabilities=[_nod_catalog_capability().model_dump(mode='json')], meaning_uncertainties=uncertainty)
     validator = Draft202012Validator(alone)
     gaps = [{'gap_id': 'gap-person', 'description': 'which person 那个 is', 'blocking': True, 'resolved': False, 'required_for': ['which person 那个 is'], 'preferred_resolution': 'ask_user', 'source_kind': 'unresolved_meaning', 'source_reference': 'which person 那个 is', 'resolution_sources_considered': ['authoritative_context']}]
-    clarify = {'responsibility_decisions': {'r1': {'needed_abilities_fit': True, 'decision': 'clarify', 'missing': []}}, 'disposition': 'clarify', 'coverage': 'complete', 'covered_responsibility_refs': ['r1'], 'activities': [{'activity_id': 'ask-who', 'role': 'clarification', 'source_responsibility_refs': ['r1'], 'information_gaps': gaps}], 'confidence': 0.9, 'unresolved': ['which person 那个 is'], 'reason_summary': 'Ask who is meant.'}
+    clarify = {'responsibility_decisions': {'r1': {'needed_abilities_fit': True, 'decision': 'clarify', 'missing': []}}, 'disposition': 'clarify', 'coverage': 'complete', 'covered_responsibility_refs': ['r1'], 'activities': [{'activity_id': 'ask-who', 'role': 'clarification', 'timing': 'sequential', 'source_responsibility_refs': ['r1'], 'information_gaps': gaps}], 'confidence': 0.9, 'unresolved': ['which person 那个 is'], 'reason_summary': 'Ask who is meant.'}
     assert validator.is_valid(_counted(clarify))
     lacking = {**clarify, 'responsibility_decisions': {'r1': {'needed_abilities_fit': False, 'decision': 'unavailable', 'missing': ['nod at a person']}}, 'disposition': 'unavailable', 'coverage': 'uncertain', 'activities': [], 'unresolved': ['nod at a person']}
     assert validator.is_valid(_counted(lacking))
@@ -263,7 +276,7 @@ def test_needed_abilities_fit_selects_the_decision_before_it_is_written() -> Non
 
 
 def _body_request() -> tuple[CognitiveWorkRequest, CognitiveResponsibilityProposal]:
-    responsibility = CognitiveResponsibilityProposal(local_ref='walk', outcome='walk forward for ten seconds', output_mode='body_action', bindings={'duration_s': 10}, confidence=0.99)
+    responsibility = CognitiveResponsibilityProposal(local_ref='walk', outcome='walk forward for ten seconds',  bindings={'duration_s': 10}, confidence=0.99)
     return (CognitiveWorkRequest(sid='turn-stream-walk', text='向前走十秒', language='zh-CN', responsibilities=[responsibility], interpretation_confidence=0.99, context={}), responsibility)
 
 def _walk_capability() -> dict[str, Any]:
@@ -287,7 +300,7 @@ async def test_streamed_string_argument_mapping_preserves_source_ownership(varia
         interpretation_confidence=1,
         responsibilities=[CognitiveResponsibilityProposal(
             local_ref="turn", outcome="turn LEFT" if variant == "en_case_only" else outcome,
-            output_mode="body_action", confidence=1,
+             confidence=1,
             source_evidence={"source_start_token_ref": start, "source_end_token_ref": tokens[-1]["ref"]},
         )],
     )
@@ -346,8 +359,8 @@ async def test_nod_count_binding_evidence_wrapper_is_semantically_equal_to_scala
         responsibilities=[CognitiveResponsibilityProposal(
             local_ref="r1",
             outcome="nod your head 5 times",
-            output_mode="body_action",
-            continuity_scope="goal",
+
+
             bindings={"count": {"value": 5, "source_evidence": "t3"}},
             confidence=1.0,
         )],
@@ -386,7 +399,7 @@ def _blink_social_catalog_capability() -> CatalogCapability:
     return CatalogCapability(capability_id='soridormi.blink_eyes', agent_id='capability_agent', description='Blink as an optional visual social expression.', input_schema={'type': 'object', 'properties': {'count': {'type': 'integer', 'minimum': 1, 'default': 2}}, 'additionalProperties': False}, effects=['visual_expression'], available=True, interaction_executable=True, prompt_tier='common', behavior_domains=['social_attention', 'facial_expression'], can_run_parallel=True, parallel_metadata_declared=True, exclusive_group='visual.eyes', resource_claims=['visual.eyes'])
 
 def _look_request() -> CognitiveWorkRequest:
-    return CognitiveWorkRequest(sid='turn-stream-look', text='看着我三秒', language='zh-CN', responsibilities=[CognitiveResponsibilityProposal(local_ref='look', outcome='look at the addressee', output_mode='body_action', body_effect_family='gaze_or_orientation', bindings={'addressee': '我'}, confidence=1.0)], interpretation_confidence=1.0, context={'active_user_target': {'source': 'live_perception', 'target_ref': 'current_speaker', 'relative_direction': 'front', 'confidence': 1.0, 'evidence_refs': ['scenario:current-speaker']}})
+    return CognitiveWorkRequest(sid='turn-stream-look', text='看着我三秒', language='zh-CN', responsibilities=[CognitiveResponsibilityProposal(local_ref='look', outcome='look at the addressee',   bindings={'addressee': '我'}, confidence=1.0)], interpretation_confidence=1.0, context={'active_user_target': {'source': 'live_perception', 'target_ref': 'current_speaker', 'relative_direction': 'front', 'confidence': 1.0, 'evidence_refs': ['scenario:current-speaker']}})
 
 def _look_output(*, target_ref: str) -> dict[str, Any]:
     return {'disposition': 'execute', 'coverage': 'complete', 'covered_responsibility_refs': ['look'], 'activities': [{'role': 'capability', 'capability_id': 'soridormi.look_at_person', 'activity_id': 'look-at-speaker', 'args': {'target_ref': target_ref}, 'depends_on': [], 'source_responsibility_refs': ['look']}], 'confidence': 1.0, 'unresolved': [], 'reason_summary': 'Look at the trusted current speaker target.'}
@@ -433,7 +446,7 @@ def _weather_information_catalog_capability() -> CatalogCapability:
 
 
 def _structured_resource_request() -> CognitiveWorkRequest:
-    return CognitiveWorkRequest(sid='turn-stream-resource', text='there is a bottle of milk ahead of you about 50 meters, please bring it to me', language='en-US', responsibilities=[CognitiveResponsibilityProposal(local_ref='fetch', outcome='acquire and deliver the resource', output_mode='body_action', body_effect_family='task_physical_effect', bindings={'entity': 'bottle of milk', 'location': 'ahead of you about 50 meters', 'distance': 50, 'recipient': 'me'}, confidence=1.0)], interpretation_confidence=1.0)
+    return CognitiveWorkRequest(sid='turn-stream-resource', text='there is a bottle of milk ahead of you about 50 meters, please bring it to me', language='en-US', responsibilities=[CognitiveResponsibilityProposal(local_ref='fetch', outcome='acquire and deliver the resource',   bindings={'entity': 'bottle of milk', 'location': 'ahead of you about 50 meters', 'distance': 50, 'recipient': 'me'}, confidence=1.0)], interpretation_confidence=1.0)
 
 def _structured_resource_output(*, recipient: str='me') -> dict[str, Any]:
     return {'disposition': 'execute', 'coverage': 'complete', 'covered_responsibility_refs': ['fetch'], 'activities': [{'role': 'capability', 'capability_id': 'soridormi.acquire_and_deliver_resource', 'activity_id': 'fetch-milk', 'args': {'resource': {'kind': 'physical_object', 'description': 'bottle of milk'}, 'source': {'status': 'known', 'description': 'ahead of you about 50 meters', 'bindings': {'distance': 50}}, 'recipient': {'description': recipient}}, 'depends_on': [], 'source_responsibility_refs': ['fetch']}], 'confidence': 1.0, 'unresolved': [], 'reason_summary': 'Acquire the resource and deliver it.'}
@@ -475,9 +488,9 @@ def _contextual_structured_resource_request() -> CognitiveWorkRequest:
         responsibilities=[CognitiveResponsibilityProposal(
             local_ref="fetch",
             outcome="bring the bottle of milk to the user",
-            output_mode="body_action",
-            body_effect_family="task_physical_effect",
-            continuity_scope="goal",
+
+
+
             bindings={
                 "entity": {
                     "confidence": 1.0, "entity_type": "object", "name": "entity",
@@ -581,10 +594,13 @@ def test_fast_schema_forbids_false_source_span_for_inherited_source_role_binding
     )
     items = schema["properties"]["activities"]["items"]
     branches = items.get("oneOf", [items])
-    # Complete provider-owned inputs leave Work or an honest limitation, never a clarification.
-    assert {branch["properties"]["role"]["enum"][0] for branch in branches} == {"capability"}
+    # Complete provider-owned inputs never create a clarification. A compound body
+    # outcome may still carry its explicitly requested response beside real Work.
+    assert "clarification" not in {branch["properties"]["role"]["enum"][0] for branch in branches}
+    branches = [branch for branch in branches if branch["properties"]["role"]["enum"] == ["capability"]]
+    assert branches
     decision = schema["properties"]["responsibility_decisions"]["properties"]["fetch"]
-    assert {value for branch in decision["oneOf"] for value in branch["properties"]["decision"]["enum"]} == {"work", "unavailable"}
+    assert {value for branch in decision["oneOf"] for value in branch["properties"]["decision"]["enum"]} == {"work", "answer", "unavailable"}
     activity = next(branch for branch in branches if branch["properties"]["role"]["enum"] == ["capability"])
     assert "clarify" not in schema["properties"]["disposition"]["enum"]
     assert activity["properties"]["argument_sources"]["properties"] == {}
@@ -686,7 +702,7 @@ async def test_fast_stream_accepts_inherited_source_role_bindings_without_span()
     assert frames[-1].advance.activities[0].argument_sources == {}
 
 @pytest.mark.asyncio
-async def test_fast_stream_filters_incompatible_information_capability_before_generation() -> None:
+async def test_fast_stream_catalog_is_data_and_work_still_requires_a_fitting_need() -> None:
     request = _structured_resource_request()
     model = _StreamingModel([_wire_output(_structured_resource_output())])
     frames = [
@@ -704,7 +720,8 @@ async def test_fast_stream_filters_incompatible_information_capability_before_ge
     assert isinstance(frames[-1], FastPlannerStreamTerminal)
     schema_text = json.dumps(model.last_kwargs['response_format'], ensure_ascii=False)
     assert 'soridormi.acquire_and_deliver_resource' in schema_text
-    assert 'chromie.weather.lookup' not in schema_text
+    assert 'chromie.weather.lookup' in schema_text
+    assert [a.capability_id for a in frames[-1].advance.activities if a.role == 'capability'] == ['soridormi.acquire_and_deliver_resource']
     assert 'soridormi.blink_eyes' in schema_text
 
 
@@ -717,8 +734,8 @@ async def test_fast_stream_keeps_body_capabilities_across_social_domain_labels()
         responsibilities=[CognitiveResponsibilityProposal(
             local_ref="blink",
             outcome="blink twice",
-            output_mode="body_action",
-            body_effect_family="social_expression",
+
+
             bindings={"count": 2},
             confidence=1.0,
         )],
@@ -774,12 +791,12 @@ async def test_planner_rejects_invalid_argument_source_in_compound_work() -> Non
 
 
 def test_fast_decision_projection_localizes_coverage_bindings_and_relations() -> None:
-    look = CognitiveResponsibilityProposal(local_ref='r1', outcome='look at the person', output_mode='body_action', bindings={'entity': 'me', 'parallel_with': ['r2']}, confidence=1.0)
-    blink = CognitiveResponsibilityProposal(local_ref='r2', outcome='blink twice', output_mode='body_action', bindings={'count': 2, 'parallel_with': 'r1'}, confidence=1.0)
+    look = CognitiveResponsibilityProposal(local_ref='r1', outcome='look at the person',  bindings={'entity': 'me', 'parallel_with': ['r2']}, confidence=1.0)
+    blink = CognitiveResponsibilityProposal(local_ref='r2', outcome='blink twice',  bindings={'count': 2, 'parallel_with': 'r1'}, confidence=1.0)
     projection = fast_responsibility_decision_projection([look, blink])
     assert projection == [
-        {"ref": "r1", "outcome": "look at the person", "output_mode": "body_action", "source_evidence": None},
-        {"ref": "r2", "outcome": "blink twice", "output_mode": "body_action", "source_evidence": None},
+        {"ref": "r1", "outcome": "look at the person", "source_evidence": None},
+        {"ref": "r2", "outcome": "blink twice", "source_evidence": None},
     ]
 
 @pytest.mark.asyncio
@@ -939,7 +956,7 @@ def test_typed_source_relation_is_checked_on_work_dependencies(relation, list_bi
     from shared.chromie_contracts.plan import FastPlannerAdvanceModelOutput
 
     responsibilities = [CognitiveResponsibilityProposal(
-        local_ref=ref, outcome="walk forward for ten seconds", output_mode="body_action", confidence=1,
+        local_ref=ref, outcome="walk forward for ten seconds",  confidence=1,
         bindings={"duration_s": 10, **({relation: ["second"] if list_binding else "second"} if ref == "first" else {})},
     ) for ref in ("first", "second")]
     request = CognitiveWorkRequest(sid="typed-relation", text="walk forward for ten seconds", language="en-US",
@@ -965,7 +982,7 @@ def test_typed_source_relation_is_checked_on_work_dependencies(relation, list_bi
 
 def test_native_work_timing_keeps_honest_limitation_when_no_provider_can_honor_concurrency():
     responsibilities = [CognitiveResponsibilityProposal(
-        local_ref=ref, outcome="perform bounded action", output_mode="body_action", confidence=1,
+        local_ref=ref, outcome="perform bounded action",  confidence=1,
         bindings={"parallel_with": "second"} if ref == "first" else {},
     ) for ref in ("first", "second")]
     capability = {**_walk_capability(), "can_run_parallel": False}
@@ -1012,11 +1029,11 @@ def test_fast_native_visible_work_bounds_conserve_all_existing_response_assignme
 
 @pytest.mark.parametrize("mode", ["styled_speech", "recitation", "singing", "humming", "nonverbal_vocalization"])
 @pytest.mark.parametrize("provider_modes", [None, ["speech"], ["speech", "styled_speech", "recitation", "singing", "humming", "nonverbal_vocalization"]])
-def test_native_advance_preserves_vocal_source_mode_without_redirecting_body_work(mode, provider_modes):
+def test_native_vocal_provider_modes_and_unmet_ability_gate(mode, provider_modes):
     from shared.chromie_contracts.interaction import VOCAL_PERFORMANCE_CAPABILITY_ID, vocal_performance_input_schema
     responsibilities = [
-        CognitiveResponsibilityProposal(local_ref="voice", outcome="perform requested vocal effect", output_mode=mode, confidence=1),
-        CognitiveResponsibilityProposal(local_ref="body", outcome="walk for 10 seconds", output_mode="body_action", confidence=1),
+        CognitiveResponsibilityProposal(local_ref="voice", outcome=f"perform the requested {mode}",  confidence=1),
+        CognitiveResponsibilityProposal(local_ref="body", outcome="walk for 10 seconds",  confidence=1),
     ]
     capabilities = [_walk_capability()]
     if provider_modes is not None:
@@ -1024,17 +1041,23 @@ def test_native_advance_preserves_vocal_source_mode_without_redirecting_body_wor
             "input_schema": vocal_performance_input_schema(provider_modes), "can_run_parallel": True})
     schema = fast_streaming_advance_response_schema(
         [x.local_ref for x in responsibilities], responsibilities=responsibilities, capabilities=capabilities)
-    validator = Draft202012Validator(schema["properties"]["activities"]["items"])
+    validator = Draft202012Validator(schema).evolve(schema=schema["properties"]["activities"]["items"])
     body = {"role": "capability", "activity_id": "act", "capability_id": capabilities[0]["capability_id"],
         "args": {"duration_s": 10}, "argument_sources": {"duration_s": {"source_start_token_ref": "t0", "source_end_token_ref": "t1"}},
         "depends_on": [], "source_responsibility_refs": ["body"]}
     validator.validate(body)
-    assert not validator.is_valid({**body, "source_responsibility_refs": ["voice"]})
+    # WHAT has no mechanical lane label. A catalog entry is not a Work permit:
+    # the accepted ability prefix must positively fit before any Work is released.
+    from agent.app.planner_model_contract import PlannerAbilityNeed, validate_ability_need_realization
+    need = PlannerAbilityNeed(need=f"perform {mode}", closest_loaded=body["capability_id"],
+                             closest_loaded_does="Walk forward", fits=False)
+    with pytest.raises(PlannerDTOContractError, match="accepted fitting ability need"):
+        validate_ability_need_realization([need], [body["capability_id"]])
     for candidate_mode in ["speech", "styled_speech", "recitation", "singing", "humming", "nonverbal_vocalization"]:
         vocal = {**body, "capability_id": VOCAL_PERFORMANCE_CAPABILITY_ID,
             "argument_sources": {},
             "args": {"text": "authored performance", "mode": candidate_mode}, "source_responsibility_refs": ["voice"]}
-        assert validator.is_valid(vocal) == (provider_modes is not None and mode in provider_modes and candidate_mode == mode)
+        assert validator.is_valid(vocal) == (provider_modes is not None and candidate_mode in provider_modes)
     # An unavailable mode is reported honestly without inventing another effect; the
     # limitation is the voice Responsibility's decision, beside the body's own Work.
     honest = {"responsibility_decisions": {
@@ -1050,7 +1073,7 @@ def test_native_advance_preserves_vocal_source_mode_without_redirecting_body_wor
 
 def test_native_advance_keeps_distinct_and_shared_vocal_mode_composition():
     from shared.chromie_contracts.interaction import VOCAL_PERFORMANCE_CAPABILITY_ID, vocal_performance_input_schema
-    responsibilities = [CognitiveResponsibilityProposal(local_ref=ref, outcome="requested vocal performance", output_mode=mode, confidence=1)
+    responsibilities = [CognitiveResponsibilityProposal(local_ref=ref, outcome="requested vocal performance",  confidence=1)
         for ref, mode in [("song1", "singing"), ("song2", "singing"), ("hum", "humming")]]
     schema = fast_streaming_advance_response_schema([x.local_ref for x in responsibilities], responsibilities=responsibilities,
         capabilities=[{"capability_id": VOCAL_PERFORMANCE_CAPABILITY_ID, "input_schema": vocal_performance_input_schema(), "can_run_parallel": True}])
@@ -1058,12 +1081,12 @@ def test_native_advance_keeps_distinct_and_shared_vocal_mode_composition():
     act = {"role": "capability", "activity_id": "voice", "capability_id": VOCAL_PERFORMANCE_CAPABILITY_ID,
         "args": {"text": "authored performance", "mode": "singing"}, "depends_on": [], "source_responsibility_refs": ["song1", "song2"]}
     validator.validate(act)
-    assert not validator.is_valid({**act, "source_responsibility_refs": ["song1", "hum"]})
+    assert not validator.is_valid({**act, "source_responsibility_refs": ["song1", "unknown"]})
     validator.validate({**act, "args": {**act["args"], "mode": "humming"}, "source_responsibility_refs": ["hum"]})
 
 
 def test_native_vocal_work_with_empty_catalog_cannot_invent_a_provider():
-    source = CognitiveResponsibilityProposal(local_ref="song", outcome="sing", output_mode="singing", confidence=1)
+    source = CognitiveResponsibilityProposal(local_ref="song", outcome="sing",  confidence=1)
     schema = fast_streaming_advance_response_schema([source.local_ref], responsibilities=[source], capabilities=[])
     act = {"role": "capability", "activity_id": "voice", "capability_id": "unavailable.provider",
         "args": {"mode": "singing", "text": "performance"}, "depends_on": [], "source_responsibility_refs": ["song"]}
@@ -1106,7 +1129,7 @@ def test_native_decision_alternatives_preserve_execution_limitation_boundary(dis
         "confidence": 1, "unresolved": [], "reason_summary": "Bounded Work decision."}
     # Exercise the native alternatives independently of the Host's conditional
     # allOf checks, which the deployed decoder does not enforce.
-    assert Draft202012Validator({"oneOf": schema["oneOf"]}).is_valid(_counted(output)) == valid
+    assert Draft202012Validator({"$defs": schema.get("$defs", {}), "oneOf": schema["oneOf"]}).is_valid(_counted(output)) == valid
     assert Draft202012Validator(schema).is_valid(_counted(output)) == valid
 
 
@@ -1120,7 +1143,7 @@ def test_planner_authority_forbids_confirmation_only_complete_response_for_work(
             CognitiveResponsibilityProposal(
                 local_ref="r1",
                 outcome="walk, nod, then turn left",
-                output_mode="body_action",
+
                 confidence=1.0,
             )
         ],
@@ -1146,7 +1169,7 @@ def test_fast_decoder_purpose_matches_provider_normalization(resource_contract, 
     definition = {"capability_id": "test.provider", "input_schema": {"type": "object", "properties": {}},
                   location: {"resource_contract": resource_contract}}
     responsibility = CognitiveResponsibilityProposal(local_ref="r1", outcome="Complete the requested work",
-                                                       output_mode="body_action", confidence=1.0)
+                                                        confidence=1.0)
     raw = {"responsibility_decisions": {"r1": {"decision": "work", "missing": []}},
            "activities": [{"role": "capability", "capability_id": "test.provider", "activity_id": "step",
                            "args": {}, "source_responsibility_refs": ["r1"], "depends_on": []}],
@@ -1252,8 +1275,8 @@ def _compound_body_case(variant: str) -> tuple[CognitiveWorkRequest, list[Catalo
         return {'source_start_token_ref': contained[0]['ref'], 'source_end_token_ref': contained[-1]['ref']}
 
     responsibility = CognitiveResponsibilityProposal(
-        local_ref='r1', outcome=text, output_mode=mode,
-        body_effect_family=family if mode == 'body_action' else None,
+        local_ref='r1', outcome=text,
+
         source_evidence={'source_start_token_ref': tokens[0]['ref'], 'source_end_token_ref': tokens[-1]['ref']},
         confidence=1.0,
     )
@@ -1265,7 +1288,7 @@ def _compound_body_case(variant: str) -> tuple[CognitiveWorkRequest, list[Catalo
         })
         responsibilities = [responsibility]
         responsibilities.append(CognitiveResponsibilityProposal(
-            local_ref='r2', outcome='nod twice', output_mode='body_action', body_effect_family='social_expression',
+            local_ref='r2', outcome='nod twice',
             source_evidence=span('nod twice'), confidence=1,
         ))
     request = CognitiveWorkRequest(sid='compound-body-contrast', text=text, language='en-US',
@@ -1405,7 +1428,7 @@ async def test_required_enum_source_matches_selected_value_and_original_turn(var
         return {'source_start_token_ref': found[0]['ref'], 'source_end_token_ref': found[-1]['ref']}
 
     responsibility = CognitiveResponsibilityProposal(local_ref='r1', outcome=outcome,
-        output_mode='body_action', body_effect_family='task_physical_effect', confidence=1,
+          confidence=1,
         source_evidence=span(owned or text), bindings=bindings)
     request = CognitiveWorkRequest(sid='enum-source-contract', text=text, responsibilities=[responsibility],
         interpretation_confidence=1)
@@ -1436,9 +1459,9 @@ async def test_work_beside_an_impossible_sibling_is_one_mixed_decision() -> None
     work + unavailable correctly and the Host rejected the impossible sibling as having
     no terminal Activity."""
     responsibilities = [
-        CognitiveResponsibilityProposal(local_ref="r1", outcome="walk forward for ten seconds", output_mode="body_action",
+        CognitiveResponsibilityProposal(local_ref="r1", outcome="walk forward for ten seconds",
                                         bindings={"duration_s": 10}, confidence=0.99),
-        CognitiveResponsibilityProposal(local_ref="r2", outcome="make me a cup of coffee", output_mode="body_action",
+        CognitiveResponsibilityProposal(local_ref="r2", outcome="make me a cup of coffee",
                                         confidence=0.99),
     ]
     request = CognitiveWorkRequest(sid="turn-mixed-limit", text="向前走十秒，然后帮我做一杯咖啡", language="zh-CN",
@@ -1462,19 +1485,21 @@ async def test_work_beside_an_impossible_sibling_is_one_mixed_decision() -> None
 
 
 @pytest.mark.asyncio
-async def test_ordinary_speech_is_answered_never_declared_unavailable() -> None:
+async def test_a_missing_method_remains_expressible_without_an_umi_category() -> None:
     """Live 2026-10-12 ("tell me a joke"): SC told the joke, then the Planner decided the
     joke unavailable and SC had to say it could not tell jokes."""
     request = _request()
     schema = fast_streaming_advance_response_schema(["reply"], responsibilities=request.responsibilities, capabilities=[])
     decision = schema["properties"]["responsibility_decisions"]["properties"]["reply"]
-    assert [branch["properties"]["decision"]["enum"] for branch in decision.get("oneOf", [decision])] == [["answer", "clarify"]]
-    assert "unavailable" not in [state["properties"]["disposition"]["enum"][0] for state in schema["oneOf"]]
+    assert [branch["properties"]["decision"]["enum"] for branch in decision.get("oneOf", [decision])] == [["answer", "clarify"], ["unavailable"]]
+    assert "unavailable" in [state["properties"]["disposition"]["enum"][0] for state in schema["oneOf"]]
     limited = {"responsibility_decisions": {"reply": {"decision": "unavailable", "missing": ["a joke capability"]}},
                "activities": [], "disposition": "unavailable", "coverage": "uncertain",
                "covered_responsibility_refs": ["reply"], "confidence": 1.0, "unresolved": [], "reason_summary": "No jokes."}
     frames = [frame async for frame in PlannerResolver(_StreamingModel([_wire_output(limited)]), _Catalog()).stream_advance(request)]
-    assert isinstance(frames[-1], FastPlannerStreamFailure)
+    assert isinstance(frames[-1], FastPlannerStreamTerminal)
+    assert frames[-1].advance.disposition == "unavailable"
+    assert not any(item.role == "capability" for item in frames[-1].advance.activities)
 
 
 @pytest.mark.asyncio
@@ -1507,7 +1532,7 @@ def test_outcome_spans_cannot_reuse_user_turn_token_names():
 
     text = "If it's going to rain in Shanghai today, nod twice."
     outcome = "nod twice if it's going to rain in Shanghai today"
-    responsibility = CognitiveResponsibilityProposal(local_ref="r1", outcome=outcome, output_mode="information", confidence=1)
+    responsibility = CognitiveResponsibilityProposal(local_ref="r1", outcome=outcome,  confidence=1)
     capability = {"capability_id": "test.weather", "input_schema": {"type": "object",
         "properties": {"location": {"type": "string"}}, "required": ["location"], "additionalProperties": False},
         "hints": {"resource_contract": {"provider_role": "acquire_information"}}}
@@ -1516,7 +1541,8 @@ def test_outcome_spans_cannot_reuse_user_turn_token_names():
         source_token_refs=[token["ref"] for token in user_turn_source_tokens(text)], original_user_text=text)
     items = schema["properties"]["activities"]["items"]
     branch = next(item for item in items.get("oneOf", [items]) if item["properties"]["role"]["enum"] == ["capability"])
-    location = Draft202012Validator(branch["properties"]["argument_sources"]["properties"]["location"])
+    location = Draft202012Validator(schema).evolve(
+        schema=branch["properties"]["argument_sources"]["properties"]["location"])
     assert location.is_valid({"source_start_token_ref": "t6", "source_end_token_ref": "t6"})
     assert not location.is_valid({"source_start_token_ref": "t6", "source_end_token_ref": "t6", "source_responsibility_ref": "r1"})
     assert location.is_valid({"source_start_token_ref": "r1.t8", "source_end_token_ref": "r1.t8", "source_responsibility_ref": "r1"})
@@ -1551,7 +1577,7 @@ def test_a_conditional_plans_its_read_and_holds_the_action():
 
     responsibility = CognitiveResponsibilityProposal(
         local_ref="r1", outcome="wave your hand if it will be sunny in Beijing tomorrow",
-        output_mode="body_action", confidence=1.0)
+         confidence=1.0)
     weather = {"capability_id": "test.weather", "input_schema": {"type": "object", "properties": {},
                "additionalProperties": False},
                "hints": {"resource_contract": {"provider_role": "acquire_information"}}}
@@ -1599,8 +1625,8 @@ def test_a_mixed_limitation_gets_no_activity():
     """Live 2026-10-12 (wave at me, then make me coffee): coffee was decided unavailable,
     then also given a clarification Activity; Host rejected the whole turn, wave included."""
     responsibilities = [
-        CognitiveResponsibilityProposal(local_ref="r1", outcome="wave at me", output_mode="body_action", confidence=1.0),
-        CognitiveResponsibilityProposal(local_ref="r2", outcome="make me a cup of coffee", output_mode="body_action",
+        CognitiveResponsibilityProposal(local_ref="r1", outcome="wave at me",  confidence=1.0),
+        CognitiveResponsibilityProposal(local_ref="r2", outcome="make me a cup of coffee",
                                         confidence=1.0),
     ]
     wave = {"capability_id": "test.wave", "input_schema": {"type": "object", "properties": {},
@@ -1625,7 +1651,7 @@ def test_a_mixed_limitation_gets_no_activity():
     assert not validator.is_valid(output([waving, {**asking, "source_responsibility_refs": ["r1"]}]))
     mixed = {json.dumps(state["properties"]["responsibility_decisions"], sort_keys=True)
              for state in schema["oneOf"] if state["properties"]["disposition"]["enum"] == ["mixed"]}
-    assert len(mixed) == 6  # every non-uniform pair of {work, clarify, unavailable}
+    assert len(mixed) == 12  # non-uniform pairs of work, answer, clarify, unavailable
 
 
 def test_two_answers_are_never_mixed_in_the_decoder():
@@ -1633,17 +1659,17 @@ def test_two_answers_are_never_mixed_in_the_decoder():
     decided answer and r2 answer_from_perception, both respond, yet the decoder still offered
     mixed and Host rejected the turn. Mixed now needs two dispositions, so only respond fits."""
     responsibilities = [
-        CognitiveResponsibilityProposal(local_ref="r1", outcome="comfort me about my headache", output_mode="speech",
+        CognitiveResponsibilityProposal(local_ref="r1", outcome="comfort me about my headache",
                                         confidence=1.0),
         CognitiveResponsibilityProposal(local_ref="r2", outcome="whether I may take the pills",
-                                        output_mode="information", confidence=1.0),
+                                         confidence=1.0),
     ]
     schema = fast_streaming_advance_response_schema(["r1", "r2"], responsibilities=responsibilities,
                                                     situation_source_refs=["scene:object-1"])
     validator = Draft202012Validator(schema)
     answered = _counted({
         "responsibility_decisions": {
-            "r1": {"decision": "answer", "missing": []},
+            "r1": {"answer_source": "a Capability or what Chromie knows answers it", "observed_refs": [], "decision": "answer", "missing": []},
             "r2": {"answer_source": "a current observation shows it", "observed_refs": ["scene:object-1"],
                    "decision": "answer_from_perception", "missing": []}},
         "activities": [{"role": "complete_response", "activity_id": "resp_r1", "source_responsibility_refs": ["r1"],
@@ -1656,11 +1682,11 @@ def test_two_answers_are_never_mixed_in_the_decoder():
 
 def _answer_beside_body(decision: dict[str, Any], activities: list[dict[str, Any]]):
     responsibilities = [
-        CognitiveResponsibilityProposal(local_ref="r1", outcome="perform it", output_mode="body_action", confidence=1.0),
-        CognitiveResponsibilityProposal(local_ref="r2", outcome="answer the question", output_mode="speech", confidence=1.0),
+        CognitiveResponsibilityProposal(local_ref="r1", outcome="perform it",  confidence=1.0),
+        CognitiveResponsibilityProposal(local_ref="r2", outcome="answer the question",  confidence=1.0),
     ]
     wave = {"capability_id": "test.wave", "input_schema": {"type": "object", "properties": {},
-            "additionalProperties": False}, "effects": ["physical_motion"]}
+            "additionalProperties": False}, "effects": ["physical_motion"], "can_run_parallel": True, "parallel_metadata_declared": True}
     schema = fast_streaming_advance_response_schema(["r1", "r2"], responsibilities=responsibilities, capabilities=[wave])
     output = {"responsibility_decisions": {"r1": decision, "r2": {"decision": "answer", "missing": []}},
               "activities": activities, "disposition": "mixed", "coverage": "complete",
@@ -1679,45 +1705,118 @@ def test_an_answer_beside_a_limitation_is_mixed_with_only_its_response():
     schema, output = _answer_beside_body({"decision": "unavailable", "missing": ["a backflip ability"]}, [respond])
     assert Draft202012Validator(schema).is_valid(_counted(output))
     projected = project_responsibility_decisions(
-        FastPlannerAdvanceModelOutput.model_validate(_uncounted(output)), responsibility_refs=["r1", "r2"], speech_refs={"r2"})
+        FastPlannerAdvanceModelOutput.model_validate(_uncounted(output)), responsibility_refs=["r1", "r2"])
     assert [(item.role, item.source_responsibility_refs) for item in projected.activities] == [
         ("complete_response", ["r2"]), ("unavailable", ["r1"])]
 
 
-def test_a_decided_answer_without_its_response_is_projected():
-    """Live 2026-10-13 ("Wave to my little brother, then tell us a joke."): the joke was
-    decided answer but its response was omitted, and the whole turn failed. The response
-    need names only its Responsibility, so the decision realizes it; a decided
-    clarification still needs the model's own question need."""
+def test_mixed_work_requires_an_authored_answer_and_timing():
+    """A missing answer beside Work cannot acquire parallel timing in Host."""
     from agent.app.planner_fast_validation import project_responsibility_decisions
 
     waving = {"role": "capability", "capability_id": "test.wave", "activity_id": "act_wave", "args": {},
               "depends_on": [], "source_responsibility_refs": ["r1"]}
-    schema, output = _answer_beside_body({"decision": "work", "missing": []}, [waving])
-    assert Draft202012Validator(schema).is_valid(_counted(output))
+    response = {"role": "complete_response", "activity_id": "answer", "source_responsibility_refs": ["r2"],
+                "rationale": "Answer after the requested action."}
+    for activities in ([waving], [waving, response]):
+        schema, output = _answer_beside_body({"decision": "work", "missing": []}, activities)
+        assert not Draft202012Validator(schema).is_valid(output)
+        with pytest.raises(PlannerDTOContractError, match="authored response|explicit timing"):
+            project_responsibility_decisions(FastPlannerAdvanceModelOutput.model_validate(_uncounted(output)),
+                                            responsibility_refs=["r1", "r2"])
+    for timing in ("sequential", "parallel"):
+        for activities in ([waving, {**response, "timing": timing}], [{**response, "timing": timing}, waving]):
+            schema, output = _answer_beside_body({"decision": "work", "missing": []}, activities)
+            assert Draft202012Validator(schema).is_valid(output)
+            projected = project_responsibility_decisions(FastPlannerAdvanceModelOutput.model_validate(_uncounted(output)),
+                                                        responsibility_refs=["r1", "r2"])
+            assert [x.activity_id for x in projected.activities] == [x["activity_id"] for x in activities]
+            assert next(x for x in projected.activities if x.role == "complete_response").timing == timing
+
+
+@pytest.mark.parametrize("perceived_count", [1, 2])
+@pytest.mark.parametrize("timing", ["sequential", "parallel"])
+@pytest.mark.parametrize("before_work", [False, True])
+def test_perceived_answer_beside_work_preserves_authored_need(perceived_count, timing, before_work):
+    """An observed answer has the same Planner-owned order as any other answer.
+
+    The order_before live failure appended an implicit parallel answer after Work,
+    despite the primary result's ordered Need. No Host projection may do that.
+    """
+    from agent.app.planner_fast_validation import project_responsibility_decisions
+    from agent.app.clients.sglang_protocol import _openai_response_format
+    from shared.chromie_contracts.plan import PERCEIVED_ANSWER_SOURCE, OTHER_ANSWER_SOURCE
+    from shared.chromie_contracts.situation import SituationProjection, SituationInterpretation, SituationSourceRef
+
+    refs = [f"r{i}" for i in range(perceived_count + 1)]
+    responsibilities = [CognitiveResponsibilityProposal(local_ref=ref,
+        outcome="Report the observed object" if i else "Perform the requested gesture", confidence=1)
+        for i, ref in enumerate(refs)]
+    capability = {"capability_id": "test.wave", "effects": ["physical_motion"],
+        "input_schema": {"type": "object", "properties": {}, "additionalProperties": False},
+        "can_run_parallel": True, "parallel_metadata_declared": True}
+    request = CognitiveWorkRequest(sid="perceived-work", text="Report what is here and perform the gesture",
+        responsibilities=responsibilities, interpretation_confidence=1,
+        context={"situation": SituationProjection.create(turn_id="perceived-work", source_refs=[
+            SituationSourceRef(kind="perception", reference_id="frame:1", owner="scene")],
+            interpretations=[SituationInterpretation(interpretation_id="scene:object", subject_ref="bottle",
+                relation="presence", value="A bottle is here", epistemic_status="established",
+                source_refs=["frame:1"])]).model_dump(mode="json")})
+    schema = fast_streaming_advance_response_schema(refs, responsibilities=responsibilities,
+        capabilities=[capability], situation_source_refs=["scene:object"])
+    decisions = {refs[0]: {"answer_source": OTHER_ANSWER_SOURCE, "observed_refs": [],
+                           "decision": "work", "needed_abilities_fit": True, "missing": []},
+        **{ref: {"answer_source": PERCEIVED_ANSWER_SOURCE, "observed_refs": ["scene:object"],
+                 "decision": "answer_from_perception", "missing": []} for ref in refs[1:]}}
+    work = {"role": "capability", "activity_id": "wave", "capability_id": "test.wave", "args": {},
+            "source_responsibility_refs": refs[:1], "depends_on": []}
+    answer = {"role": "complete_response", "activity_id": "observed-answer",
+              "source_responsibility_refs": refs[1:], "timing": timing,
+              "rationale": "Report the established observation at the requested position."}
+    raw = _counted({"responsibility_decisions": decisions, "activities": [answer, work] if before_work else [work, answer],
+        "disposition": "mixed", "coverage": "complete", "covered_responsibility_refs": refs,
+        "confidence": 1, "unresolved": [], "reason_summary": "Preserve observed answer and gesture order."})
+    for contract in (schema, _openai_response_format(schema)["json_schema"]["schema"]):
+        Draft202012Validator(contract).validate(raw)
+        if perceived_count == 1:
+            # Native minimal coverage must not place the answer on the Work sibling.
+            missing = {**raw, "activity_count": 1, "activities": [work]}
+            assert not Draft202012Validator(contract).is_valid(missing)
     projected = project_responsibility_decisions(
-        FastPlannerAdvanceModelOutput.model_validate(_uncounted(output)), responsibility_refs=["r1", "r2"], speech_refs={"r2"})
-    assert [(item.role, item.activity_id, item.source_responsibility_refs) for item in projected.activities] == [
-        ("capability", "act_wave", ["r1"]), ("complete_response", "response-r2", ["r2"])]
-    unasked = FastPlannerAdvanceModelOutput.model_validate({
-        **_uncounted(output), "responsibility_decisions": {"r1": {"decision": "clarify", "missing": []},
-                                               "r2": {"decision": "answer", "missing": []}},
-        "activities": []})
-    with pytest.raises(PlannerDTOContractError, match="decided clarify without its Activity"):
-        project_responsibility_decisions(unasked, responsibility_refs=["r1", "r2"], speech_refs={"r2"})
+        FastPlannerAdvanceModelOutput.model_validate(_uncounted(raw)), responsibility_refs=refs)
+    assert [item.activity_id for item in projected.activities] == [item["activity_id"] for item in raw["activities"]]
+    actual = next(item for item in projected.activities if item.role == "complete_response")
+    assert actual.timing == timing
+    assert actual.situation_interpretation_refs == ["scene:object"]
+    validate_fast_advance_output(projected, request=request, responsibilities=responsibilities, capabilities=[capability])
+    forbidden_dependency = projected.model_copy(update={"activities": [
+        activity.model_copy(update={"depends_on": [answer["activity_id"]]})
+        if activity.role == "capability" else activity for activity in projected.activities]})
+    with pytest.raises(PlannerDTOContractError, match="independent provider-qualified|earlier Capability"):
+        validate_fast_advance_output(forbidden_dependency, request=request,
+            responsibilities=responsibilities, capabilities=[capability])
+    if timing == "parallel":
+        with pytest.raises(PlannerDTOContractError, match="independent provider-qualified"):
+            validate_fast_advance_output(projected, request=request, responsibilities=responsibilities,
+                capabilities=[{**capability, "can_run_parallel": False}])
+    for activities, message in (([work], "authored response"),
+        ([{key: value for key, value in answer.items() if key != "timing"}, work], "explicit timing")):
+        bad = FastPlannerAdvanceModelOutput.model_validate({**_uncounted(raw), "activities": activities})
+        with pytest.raises(PlannerDTOContractError, match=message):
+            project_responsibility_decisions(bad, responsibility_refs=refs)
 
 
-def test_a_decided_work_gets_its_own_activity_before_a_sibling_answer():
+def test_native_coverage_does_not_force_work_before_a_sibling_answer():
     """Live 2026-10-20 ("我考了满分！快跟我一起庆祝一下！"): r1 was decided answer and r2
     work; the model counted one Activity, spent it on r1's response and left the
-    celebration without one, so Host rejected the turn. The decided work now opens the
-    array, on the wire as in the canonical schema."""
+    celebration without one, so Host rejected the turn. Both primary Activities are
+    required without excluding response-before-Work or longer multi-step plans."""
     from agent.app.clients.sglang_protocol import _openai_response_format
 
     responsibilities = [
-        CognitiveResponsibilityProposal(local_ref="r1", outcome="share in the news", output_mode="speech",
+        CognitiveResponsibilityProposal(local_ref="r1", outcome="share in the news",
                                         confidence=1.0),
-        CognitiveResponsibilityProposal(local_ref="r2", outcome="celebrate with me", output_mode="body_action",
+        CognitiveResponsibilityProposal(local_ref="r2", outcome="celebrate with me",
                                         confidence=1.0),
     ]
     celebrate = {"capability_id": "test.celebrate", "effects": ["physical_motion"],
@@ -1728,7 +1827,7 @@ def test_a_decided_work_gets_its_own_activity_before_a_sibling_answer():
     celebrating = {"role": "capability", "source_responsibility_refs": ["r2"], "capability_id": "test.celebrate",
                    "activity_id": "act_celebrate", "args": {}, "depends_on": []}
     responding = {"role": "complete_response", "source_responsibility_refs": ["r1"], "activity_id": "act_r1",
-                  "rationale": "Share in the news."}
+                  "rationale": "Share in the news.", "timing": "sequential"}
 
     def output(decision, activities):
         missing = ["a way to celebrate"] if decision == "unavailable" else []
@@ -1740,9 +1839,13 @@ def test_a_decided_work_gets_its_own_activity_before_a_sibling_answer():
 
     for validator in (Draft202012Validator(schema), Draft202012Validator(wire)):
         assert not validator.is_valid(output("work", [responding]))
-        assert not validator.is_valid(output("work", [responding, celebrating]))
-        assert validator.is_valid(output("work", [celebrating]))
+        assert validator.is_valid(output("work", [responding, celebrating]))
+        assert not validator.is_valid(output("work", [celebrating]))
         assert validator.is_valid(output("work", [celebrating, responding]))
+        another = {**celebrating, "activity_id": "act_second"}
+        for activities in ([celebrating, another, responding], [responding, celebrating, another],
+                           [celebrating, responding, another]):
+            assert validator.is_valid(output("work", activities))
         # A sibling answer still needs no authored Activity beside a limitation.
         assert validator.is_valid(output("unavailable", [responding]))
 
@@ -1753,8 +1856,8 @@ def test_decision_states_share_each_activity_branch_on_the_wire():
     from agent.app.clients.sglang_protocol import _openai_response_format
 
     responsibilities = [
-        CognitiveResponsibilityProposal(local_ref="r1", outcome="wave at me", output_mode="body_action", confidence=1.0),
-        CognitiveResponsibilityProposal(local_ref="r2", outcome="nod twice", output_mode="body_action", confidence=1.0),
+        CognitiveResponsibilityProposal(local_ref="r1", outcome="wave at me",  confidence=1.0),
+        CognitiveResponsibilityProposal(local_ref="r2", outcome="nod twice",  confidence=1.0),
     ]
     capabilities = [{"capability_id": f"test.{name}", "effects": ["physical_motion"],
                      "input_schema": {"type": "object", "properties": {}, "additionalProperties": False}}
@@ -1762,11 +1865,31 @@ def test_decision_states_share_each_activity_branch_on_the_wire():
     schema = fast_streaming_advance_response_schema(["r1", "r2"], responsibilities=responsibilities,
                                                     capabilities=capabilities)
     wire = _openai_response_format(schema)["json_schema"]["schema"]
-    inline = sum(len(state["properties"]["activities"]["items"]["oneOf"]) for state in schema["oneOf"])
+    inline = sum(len(slot.get("oneOf", [])) for state in schema["oneOf"]
+                 for array in state["properties"]["activities"].get("oneOf", [state["properties"]["activities"]])
+                 for slot in [array.get("items"), *array.get("prefixItems", [])] if isinstance(slot, dict))
     shared = [key for key in wire["$defs"] if key.startswith("FastActivityBranch")]
-    assert 0 < len(shared) < inline
-    assert all("$ref" in branch for state in wire["oneOf"]
-               for branch in state["properties"]["activities"]["items"]["oneOf"])
+    assert inline > 0 and shared
+    assert len(json.dumps(wire)) < len(json.dumps(schema))
+
+    def resolved(node):
+        while "$ref" in node:
+            node = wire["$defs"][node["$ref"].rsplit("/", 1)[-1]]
+        return node
+
+    inspected = 0
+    for state in wire["oneOf"]:
+        activities = resolved(state["properties"]["activities"])
+        for array in activities.get("oneOf", [activities]):
+            array = resolved(array)
+            for slot in [array.get("items"), *array.get("prefixItems", [])]:
+                if not isinstance(slot, dict):
+                    continue
+                assert "$ref" in slot
+                inspected += 1
+                body = resolved(slot)
+                assert all("$ref" in branch for branch in body.get("oneOf", []))
+    assert inspected > 0
 
     def act(name, ref):
         return {"role": "capability", "capability_id": f"test.{name}", "activity_id": name, "args": {},
@@ -1794,7 +1917,7 @@ def test_the_activity_count_comes_first_and_fixes_how_many_activities_follow():
     chosen first, so the array cannot grow past it."""
     from agent.app.planner_model_contract import take_activity_count
 
-    source = CognitiveResponsibilityProposal(local_ref="r1", outcome="bring the milk", output_mode="body_action",
+    source = CognitiveResponsibilityProposal(local_ref="r1", outcome="bring the milk",
                                              confidence=1.0)
     fetch = {"capability_id": "test.fetch", "effects": ["physical_motion"],
              "input_schema": {"type": "object", "properties": {}, "additionalProperties": False}}
@@ -1828,7 +1951,7 @@ def test_an_activity_names_its_responsibilities_before_its_capability():
     """Live 2026-10-15 (info_umbrella_zh): one weather read served "will it rain" and "should I
     take an umbrella" but, written after its args, was bound to the first only (Host: "r2 was
     decided work without its Activity"). Each Activity now names its Responsibilities first."""
-    sources = [CognitiveResponsibilityProposal(local_ref=ref, outcome=text, output_mode="information",
+    sources = [CognitiveResponsibilityProposal(local_ref=ref, outcome=text,
                                                confidence=1.0)
                for ref, text in (("r1", "will it rain tomorrow"), ("r2", "should I take an umbrella"))]
     read = {"capability_id": "test.weather", "effects": ["information"],
@@ -1865,11 +1988,11 @@ def test_argument_spans_stay_inside_a_responsibilitys_own_words():
         found = [t for t in tokens if start <= t["start"] and t["end"] <= start + len(surface)]
         return {"source_start_token_ref": found[0]["ref"], "source_end_token_ref": found[-1]["ref"]}
 
-    weather = CognitiveResponsibilityProposal(local_ref="r1", outcome="北京天气怎么样", output_mode="information",
+    weather = CognitiveResponsibilityProposal(local_ref="r1", outcome="北京天气怎么样",
                                               confidence=1.0, source_evidence=span("北京天气怎么样"))
-    joke = CognitiveResponsibilityProposal(local_ref="r2", outcome="给我讲个笑话", output_mode="speech",
-                                           continuity_scope="turn", confidence=1.0, source_evidence=span("给我讲个笑话"))
-    read = {"capability_id": "test.weather", "effects": ["information"], "input_schema": {
+    joke = CognitiveResponsibilityProposal(local_ref="r2", outcome="给我讲个笑话",
+                                            confidence=1.0, source_evidence=span("给我讲个笑话"))
+    read = {"capability_id": "test.weather", "effects": ["information"], "can_run_parallel": True, "parallel_metadata_declared": True, "input_schema": {
         "type": "object", "properties": {"location": {"type": "string"}}, "required": ["location"],
         "additionalProperties": False}}
     schema = fast_streaming_advance_response_schema(["r1", "r2"], responsibilities=[weather, joke], capabilities=[read],
@@ -1877,13 +2000,13 @@ def test_argument_spans_stay_inside_a_responsibilitys_own_words():
 
     def output(location_span):
         return {"responsibility_decisions": {"r1": {"needed_abilities_fit": True, "decision": "work", "missing": []},
-                                             "r2": {"decision": "answer", "missing": []}},
+                                             "r2": {"needed_abilities_fit": True, "decision": "answer", "missing": []}},
                 "activity_count": 2,
                 "activities": [{"role": "capability", "source_responsibility_refs": ["r1"], "capability_id": "test.weather",
                                 "activity_id": "act_0", "args": {"location": "北京"},
                                 "argument_sources": {"location": location_span}, "depends_on": []},
                                {"role": "complete_response", "activity_id": "act_1", "source_responsibility_refs": ["r2"],
-                                "timing": "parallel", "rationale": "x"}],
+                                "timing": "concurrent_with_work", "rationale": "x"}],
                 "disposition": "mixed", "coverage": "complete", "covered_responsibility_refs": ["r1", "r2"],
                 "confidence": 1.0, "unresolved": [], "reason_summary": "x"}
 
@@ -1911,7 +2034,7 @@ async def test_an_identical_read_written_for_a_second_question_serves_both(same_
         return {"source_start_token_ref": found[0]["ref"], "source_end_token_ref": found[-1]["ref"]}
 
     request = CognitiveWorkRequest(sid="umbrella", text=text, language="zh-CN", interpretation_confidence=1.0,
-        responsibilities=[CognitiveResponsibilityProposal(local_ref=ref, outcome=words, output_mode="information",
+        responsibilities=[CognitiveResponsibilityProposal(local_ref=ref, outcome=words,
                                                           confidence=1.0, source_evidence=span(words))
                           for ref, words in (("r1", "明天北京会下雨吗"), ("r2", "我要不要带伞"))])
     weather = CatalogCapability(
@@ -2014,7 +2137,7 @@ async def test_a_value_resolved_from_earlier_talk_is_cited_from_the_outcome(loca
         history=[{"role": "user", "text": "I'm going to the park in Beijing this afternoon."}] if earlier else [],
         responsibilities=[CognitiveResponsibilityProposal(
             local_ref="r1", outcome="determine and provide the weather forecast for Beijing for this afternoon",
-            output_mode="information", confidence=1.0, source_evidence=span(text.rstrip("?")))])
+             confidence=1.0, source_evidence=span(text.rstrip("?")))])
     weather = CatalogCapability(
         capability_id="chromie.weather.lookup", agent_id="chromie.weather", description="Retrieve a forecast.",
         input_schema={"type": "object", "properties": {"location": {"type": "string"}}, "required": ["location"],
@@ -2064,7 +2187,7 @@ async def test_a_value_said_earlier_in_the_same_turn_is_cited_from_the_outcome(l
 
     request = CognitiveWorkRequest(sid="trip", text=text, language="zh-CN", interpretation_confidence=1.0,
         responsibilities=[CognitiveResponsibilityProposal(
-            local_ref="r1", outcome="回答明天广州的天气是否炎热", output_mode="information", confidence=1.0,
+            local_ref="r1", outcome="回答明天广州的天气是否炎热",  confidence=1.0,
             source_evidence=span("那边热不热"))])
     weather = CatalogCapability(
         capability_id="chromie.weather.lookup", agent_id="chromie.weather", description="Retrieve a forecast.",
@@ -2112,10 +2235,10 @@ async def test_a_read_merged_across_responsibilities_cites_its_value_from_the_fi
 
     request = CognitiveWorkRequest(sid="cold", text=text, language="zh-CN", interpretation_confidence=1.0,
         responsibilities=[
-            CognitiveResponsibilityProposal(local_ref="r1", outcome="回答北京今天的气温情况", output_mode="information",
+            CognitiveResponsibilityProposal(local_ref="r1", outcome="回答北京今天的气温情况",
                                             confidence=1.0, source_evidence=span("北京今天冷不冷？")),
             CognitiveResponsibilityProposal(local_ref="r2", outcome="根据北京的气温情况，建议用户出门时是否需要多穿点衣服",
-                                            output_mode="information", confidence=1.0,
+                                             confidence=1.0,
                                             source_evidence=span("我出门要不要多穿点？"))])
     weather = CatalogCapability(
         capability_id="chromie.weather.lookup", agent_id="chromie.weather", description="Retrieve a forecast.",
@@ -2163,7 +2286,7 @@ async def test_an_outcome_citation_off_its_value_moves_to_the_value_in_that_outc
     tokens = user_turn_source_tokens(text)
     request = CognitiveWorkRequest(sid="follow", text=text, language="zh-CN", interpretation_confidence=1.0,
         responsibilities=[CognitiveResponsibilityProposal(
-            local_ref="r1", outcome=outcome, output_mode="information", confidence=1.0,
+            local_ref="r1", outcome=outcome,  confidence=1.0,
             source_evidence={"source_start_token_ref": tokens[0]["ref"], "source_end_token_ref": tokens[-1]["ref"]})])
     weather = CatalogCapability(
         capability_id="chromie.weather.lookup", agent_id="chromie.weather", description="Retrieve a forecast.",
@@ -2214,7 +2337,7 @@ async def test_a_kept_fact_the_person_told_grounds_a_later_conversations_value(l
     request = CognitiveWorkRequest(sid="later", text=text, language="zh-CN", interpretation_confidence=1.0,
         context={"session_memory": {"active_memory": {"entries": memory}}},
         responsibilities=[CognitiveResponsibilityProposal(
-            local_ref="r1", outcome="回答明天早上上班是否需要带伞", output_mode="information", confidence=1.0,
+            local_ref="r1", outcome="回答明天早上上班是否需要带伞",  confidence=1.0,
             source_evidence=whole)])
     weather = CatalogCapability(
         capability_id="chromie.weather.lookup", agent_id="chromie.weather", description="Retrieve a forecast.",
@@ -2262,7 +2385,7 @@ async def test_a_read_input_no_source_states_is_asked_for_never_read(location, o
     whole = {"source_start_token_ref": tokens[0]["ref"], "source_end_token_ref": tokens[-1]["ref"]}
     request = CognitiveWorkRequest(sid="umbrella", text=text, language="zh-CN", interpretation_confidence=1.0,
         responsibilities=[CognitiveResponsibilityProposal(
-            local_ref="r1", outcome=outcome, output_mode="information", confidence=1.0, source_evidence=whole)])
+            local_ref="r1", outcome=outcome,  confidence=1.0, source_evidence=whole)])
     weather = CatalogCapability(
         capability_id="chromie.weather.lookup", agent_id="chromie.weather", description="Retrieve a forecast.",
         input_schema={"type": "object", "properties": {"location": {"type": "string"}}, "required": ["location"],
@@ -2297,7 +2420,7 @@ async def test_a_read_input_no_source_states_is_asked_for_never_read(location, o
 def test_one_activity_for_every_work_responsibility_serves_them_all():
     """Live 2026-10-15 (info_umbrella_zh, runs 14-16): both Responsibilities were decided work
     and one weather read was written for them, citing the first only; Host rejected the turn."""
-    sources = [CognitiveResponsibilityProposal(local_ref=ref, outcome=text, output_mode="information",
+    sources = [CognitiveResponsibilityProposal(local_ref=ref, outcome=text,
                                                confidence=1.0)
                for ref, text in (("r1", "will it rain tomorrow"), ("r2", "should I take an umbrella"))]
     read = {"capability_id": "test.weather", "effects": ["information"],
@@ -2333,7 +2456,7 @@ async def test_need_first_ability_guidance_reaches_the_actual_model_packet():
 
 @pytest.mark.parametrize("count", [0, 1, 2, 4])
 def test_need_first_guidance_keeps_composable_ability_counts_representable(count):
-    from agent.app.planner_schema import need_first_response_schema
+    from agent.app.planner_model_contract import need_first_response_schema
 
     schema = need_first_response_schema({
         "type": "object", "additionalProperties": False, "properties": {}, "required": [],
@@ -2348,7 +2471,7 @@ def test_need_first_guidance_keeps_composable_ability_counts_representable(count
 @pytest.mark.parametrize("branch_count", [1, 4, 100])
 def test_need_first_alternatives_share_the_complete_ability_contract(branch_count):
     from copy import deepcopy
-    from agent.app.planner_schema import need_first_response_schema
+    from agent.app.planner_model_contract import need_first_response_schema
 
     original = {"oneOf": [{
         "type": "object", "additionalProperties": False,
@@ -2372,3 +2495,269 @@ def test_need_first_alternatives_share_the_complete_ability_contract(branch_coun
     ):
         assert not validator.is_valid(output)
 
+
+@pytest.mark.parametrize("count", [1, 2, 3])
+@pytest.mark.parametrize("need_kind", ["empty", "fitting", "unmet", "placeholder"])
+def test_native_perceived_response_cannot_complete_declared_work_needs(count, need_kind):
+    from agent.app.planner_model_contract import need_first_response_schema, validate_ability_need_realization, PlannerAbilityNeed
+    from shared.chromie_contracts.plan import PERCEIVED_ANSWER_SOURCE
+
+    responsibilities = [CognitiveResponsibilityProposal(
+        local_ref=f"r{i}", outcome="Report the current visible person", confidence=1)
+        for i in range(count)]
+    refs = [item.local_ref for item in responsibilities]
+    schema = need_first_response_schema(fast_streaming_advance_response_schema(
+        refs, responsibilities=responsibilities, capabilities=[], situation_source_refs=["observation:1"]),
+        ["test.read"])
+    need = {"need": "read the current fact", "closest_loaded": "test.read",
+            "closest_loaded_does": "Read the current fact", "fits": need_kind == "fitting"}
+    if need_kind == "placeholder":
+        need = {"need": "none", "closest_loaded": "none", "closest_loaded_does": "none", "fits": True}
+    needs = [] if need_kind == "empty" else [need]
+    raw = {"ability_needs": needs, "responsibility_decisions": {
+        ref: {"answer_source": PERCEIVED_ANSWER_SOURCE, "observed_refs": ["observation:1"],
+              "decision": "answer_from_perception", "missing": []} for ref in refs},
+        "activity_count": 0, "activities": [], "disposition": "respond", "coverage": "complete",
+        "covered_responsibility_refs": refs, "confidence": 1, "unresolved": [], "reason_summary": "Current observation answers it."}
+    assert Draft202012Validator(schema).is_valid(raw) == (need_kind == "empty")
+    if needs:
+        with pytest.raises(PlannerDTOContractError, match="response cannot fulfill declared Work abilities"):
+            validate_ability_need_realization([PlannerAbilityNeed.model_validate(need)], [], completes_without_work=True)
+    else:
+        validate_ability_need_realization([], [], completes_without_work=True)
+
+
+@pytest.mark.parametrize("retained", [False, True])
+@pytest.mark.parametrize("disposition", ["respond", "execute", "mixed", "clarify", "unavailable"])
+def test_need_first_state_guard_preserves_work_and_limitation_choices(retained, disposition):
+    from agent.app.planner_model_contract import need_first_response_schema
+
+    need = {"need": "read the current fact", "closest_loaded": "none",
+            "closest_loaded_does": "No matching loaded contract", "fits": False}
+    original = {"oneOf": [{"type": "object", "additionalProperties": False,
+        "properties": {"disposition": {"type": "string", "enum": [choice]}}, "required": ["disposition"]}
+        for choice in ("respond", "execute", "mixed", "clarify", "unavailable")]}
+    schema = need_first_response_schema(original, [],
+        retained_need_texts=[need["need"]] if retained else None)
+    Draft202012Validator.check_schema(schema)
+    assert Draft202012Validator(schema).is_valid({"disposition": disposition, "ability_needs": [need]}) == (disposition != "respond")
+    assert Draft202012Validator(schema).is_valid({"disposition": "respond", "ability_needs": []}) == (not retained)
+
+
+@pytest.mark.parametrize("retained", [False, True])
+@pytest.mark.parametrize("with_need", [False, True])
+@pytest.mark.parametrize("with_future", [False, True])
+def test_need_first_response_preserves_only_explicit_future_exception(retained, with_need, with_future):
+    from agent.app.planner_model_contract import need_first_response_schema
+
+    need = {"need": "perform the future effect", "closest_loaded": "test.effect",
+            "closest_loaded_does": "Perform the requested effect", "fits": True}
+    original = {"type": "object", "additionalProperties": False,
+        "properties": {"disposition": {"type": "string", "enum": ["respond"]},
+            "time_conditions": {"type": "array", "items": {"type": "string"}, "maxItems": 2}},
+        "required": ["disposition", "time_conditions"]}
+    before = copy.deepcopy(original)
+    schema = need_first_response_schema(original, ["test.effect"],
+        retained_need_texts=[need["need"]] if retained else None)
+    assert original == before
+    Draft202012Validator.check_schema(schema)
+    raw = {"disposition": "respond", "ability_needs": [need] if with_need else [],
+           "time_conditions": ["later"] if with_future else []}
+    assert Draft202012Validator(schema).is_valid(raw) == (
+        (not retained or with_need) and (not with_need or with_future))
+
+
+
+def test_answer_responsibility_does_not_grant_extra_capability_activity_budget():
+    waving = {'role': 'capability', 'capability_id': 'test.wave', 'activity_id': 'wave', 'args': {},
+              'depends_on': [], 'source_responsibility_refs': ['r1']}
+    answer = {'role': 'complete_response', 'activity_id': 'answer', 'source_responsibility_refs': ['r2'],
+              'timing': 'sequential', 'rationale': 'Answer after the requested work.'}
+    schema, _ = _answer_beside_body({'decision': 'work', 'missing': []}, [waving, answer])
+    # Existing Fast contract: at most four executable Activities per Responsibility,
+    # plus its terminal communication/input Need. A speech sibling grants no Work slots.
+    for count in (2, 5, 10):
+        activities = [{**waving, 'activity_id': f'work-{i}'} for i in range(count - 1)] + [answer]
+        _, output = _answer_beside_body({'decision': 'work', 'missing': []}, activities)
+        assert Draft202012Validator(schema).is_valid(output) == (count <= 5)
+    body_response = {**answer, 'activity_id': 'body-answer', 'source_responsibility_refs': ['r1']}
+    activities = [{**waving, 'activity_id': f'work-{i}'} for i in range(4)] + [body_response, answer]
+    _, output = _answer_beside_body({'decision': 'work', 'missing': []}, activities)
+    assert Draft202012Validator(schema).is_valid(output)  # four Work plus two authored Needs
+    # Native total slots do not prove the per-Responsibility executable budget.
+    request = CognitiveWorkRequest(sid='budget', text='perform it and answer', responsibilities=[
+        CognitiveResponsibilityProposal(local_ref='r1', outcome='perform it',  confidence=1),
+        CognitiveResponsibilityProposal(local_ref='r2', outcome='answer',  confidence=1)],
+        interpretation_confidence=1, context={})
+    activities = [{**waving, 'activity_id': f'work-{i}'} for i in range(5)] + [answer]
+    _, output = _answer_beside_body({'decision': 'work', 'missing': []}, activities)
+    with pytest.raises(PlannerDTOContractError, match='four executable Activities'):
+        validate_fast_advance_output(FastPlannerAdvanceModelOutput.model_validate(_uncounted(output)), request=request,
+                                    responsibilities=request.responsibilities,
+                                    capabilities=[{'capability_id': 'test.wave', 'input_schema': {'type': 'object', 'properties': {}}}])
+
+
+@pytest.mark.parametrize('mode', ['other', 'body_action'])
+@pytest.mark.parametrize('relation', ['before', 'after', 'parallel'])
+def test_compound_body_and_speech_keeps_one_work_and_one_need(mode, relation):
+    from agent.app.planner_fast_validation import project_responsibility_decisions
+    from orchestrator.runtime.planner_advance_projection import canonical_plan_from_fast_advance
+    from shared.chromie_contracts.plan import FastPlannerAdvance
+    from tests.cognitive_runtime_test_support import body_goal_association
+
+    outcome = {'before': 'tell a story before waving', 'after': 'wave before telling a story',
+               'parallel': 'wave while telling a story'}[relation]
+    responsibility = CognitiveResponsibilityProposal(local_ref='r1', outcome=outcome,
+                                                       confidence=1.0)
+    request = CognitiveWorkRequest(sid='compound', text=responsibility.outcome, language='en-US',
+                                   responsibilities=[responsibility], interpretation_confidence=1.0, context={})
+    capability = {'capability_id': 'test.wave', 'input_schema': {'type': 'object', 'properties': {},
+                  'additionalProperties': False}, 'effects': ['physical_motion'], 'can_run_parallel': True, 'parallel_metadata_declared': True}
+    wave = {'role': 'capability', 'activity_id': 'wave', 'source_responsibility_refs': ['r1'],
+            'capability_id': 'test.wave', 'args': {}, 'depends_on': []}
+    response = {'role': 'complete_response', 'activity_id': 'story', 'source_responsibility_refs': ['r1'],
+                'timing': 'parallel' if relation == 'parallel' else 'sequential',
+                'rationale': 'Realize the explicitly requested story, not optional narration.'}
+    activities = [response, wave] if relation == 'before' else [wave, response]
+    raw = {'responsibility_decisions': {'r1': {'decision': 'work', 'missing': []}}, 'activities': activities,
+           'disposition': 'execute', 'coverage': 'complete', 'covered_responsibility_refs': ['r1'],
+           'confidence': 1.0, 'unresolved': [], 'reason_summary': 'Preserve both requested effects.'}
+    schema = fast_streaming_advance_response_schema(['r1'], responsibilities=[responsibility], capabilities=[capability])
+    assert Draft202012Validator(schema).is_valid(_counted(raw))
+    output = project_responsibility_decisions(FastPlannerAdvanceModelOutput.model_validate(_uncounted(_counted(raw))), responsibility_refs=['r1'])
+    validate_fast_advance_output(output, request=request, responsibilities=[responsibility], capabilities=[capability])
+    association = body_goal_association('compound-goal')
+    goal = association.new_goals[0].model_copy(update={'description': responsibility.outcome,
+        'source_text': request.text, 'metadata': {'output_mode': mode}})
+    association = association.model_copy(update={'new_goals': [goal]})
+    advance = FastPlannerAdvance(turn_id='compound', **output.model_dump(exclude={'responsibility_decisions'}))
+    plan = canonical_plan_from_fast_advance(advance=advance, association=association,
+                                           user_text=request.text, responsibilities=[responsibility])
+    assert len(plan.steps) == len(plan.communication_needs) == 1
+    assert plan.steps[0].timing == ('parallel' if relation == 'parallel' else 'sequential')
+    assert plan.communication_needs[0].facts['timing'] == ('parallel' if relation == 'parallel' else 'sequential')
+    need = plan.communication_needs[0]
+    assert need.source_goal_ids == ['compound-goal']
+    assert need.before_step_ids == (['wave'] if relation == 'before' else [])
+    assert need.after_step_ids == (['wave'] if relation == 'after' else [])
+    # A physical outcome can never become answer-only merely because a Need is available.
+    raw['activities'] = [response]
+    with pytest.raises(PlannerDTOContractError, match='decided work without its Activity'):
+        project_responsibility_decisions(FastPlannerAdvanceModelOutput.model_validate(raw), responsibility_refs=['r1'])
+
+
+def test_native_first_capability_has_no_need_or_unknown_predecessor():
+    from agent.app.clients.sglang_protocol import _openai_response_format
+
+    wave = {'role': 'capability', 'activity_id': 'wave', 'capability_id': 'test.wave',
+            'args': {}, 'depends_on': [], 'source_responsibility_refs': ['r1']}
+    reply = {'role': 'complete_response', 'activity_id': 'reply', 'timing': 'sequential',
+             'source_responsibility_refs': ['r2'], 'rationale': 'The requested reply precedes Work.'}
+    schema, valid = _answer_beside_body({'decision': 'work', 'missing': []}, [reply, wave])
+    for contract in (schema, _openai_response_format(schema)['json_schema']['schema']):
+        validator = Draft202012Validator(contract)
+        assert validator.is_valid(valid)
+        for predecessor in ('reply', 'unknown-work'):
+            bad = copy.deepcopy(valid)
+            bad['activities'][1]['depends_on'] = [predecessor]
+            assert not validator.is_valid(bad)
+        # IDs remain opaque; this constraint derives only from the known role order.
+        opaque = copy.deepcopy(valid)
+        opaque['activities'][1]['activity_id'] = 'opaque:work'
+        assert validator.is_valid(opaque)
+
+
+@pytest.mark.parametrize('role', ['complete_response', 'clarification'])
+@pytest.mark.parametrize('wire,canonical', [('ordered_with_work', 'sequential'), ('concurrent_with_work', 'parallel')])
+def test_need_timing_wire_encoding_preserves_the_primary_choice(role, wire, canonical):
+    from agent.app.planner_model_contract import decode_need_timings
+    from agent.app.planner_native_schema import native_need_timing_schema
+
+    activity = {'role': role, 'activity_id': 'opaque', 'timing': wire,
+                'source_responsibility_refs': ['r1'], 'rationale': 'The requested effect.'}
+    raw = {'activities': [activity, {'role': 'capability', 'args': {'timing': wire}, 'depends_on': []}]}
+    before = copy.deepcopy(raw)
+    decode_need_timings(raw)
+    assert activity['timing'] == canonical
+    before['activities'][0]['timing'] = canonical
+    assert raw == before
+    schema = native_need_timing_schema({'type': 'string', 'enum': ['sequential', 'parallel'], 'default': canonical})
+    assert schema['default'] == wire
+    validator = Draft202012Validator(schema)
+    assert validator.is_valid(wire) and not validator.is_valid(canonical)
+
+
+@pytest.mark.parametrize('value', ['parallel', 'sequential', 'unknown', None, []])
+def test_need_timing_wire_decoder_rejects_ambiguous_or_unknown_labels(value):
+    from agent.app.planner_model_contract import decode_need_timings
+    with pytest.raises(PlannerDTOContractError, match='Work-relative'):
+        decode_need_timings({'activities': [{'role': 'complete_response', 'timing': value}]})
+
+
+@pytest.mark.parametrize("mutation", ["rewrite", "drop", "add", "reorder"])
+def test_loaded_contracts_cannot_reauthor_accepted_ability_needs(mutation):
+    from agent.app.planner_model_contract import take_ability_needs
+    from agent.app.planner_model_contract import need_first_response_schema
+
+    fixed = ["read the current scene", "deliver the requested resource"]
+    schema = need_first_response_schema(
+        {"type": "object", "properties": {}, "additionalProperties": False},
+        ["test.observe", "test.deliver"], retained_need_texts=fixed,
+    )
+    rows = [{"need": need, "closest_loaded": capability,
+             "closest_loaded_does": effect, "fits": True}
+            for need, capability, effect in zip(fixed, ["test.observe", "test.deliver"],
+                                               ["Read scene evidence", "Deliver an object"])]
+    # Capability fit may change after loading contracts; the semantic needs may not.
+    Draft202012Validator(schema).validate({"ability_needs": rows})
+    assert [n.need for n in take_ability_needs(
+        {"ability_needs": rows}, loaded_capability_ids=["test.observe", "test.deliver"],
+        retained_need_texts=fixed)] == fixed
+    changed = copy.deepcopy(rows)
+    if mutation == "rewrite":
+        changed[0]["need"] = "acquire and deliver a physical object"
+    elif mutation == "drop":
+        changed.pop()
+    elif mutation == "add":
+        changed.append(copy.deepcopy(rows[0]))
+    else:
+        changed.reverse()
+    assert not Draft202012Validator(schema).is_valid({"ability_needs": changed})
+    with pytest.raises(PlannerDTOContractError, match="cannot change accepted ability needs"):
+        take_ability_needs({"ability_needs": changed},
+                          loaded_capability_ids=["test.observe", "test.deliver"],
+                          retained_need_texts=fixed)
+
+
+@pytest.mark.asyncio
+async def test_streamed_contract_lookup_rejects_rewritten_need_before_any_work(monkeypatch):
+    import agent.app.planner as module
+
+    request, _ = _body_request()
+    capability = _walk_catalog_capability()
+    first = [{"need": "read the current scene", "closest_loaded": "none",
+              "closest_loaded_does": "No loaded scene reader", "fits": False}]
+    from agent.app.planner_schema import fast_streaming_advance_response_schema
+    schemas = []
+
+    class Model:
+        async def generate_stream(self, *args, **kwargs):
+            schema = kwargs["response_format"]
+            schemas.append(schema)
+            if len(schemas) == 1:
+                yield '{"ability_needs": ' + json.dumps(first) + ','
+            else:
+                # No Activities may escape even when a provider ignores the decoder.
+                yield json.dumps({"ability_needs": [{**first[0], "need": "walk forward"}]})
+
+    async def context(catalog, source, loaded_ids=()):
+        return source.model_copy(deep=True), [capability], [capability]
+
+    monkeypatch.setattr(module, "fast_capability_context", context)
+    monkeypatch.setattr(module, "search_capability_library", lambda *args, **kwargs: [capability.capability_id])
+    frames = [f async for f in PlannerResolver(Model(), _Catalog()).stream_advance(request)]
+    assert len(schemas) == 2
+    fixed = schemas[1]["$defs"]["PlannerAbilityNeeds"]
+    assert fixed["prefixItems"][0]["properties"]["need"]["const"] == first[0]["need"]
+    assert len(frames) == 1 and isinstance(frames[0], FastPlannerStreamFailure)
+    assert frames[0].failure_stage == "before_commit"

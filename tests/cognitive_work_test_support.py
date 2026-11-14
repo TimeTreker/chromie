@@ -112,7 +112,7 @@ def ordinary_plan_schema(schema):
         schema = {**schema["anyOf"][0], "$defs": schema["$defs"]}
     if "properties" not in schema and isinstance(schema.get("oneOf"), list):
         definitions = schema.get("$defs", {})
-        view = _offered_by_any(schema["oneOf"])
+        view = _offered_by_any(plan_assignment_branches(schema))
         for outcome in view["properties"].get("goal_outcomes", {}).get("properties", {}).values():
             if isinstance(outcome.get("oneOf"), list):
                 outcome["oneOf"] = [definitions[item["$ref"].rsplit("/", 1)[-1]] if "$ref" in item else item
@@ -125,7 +125,10 @@ def plan_assignment_branches(schema):
     """The ordinary plan's native disposition-assignment branches (one when unbranched)."""
     if "anyOf" in schema and any(name.startswith("Waiting") for name in schema.get("$defs", {})):
         schema = schema["anyOf"][0]
-    return schema.get("oneOf", [schema]) if "properties" not in schema else [schema]
+    if "properties" not in schema:
+        return [branch for child in schema.get("oneOf", [schema])
+                for branch in plan_assignment_branches(child)] if "oneOf" in schema else [schema]
+    return [schema]
 
 
 def _offered_by_any(shapes):
@@ -166,3 +169,23 @@ def goal_outcome_branch(outcome, disposition=None):
 
 def goal_outcome_dispositions(outcome):
     return [value for item in outcome.get("oneOf", [outcome]) for value in item["properties"]["disposition"]["enum"]]
+def mock_completed_speech_ledger(response, execution, *, session_id, completed=True):
+    """Declare exact mock Playback facts for Level A delivery/Memory tests."""
+    from orchestrator.runtime.interaction_ledger import InteractionLedger
+
+    ledger = InteractionLedger()
+    results = {item.request_id: item for item in execution.results}
+    for index, speech in enumerate(response.speech):
+        result = results.get(speech.id)
+        if result is None:
+            continue
+        event_id = "test-playback:" + speech.id
+        result.output.update(speech_event_id=event_id, generation=1, orders=[index])
+        ledger.record_playback_event({
+            "event_id": event_id, "session_id": session_id,
+            "status": "playback_completed" if completed else "playback_started",
+            "text": speech.text, "turn_id": speech.metadata.get("turn_id") or session_id,
+            "communicative_activity_ids": speech.metadata.get("communicative_activity_ids") or [],
+            "wording_owner": "social_cognition",
+        })
+    return ledger

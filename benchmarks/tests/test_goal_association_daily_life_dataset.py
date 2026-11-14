@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Any
 
 import pytest
+from jsonschema import Draft202012Validator
 
 from benchmarks.datasets.goal_association_daily_life.qualification import (
     CaptureModel,
@@ -101,9 +102,9 @@ def test_historical_restatements_describe_completed_work_without_repeating_effec
     prior_modes = set()
     for case in cases:
         request = case["input"]["request"]
-        assert {item["output_mode"] for item in request["responsibilities"]} == {"speech"}
+        assert all("output_mode" not in item for item in request["responsibilities"])
         expected = case["target"]["semantic_expectations"]["responsibility_map"]
-        assert {item["output_mode"] for item in expected} == {"speech"}
+        assert [item["outcome"] for item in expected] == [item["outcome"] for item in request["responsibilities"]]
         snapshots = request["context"]["recent_goal_snapshots"]
         assert all(item["responsibility_status"] == "satisfied" for item in snapshots)
         prior_modes.update(item["goal"]["metadata"]["output_mode"] for item in snapshots)
@@ -113,14 +114,13 @@ def test_historical_restatements_describe_completed_work_without_repeating_effec
 
 
 @pytest.mark.parametrize("copied_mode", ["information", "body_action", "media_playback", "stateful_effect"])
-def test_corpus_validation_rejects_self_consistent_but_wrong_restatement_type(copied_mode) -> None:
+def test_corpus_validation_rejects_retired_umi_classification(copied_mode) -> None:
     case = copy.deepcopy(next(item for item in load_cases() if item["category"] == "reference_terminal"))
     case["input"]["request"]["responsibilities"][0]["output_mode"] = copied_mode
-    case["target"]["semantic_expectations"]["responsibility_map"][0]["output_mode"] = copied_mode
 
     errors, counts = asyncio.run(_validate_cases([case]))
 
-    assert f"{case['id']}: ValueError: historical restatement requires a speech Responsibility" in errors
+    assert any("responsibilities.0.output_mode" in error and "Extra inputs are not permitted" in error for error in errors)
     assert counts.get("validated", 0) == 0
 
 
@@ -208,9 +208,13 @@ def test_goal_association_can_capture_a_fail_closed_reference_transaction() -> N
     )
     assert resolution.resolution_status == "fail_closed"
     assert len(capture.calls) == 1
+    assert not resolution.new_goals and not resolution.associations
 
     transaction = asyncio.run(build_transaction(case))
 
+    assert case["target"]["schema_expectation"] == "reject"
+    assert list(Draft202012Validator(transaction["response_schema"]).iter_errors(
+        case["target"]["reference_model_output"]))
     assert transaction["production_prompt_family"] == "goal_association.primary"
     assert transaction["response_schema"] == capture.calls[0]["response_format"]
     assert set(transaction) == {
@@ -223,7 +227,6 @@ def test_goal_association_qualification_rejects_lost_historical_goal_identity() 
     case = next(
         item for item in load_cases()
         if item["category"] == "reference_terminal"
-        and item["input"]["request"]["responsibilities"][0]["output_mode"] == "speech"
     )
     raw = copy.deepcopy(case["target"]["reference_model_output"])
     for goal in raw["new_goals"]:

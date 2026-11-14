@@ -163,7 +163,7 @@ class RestartRevalidationTests(unittest.TestCase):
             responsibility = {
                 "local_ref": "resp-walk",
                 "outcome": "Walk forward.",
-                "output_mode": "body_action",
+
                 "confidence": 1.0,
             }
             retained = goal_planning_state.planner_reentry_responsibilities(
@@ -250,3 +250,64 @@ class RestartRevalidationTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+def test_retained_classification_projection_preserves_goal_and_all_reentry_exports():
+    import copy
+    from orchestrator.runtime.planner_reentry import planner_reentry_responsibilities
+    from shared.chromie_contracts.interaction import InteractionResponse
+    from shared.chromie_contracts.core_interpretation import CognitiveResponsibilityProposal
+    record = {'schema_version': 1, 'local_ref': 'r1', 'outcome': 'Nod twice.', 'bindings': {},
+              'confidence': 1.0, 'value_review': False, 'output_mode': 'body_action',
+              'body_effect_family': 'social_expression', 'continuity_scope': 'goal',
+              'source_evidence': {'source_start_token_ref': 't0', 'source_end_token_ref': 't2'}}
+    goal = {'goal_id': 'retained-nod', 'version': 1, 'description': 'Nod twice.', 'source_text': 'Nod twice.',
+            'source_responsibility_refs': ['r1'], 'metadata': {
+                'goal_materialization_owner': 'trusted_runtime_from_umi', 'output_mode': 'body_action',
+                'body_effect_families': ['social_expression'], 'goal_lifetime': 'working',
+                'requirement_sources': [{'origin': 'umi', 'turn_id': 'original', 'responsibility': copy.deepcopy(record)}]}}
+    state = ConversationStateManager(base_conversation_id='retained')
+    association = GoalAssociationResolution(turn_id='original', resolution_status='resolved',
+                                          new_goals=[goal], confidence=1)
+    state.apply_goal_association_resolution(association, sid='original', user_text='Nod twice.', atomic=True)
+    context = state._task_context_by_goal_id('retained-nod')
+    context['metadata'].update({
+        'planner_reentry_responsibilities': [copy.deepcopy(record)], 'canonical_plan_id': 'old-plan',
+        'runtime_revalidation_required': True, 'planned_capabilities': [{'capability_id': 'test.nod'}],
+        'time_conditions': [{'condition_id': 'due', 'goal_id': 'retained-nod', 'source_plan_id': 'old-plan',
+                             'due_at_ms': 100, 'source_responsibility_refs': ['r1'], 'reason_code': 'planner_time_condition'}],
+    })
+    before = copy.deepcopy(context['semantic_goal'])
+    source = InteractionResponse(interaction_id='retained', metadata={
+        'user_meaning_interpretation': {'responsibilities': [copy.deepcopy(record)]},
+        'goal_association': association.model_dump(mode='json'),
+    })
+    [item] = planner_reentry_responsibilities(source_response=source, goal_ids=['retained-nod'])
+    exports = [state.goal_reentry_provenance(['retained-nod'])[0], state.runtime_revalidation_candidates()[0],
+               state.due_time_condition_opportunities(now_ms=100)[0]]
+    for exported in exports:
+        [row] = exported['responsibilities']
+        assert CognitiveResponsibilityProposal.model_validate(row) == item
+        assert not {'output_mode', 'body_effect_family', 'continuity_scope'}.intersection(row)
+    assert context['semantic_goal'] == before
+    assert source.metadata['user_meaning_interpretation']['responsibilities'] == [record]
+    assert context['metadata']['planner_reentry_responsibilities'] == [record]
+
+
+def test_retained_projection_rejects_missing_or_changed_authoritative_goal():
+    import copy
+    import pytest
+    from orchestrator.runtime.planner_reentry import project_retained_responsibility
+    record = {'local_ref': 'r1', 'outcome': 'Nod twice.', 'confidence': 1, 'value_review': False,
+              'output_mode': 'body_action'}
+    goal = {'goal_id': 'g', 'source_responsibility_refs': ['r1'], 'metadata': {
+        'goal_materialization_owner': 'trusted_runtime_from_umi', 'output_mode': 'body_action',
+        'requirement_sources': [{'origin': 'umi', 'responsibility': copy.deepcopy(record)}]}}
+    assert project_retained_responsibility(record, goals=[goal]).outcome == 'Nod twice.'
+    for invalid in [[], [{**goal, 'source_responsibility_refs': ['other']}],
+                    [{**goal, 'metadata': {**goal['metadata'], 'output_mode': 'information'}}],
+                    [{**goal, 'metadata': {**goal['metadata'], 'requirement_sources': []}}]]:
+        with pytest.raises(ValueError, match='exact retained typed Goal'):
+            project_retained_responsibility(record, goals=invalid)
+    with pytest.raises(ValueError):
+        project_retained_responsibility({**record, 'capability_id': 'invented'}, goals=[goal])

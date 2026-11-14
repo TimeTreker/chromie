@@ -6,7 +6,6 @@
   "expected": {
     "responsibilities": [
       {
-        "output_mode": "information",
         "outcome_contains_any": [
           "查",
           "look up",
@@ -40,14 +39,13 @@
     "responsibilities": [
       {
         "local_ref": "r1",
-        "output_mode": "information",
         "outcome": "Can you look up Tianxin?",
         "confidence": 1.0,
         "source_evidence": {
           "source_start_token_ref": "t0",
           "source_end_token_ref": "t5"
         },
-        "continuity_scope": "goal"
+        "value_review": false
       }
     ],
     "meaning_uncertainties": [],
@@ -56,8 +54,7 @@
         "authority": "planner",
         "responsibility_refs": [
           "r1"
-        ],
-        "reason_summary": "Explicit authored fixture requests the existing cognitive owner."
+        ]
       }
     ]
   },

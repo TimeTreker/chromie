@@ -143,7 +143,7 @@ class UserTurnEnvelopeContractTests(unittest.TestCase):
                 CognitiveResponsibilityProposal(
                     local_ref="r1",
                     outcome="Greet Chromie",
-                    output_mode="speech",
+
                     confidence=1.0,
                 )
             ],
@@ -187,7 +187,7 @@ class UserTurnEnvelopeContractTests(unittest.TestCase):
                     CognitiveResponsibilityProposal(
                         local_ref="r1",
                         outcome="Greet Chromie",
-                        output_mode="speech",
+
                         confidence=1.0,
                     )
                 ],

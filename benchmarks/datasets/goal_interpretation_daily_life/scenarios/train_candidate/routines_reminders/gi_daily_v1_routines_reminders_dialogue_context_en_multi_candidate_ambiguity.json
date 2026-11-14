@@ -41,14 +41,12 @@
         {
           "local_ref": "r1",
           "outcome": "bring the key card to them (Bring the key card to them)",
-          "output_mode": "body_action",
           "confidence": 0.75,
           "source_evidence": {
             "source_start_token_ref": "t0",
             "source_end_token_ref": "t5"
           },
-          "continuity_scope": "goal",
-          "body_effect_family": "task_physical_effect"
+          "value_review": false
         }
       ],
       "meaning_uncertainties": [
@@ -66,8 +64,7 @@
           "authority": "goal_association",
           "responsibility_refs": [
             "r1"
-          ],
-          "reason_summary": "Preserve canonical continuity for the requested independent outcome."
+          ]
         }
       ]
     },
@@ -76,7 +73,6 @@
       "responsibilities": [
         {
           "local_ref": "r1",
-          "output_mode": "body_action",
           "outcome_contains_any": [
             "bring",
             "hand",
@@ -87,7 +83,7 @@
             "location": "the top of the shoe cabinet",
             "recipient": "them"
           },
-          "body_effect_family": "task_physical_effect"
+          "value_review": false
         }
       ],
       "unresolved": true,
@@ -102,11 +98,14 @@
       "activities",
       "binding_items",
       "bindings",
+      "body_effect_family",
       "capability_id",
+      "continuity_scope",
       "coordination",
       "execution_lane",
       "goal_id",
       "information_gaps",
+      "output_mode",
       "plan",
       "provider_id",
       "relationship",

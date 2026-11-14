@@ -55,7 +55,7 @@ def _request(*, context: dict | None = None) -> CognitiveWorkRequest:
             {
                 "local_ref": "r1",
                 "outcome": "what is the weather today in Chongqing?",
-                "output_mode": "information",
+
                 "confidence": 1.0,
             }
         ],

@@ -72,7 +72,7 @@ def test_cognitive_evidence_archives_semantic_artifact_lineage() -> None:
     responsibility = CognitiveResponsibilityProposal(
         local_ref="r1",
         outcome="Respond to the greeting.",
-        output_mode="speech",
+
         confidence=0.95,
         source_evidence={
             "source_start_token_ref": "t0",
@@ -183,8 +183,8 @@ def test_cognitive_evidence_allows_concurrent_social_lineage_before_ga() -> None
     responsibility = CognitiveResponsibilityProposal(
         local_ref="r1",
         outcome="Respond to the greeting.",
-        output_mode="speech",
-        continuity_scope="turn",
+
+
         confidence=0.95,
         source_evidence={
             "source_start_token_ref": "t0",
@@ -395,7 +395,7 @@ def test_social_lineage_is_transport_metadata_not_model_prompt_content() -> None
     from shared.chromie_contracts.social_cognition import SocialCognitionRequest
 
     responsibility = CognitiveResponsibilityProposal(
-        local_ref="r1", outcome="Respond to the greeting.", output_mode="speech", confidence=1.0,
+        local_ref="r1", outcome="Respond to the greeting.",  confidence=1.0,
     )
     lineage = merge_semantic_artifact_lineage(
         semantic_artifact_ref(

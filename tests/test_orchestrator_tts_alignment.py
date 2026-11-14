@@ -41,6 +41,150 @@ from orchestrator.runtime import tts_text
 
 
 class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
+    async def test_rendered_speech_history_reuses_the_exact_playback_words(self) -> None:
+        from orchestrator.runtime.interaction_coordinator import InteractionRuntimeCoordinator
+        from orchestrator.runtime.interaction_ledger import InteractionLedger
+
+        for original in ("**Hello there.**", " - Hello there . ", "**" + "Hello there. " * 30 + "**"):
+            with self.subTest(original=original[:30]):
+                assistant = bare_voice_assistant()
+                ledger = InteractionLedger()
+                assistant.playback_delivery.interaction_event_sink = ledger.record_playback_event
+                assistant.session_log = MethodType(lambda self, *args: None, assistant)
+                scheduled = []
+
+                async def schedule(self, text, session_id):
+                    scheduled.append(text)
+                    return {"scheduled": True, "generation": 1, "order": 1, "orders": [1, 2]}
+
+                assistant.schedule_tts_text = MethodType(schedule, assistant)
+                state = ConversationStateManager(turn_max_text_chars=80)
+                state.record_accepted_user_turn("sid", "Please answer")
+                coordinator = InteractionRuntimeCoordinator(
+                    assistant._schedule_interaction_speech, interaction_ledger=ledger,
+                    speech_delivery_waiter=assistant.playback_delivery.wait_for_speech_completion,
+                    communicative_delivery_recorder=lambda sid, text, metadata: state.record_assistant_turn(
+                        sid, text, metadata=metadata),
+                )
+                metadata = {"session_id": "sid", "turn_id": "turn", "wording_owner": "social_cognition",
+                            "communicative_activity_ids": ["answer"], "truth_stages": ["context_grounded"]}
+                rendered = assistant.normalize_tts_candidate(original)
+                for text in (original, rendered):
+                    receipt = await assistant._schedule_interaction_speech({"text": text, "metadata": metadata})
+                    for order in (1, 2):
+                        assistant.playback_delivery.complete_turn_speech_order(
+                            generation=1, order=order, session_id="sid", completed=True, reason="completed")
+                    response = InteractionResponse(interaction_id="reply", speech=[{
+                        "id": "speech", "text": text, "metadata": metadata}])
+                    execution = CapabilityRuntimeResult(interaction_id="reply", status="completed", results=[
+                        CapabilityResult(request_id="speech", capability_id="chromie.speak",
+                                         status="completed", output=receipt)])
+                    self.assertTrue(await coordinator.record_social_delivery(response, execution, session_id="sid"))
+                history = [row for row in state.get_history() if row["role"] == "assistant"]
+                self.assertEqual(len(history), 1)
+                self.assertEqual(history[0]["text"], state._compact_text(rendered))
+                self.assertEqual(len(scheduled), 1)
+                # Validate full immutable words before history's length compaction.
+                with self.assertRaisesRegex(ValueError, "wording"):
+                    await assistant._schedule_interaction_speech(
+                        {"text": rendered + " Changed words.", "metadata": metadata})
+
+    async def test_same_activity_reuses_equivalent_single_and_list_truth_stages(self) -> None:
+        for stage in ("pre_evidence", "context_grounded", "post_evidence"):
+            for singular_first in (True, False):
+                with self.subTest(stage=stage, singular_first=singular_first):
+                    assistant = bare_voice_assistant()
+                    assistant.normalize_tts_candidate = MethodType(lambda self, text: text.strip(), assistant)
+                    assistant.session_log = MethodType(lambda self, *args: None, assistant)
+                    scheduled = []
+
+                    async def schedule(self, text, session_id):
+                        scheduled.append(text)
+                        return {"scheduled": True, "generation": 1, "orders": [1]}
+
+                    assistant.schedule_tts_text = MethodType(schedule, assistant)
+                    singular, plural = {"truth_stage": stage}, {"truth_stages": [stage]}
+                    first, second = (singular, plural) if singular_first else (plural, singular)
+                    metadata = {"session_id": "sid", "turn_id": "turn",
+                                "communicative_activity_ids": ["same-act"]}
+                    await assistant._schedule_interaction_speech({"text": "Which one?", "metadata": {**metadata, **first}})
+                    assistant.playback_delivery.complete_turn_speech_order(
+                        generation=1, order=1, session_id="sid", completed=True, reason="completed")
+                    reused = await assistant._schedule_interaction_speech(
+                        {"text": "Which one?", "metadata": {**metadata, **second}})
+                    self.assertTrue(reused["reused"])
+                    self.assertEqual(scheduled, ["Which one?"])
+                    event = assistant.playback_delivery.turn_speech_events["sid"][0]
+                    for key, value in first.items():
+                        self.assertEqual(event[key], value)
+                    # Neither conflicting redundant fields nor losing a known stage
+                    # may pass as an equivalent representation of this Activity.
+                    for invalid in ({}, {"truth_stage": stage, "truth_stages": ["unknown"]}):
+                        with self.assertRaisesRegex(ValueError, "truth"):
+                            await assistant._schedule_interaction_speech(
+                                {"text": "Which one?", "metadata": {**metadata, **invalid}})
+
+    async def test_sc_truth_survives_speech_registration_playback_and_ledger(self) -> None:
+        from orchestrator.runtime.interaction_ledger import InteractionLedger
+        from shared.chromie_contracts.social_cognition import SocialCognitionRequest, earlier_speech_replies
+        from shared.chromie_contracts.core_interpretation import CognitiveResponsibilityProposal
+
+        for truth_stage, stages, progress_kind, grounded in (
+            ("pre_evidence", [], "check_information", False),
+            ("context_grounded", [], None, True),
+            ("post_evidence", [], None, True),
+            (None, ["context_grounded", "pre_evidence"], "think", False),
+            (None, [], None, False),
+        ):
+            with self.subTest(truth_stage=truth_stage, stages=stages):
+                assistant = bare_voice_assistant()
+                ledger = InteractionLedger()
+                assistant.playback_delivery.interaction_event_sink = ledger.record_playback_event
+                assistant.normalize_tts_candidate = MethodType(lambda self, text: text.strip(), assistant)
+                assistant.session_log = MethodType(lambda self, *args: None, assistant)
+
+                async def scheduled(self, text, session_id):
+                    return {"scheduled": True, "generation": 1, "orders": [1]}
+
+                assistant.schedule_tts_text = MethodType(scheduled, assistant)
+                facts = {**({"truth_stage": truth_stage} if truth_stage else {}),
+                         **({"truth_stages": stages} if stages else {}),
+                         **({"progress_kind": progress_kind} if progress_kind else {})}
+                args = {"text": "I heard you.", "metadata": {"session_id": "sid", "turn_id": "turn",
+                    "wording_owner": "social_cognition", "communicative_activity_ids": ["act"],
+                    "source_responsibility_refs": ["r1"], "speech_act": "acknowledge", **facts}}
+                scheduled_result = await assistant._schedule_interaction_speech(args)
+                context = ledger.context("sid", turn_id="turn")
+                for key, value in facts.items():
+                    self.assertEqual(context.pending_speech[0]["metadata"].get(key), value)
+                self.assertEqual(context.already_spoken, [])
+                assistant.playback_delivery.update_turn_speech_event_for_playback(
+                    generation=1, order=1, session_id="sid", started=True, reason="start")
+                self.assertEqual(ledger.context("sid", turn_id="turn").already_spoken, [])
+                assistant.playback_delivery.complete_turn_speech_order(
+                    generation=1, order=1, session_id="sid", completed=True, reason="completed")
+                delivered = ledger.context("sid", turn_id="turn").model_dump(mode="json")
+                for key, value in facts.items():
+                    self.assertEqual(delivered["already_spoken"][0]["metadata"].get(key), value)
+                request = SocialCognitionRequest(request_id="later", trigger="goal_state", source_refs=["turn"],
+                    responsibilities=[CognitiveResponsibilityProposal(local_ref="r1", outcome="Reply", confidence=1)],
+                    context={"interaction_context": delivered})
+                self.assertEqual(earlier_speech_replies(request), {"act": {"r1"}} if grounded else {})
+                prior = request.model_copy(update={"context": {"interaction_context": {
+                    "prior_delivered_speech": delivered["already_spoken"]}}})
+                self.assertEqual(earlier_speech_replies(prior), {})
+                explicit_reuse = {**args, "metadata": {**args["metadata"],
+                    "reuse_current_turn_speech": True, "reused_speech_generation": 1,
+                    "reused_speech_orders": [1], "reused_speech_event_id": scheduled_result["speech_event_id"]}}
+                reused = await assistant._schedule_interaction_speech(explicit_reuse)
+                self.assertTrue(reused["reused"])
+                with self.assertRaisesRegex(ValueError, "truth"):
+                    await assistant._schedule_interaction_speech({**explicit_reuse, "metadata": {
+                        **explicit_reuse["metadata"], "truth_stage": "post_evidence" if truth_stage != "post_evidence" else "pre_evidence"}})
+                with self.assertRaisesRegex(ValueError, "truth"):
+                    await assistant._schedule_interaction_speech({**args, "metadata": {
+                        **args["metadata"], "truth_stage": "post_evidence" if truth_stage != "post_evidence" else "pre_evidence"}})
+
     @staticmethod
     def _configure_model_generation(assistant: VoiceAssistant) -> None:
         assistant.host_settings = HostSettingsSnapshot.from_env(

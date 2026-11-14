@@ -44,6 +44,7 @@ TOP_LEVEL_KEYS = {
     "review",
 }
 FORBIDDEN_WIRE_KEYS = {
+    "output_mode", "body_effect_family", "continuity_scope",
     "binding_items", "bindings", "coordination", "relationship", "target_goal_ids",
     "actions",
     "activities",
@@ -166,10 +167,8 @@ def _validate_case_shape(path: Path, case: dict[str, Any]) -> None:
             raise ValueError(f"{case_id}: binding keys are not lexicographic")
         if expectation["local_ref"] != reference["local_ref"]:
             raise ValueError(f"{case_id}: local_ref expectation drift")
-        if expectation["output_mode"] != reference["output_mode"]:
-            raise ValueError(f"{case_id}: output_mode expectation drift")
-        if expectation.get("body_effect_family") != reference.get("body_effect_family"):
-            raise ValueError(f"{case_id}: body_effect_family expectation drift")
+        if expectation["value_review"] != reference["value_review"]:
+            raise ValueError(f"{case_id}: value_review expectation drift")
         if not expectation["outcome_contains_any"]:
             raise ValueError(f"{case_id}: missing flexible outcome oracle")
 
@@ -326,7 +325,7 @@ def validate_dataset(dataset_root: Path = DATASET_ROOT) -> dict[str, Any]:
             )
 
     actual_dimensions: Counter[str] = Counter()
-    actual_modes: Counter[str] = Counter()
+    actual_value_review: Counter[str] = Counter()
     actual_relationships: Counter[str] = Counter()
     context_scenarios = 0
     unresolved_scenarios = 0
@@ -344,14 +343,14 @@ def validate_dataset(dataset_root: Path = DATASET_ROOT) -> dict[str, Any]:
                 and any(character.isdigit() for character in value)
                 for name, value in binding_items.items()
             )
-            actual_modes[responsibility["output_mode"]] += 1
+            actual_value_review[str(responsibility["value_review"]).lower()] += 1
 
     actual_semantic_coverage = {
         "context_scenarios": context_scenarios,
         "unresolved_scenarios": unresolved_scenarios,
         "digit_measurement_surface_bindings": digit_measurement_surface_bindings,
         "binding_dimensions": dict(sorted(actual_dimensions.items())),
-        "output_modes": dict(sorted(actual_modes.items())),
+        "value_review": {key: actual_value_review[key] for key in ("false", "true")},
     }
     if actual_semantic_coverage != coverage["semantic_coverage"]:
         errors.append(
@@ -371,7 +370,7 @@ def validate_dataset(dataset_root: Path = DATASET_ROOT) -> dict[str, Any]:
         "categories": dict(sorted(actual_categories.items())),
         "builders": dict(sorted(actual_builders.items())),
         "binding_dimensions": dict(sorted(actual_dimensions.items())),
-        "output_modes": dict(sorted(actual_modes.items())),
+        "value_review": {key: actual_value_review[key] for key in ("false", "true")},
         "context_scenarios": context_scenarios,
         "unresolved_scenarios": unresolved_scenarios,
         "digit_measurement_surface_bindings": digit_measurement_surface_bindings,

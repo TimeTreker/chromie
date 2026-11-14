@@ -98,6 +98,24 @@ def embodied_completion_evidence_policy() -> ClaimQualificationPolicy:
 
 logger = logging.getLogger(__name__)
 
+
+class StalePlanningSubmissionError(ValueError):
+    """An obsolete proposal whose Goals have proven successors or fulfillment."""
+
+    def __init__(self, expected_versions: dict[str, int], current_versions: dict[str, int], coverage_evidence: dict[str, Any]) -> None:
+        self.expected_versions = dict(expected_versions)
+        self.current_versions = dict(current_versions)
+        self.coverage_evidence = copy.deepcopy(coverage_evidence)
+        super().__init__("stale_planning_submission")
+
+    def evidence(self) -> dict[str, Any]:
+        return {
+            "reason": str(self), "expected_versions": self.expected_versions,
+            "current_versions": self.current_versions, "execution_allowed": False,
+            **self.coverage_evidence,
+        }
+
+
 CancellationDomain = Literal["output", "media_output", "embodied_motion"]
 
 _RESULT_AUTHORITY_METADATA_KEYS = (
@@ -432,6 +450,7 @@ class CapabilityRuntime:
         self.goal_state_provider: Callable[[], list[dict[str, Any]]] | None = None
         self._goal_state_versions: dict[str, str] = {}
         self._plan_commit_versions: dict[str, int] = {}
+        self._plan_commit_owners: dict[str, dict[str, Any]] = {}
         self._plan_commit_locks: dict[str, asyncio.Lock] = {}
 
     async def prepare_planner_work(self, turn_id: str, activities: list[dict[str, Any]]) -> None:
@@ -466,9 +485,9 @@ class CapabilityRuntime:
             key = "goal:" + goal_id
             self._plan_commit_versions[key] = self._plan_commit_versions.get(key, 0) + 1
 
-    def _refresh_goal_state(self, goal_ids: set[str]) -> None:
+    def _refresh_goal_state(self, goal_ids: set[str]) -> set[str]:
         if self.goal_state_provider is None:
-            return
+            return set()
         states = {str(item.get("goal_id", "")): item for item in self.goal_state_provider()}
         for goal_id in goal_ids:
             self.record_goal_state(goal_id, states.get(goal_id, {"goal_id": goal_id, "absent": True}))
@@ -480,6 +499,11 @@ class CapabilityRuntime:
                 self._prepared_planner_work[turn_id] = remaining
             else:
                 self._prepared_planner_work.pop(turn_id, None)
+        # Cancellation/refusal ends Work but does not prove that a required
+        # cancellation/refusal answer was delivered. Only qualified satisfaction
+        # is standalone fulfillment evidence for discarding an old proposal.
+        return {goal_id for goal_id, state in states.items()
+                if (state.get("goal", state)).get("responsibility_status") == "satisfied"}
 
     @staticmethod
     def _request_affects_planning_state(request: CapabilityRequest) -> bool:
@@ -607,9 +631,11 @@ class CapabilityRuntime:
             if current != expected:
                 raise ValueError("stale_planning_state: Goal or Work changed during planning")
 
-    async def reserve_planning_submission(self, snapshot: dict[str, Any], *, plan_id: str, fingerprint: str, prepared_activity_ids: list[str]) -> dict[str, Any]:
+    async def reserve_planning_submission(self, snapshot: dict[str, Any], *, plan_id: str, fingerprint: str, prepared_activity_ids: list[str], covered_goal_ids: list[str]) -> dict[str, Any]:
         """Reserve a single commit version for the exact affected Goal/turn scopes."""
         async with self._active_lock:
+            if len(set(covered_goal_ids)) != len(covered_goal_ids) or not set(covered_goal_ids).issubset(snapshot["goal_ids"]):
+                raise ValueError("planning_coverage_outside_snapshot")
             versions = {}
             for scope, expected in snapshot["commit_versions"].items():
                 if self._plan_commit_versions.get(scope, 0) != expected:
@@ -617,13 +643,54 @@ class CapabilityRuntime:
             for scope, expected in snapshot["commit_versions"].items():
                 versions[scope] = expected + 1
                 self._plan_commit_versions[scope] = expected + 1
+            # Watched scopes may include contextual Goals not covered by this
+            # validated Plan. Preserve its actual canonical coverage separately.
+            owner = {"plan_id": plan_id, "fingerprint": fingerprint,
+                     "versions": dict(versions), "covered_goal_ids": list(covered_goal_ids),
+                     "submitted": False}
+            for scope in versions:
+                self._plan_commit_owners[scope] = owner
             return {
                 "versions": versions, "plan_id": plan_id, "fingerprint": fingerprint,
+                "covered_goal_ids": list(covered_goal_ids),
                 "prepared_bindings": [
                     {"turn_id": item.get("turn_id", snapshot["turn_id"]), "activity_id": item["activity_id"]}
                     for item in snapshot["prepared"] if item["activity_id"] in prepared_activity_ids
                 ],
             }
+
+    def require_current_planning_commit(self, guard: dict[str, Any]) -> None:
+        """Check a Host reservation without yielding; dispatch still checks under lock."""
+        if not isinstance(guard, dict) or not isinstance(guard.get("versions"), dict) or not guard["versions"]:
+            raise ValueError("invalid_planning_commit")
+        satisfied = self._refresh_goal_state({scope[5:] for scope in guard["versions"] if scope.startswith("goal:")})
+        current = {scope: self._plan_commit_versions.get(scope, 0) for scope in guard["versions"]}
+        if current != guard["versions"]:
+            coverage = self._superseding_planning_coverage(guard, satisfied)
+            if coverage is not None:
+                raise StalePlanningSubmissionError(guard["versions"], current, coverage)
+            # A revision without proven replacement coverage is still an actual
+            # failure. Never silently strand an open independent obligation.
+            raise ValueError("stale_planning_submission")
+
+    def _superseding_planning_coverage(self, guard: dict[str, Any], satisfied: set[str]) -> dict[str, Any] | None:
+        goals = guard.get("covered_goal_ids")
+        if not isinstance(goals, list) or not goals:
+            return None
+        successors = {}
+        for goal_id in goals:
+            if goal_id in satisfied:
+                continue
+            owner = self._plan_commit_owners.get("goal:" + goal_id)
+            if (not owner or goal_id not in owner["covered_goal_ids"]
+                    or any(self._plan_commit_versions.get(scope, 0) != version for scope, version in owner["versions"].items())
+                    or (not owner["submitted"] and owner["plan_id"] == guard.get("plan_id")
+                        and owner["fingerprint"] == guard.get("fingerprint"))):
+                return None
+            successors[goal_id] = {"plan_id": owner["plan_id"], "fingerprint": owner["fingerprint"]}
+        return {"plan_id": guard.get("plan_id"), "fingerprint": guard.get("fingerprint"),
+                "covered_goal_ids": list(goals), "successor_plans": successors,
+                "satisfied_goal_ids": [goal_id for goal_id in goals if goal_id in satisfied]}
 
     def _validate_planning_submission_locked(self, response: InteractionResponse) -> None:
         guard = response.metadata.get("planning_commit")
@@ -631,12 +698,15 @@ class CapabilityRuntime:
             return
         if not isinstance(guard, dict) or not isinstance(guard.get("versions"), dict) or not guard["versions"]:
             raise ValueError("invalid_planning_commit")
-        self._refresh_goal_state({scope[5:] for scope in guard["versions"] if scope.startswith("goal:")})
         if (response.metadata.get("canonical_plan_id") != guard.get("plan_id")
                 or response.metadata.get("canonical_plan_fingerprint") != guard.get("fingerprint")):
             raise ValueError("planning_submission_identity_mismatch")
-        if any(self._plan_commit_versions.get(scope, 0) != version for scope, version in guard["versions"].items()):
-            raise ValueError("stale_planning_submission")
+        self.require_current_planning_commit(guard)
+
+    async def validate_planning_submission(self, response: InteractionResponse) -> None:
+        """Preflight Host side effects without consuming or renewing a reservation."""
+        async with self._active_lock:
+            self._validate_planning_submission_locked(response)
 
     async def record_planning_submission(self, response: InteractionResponse, record: Callable[[], None]) -> None:
         """Validate before Host publication; admit only that synchronous owner write.
@@ -659,6 +729,14 @@ class CapabilityRuntime:
             raise ValueError("stale_planning_goal_commit")
         self._refresh_goal_state({scope[5:] for scope in guard["versions"] if scope.startswith("goal:")})
         guard["versions"] = {scope: self._plan_commit_versions.get(scope, 0) for scope in guard["versions"]}
+        self._record_planning_commit_owner(guard, submitted=False)
+
+    def _record_planning_commit_owner(self, guard: dict[str, Any], *, submitted: bool) -> None:
+        for scope, version in guard["versions"].items():
+            owner = self._plan_commit_owners.get(scope)
+            if owner and owner["plan_id"] == guard["plan_id"] and owner["fingerprint"] == guard["fingerprint"]:
+                owner["versions"][scope] = version + int(submitted)
+                owner["submitted"] = owner["submitted"] or submitted
 
     async def accept_completed_planning_submission(self, response: InteractionResponse) -> None:
         """Consume a guarded revision whose Work already has terminal Evidence."""
@@ -668,6 +746,7 @@ class CapabilityRuntime:
             if isinstance(guard, dict):
                 for scope, version in guard["versions"].items():
                     self._plan_commit_versions[scope] = version + 1
+                self._record_planning_commit_owner(guard, submitted=True)
                 self._consume_prepared_bindings_locked(guard)
 
     def _consume_prepared_bindings_locked(self, guard: dict[str, Any]) -> None:
@@ -1065,6 +1144,7 @@ class CapabilityRuntime:
                 if isinstance(guard, dict):
                     for scope, version in guard["versions"].items():
                         self._plan_commit_versions[scope] = version + 1
+                    self._record_planning_commit_owner(guard, submitted=True)
                     self._consume_prepared_bindings_locked(guard)
                 else:
                     planning_requests = [
@@ -1236,8 +1316,8 @@ class CapabilityRuntime:
                             and pending_coordination_ids
                             and coordination_id not in pending_coordination_ids
                         ) or (
-                            pending_parallel
-                            and pending_parallel[0][0].metadata.get("execution_group") != execution_group
+                            pending_parallel and pending_parallel[0][0].metadata.get("execution_group") != execution_group
+                            and not (coordination_id and pending_coordination_ids == {coordination_id})
                         ):
                             terminal = await flush_parallel()
                             if terminal is not None:

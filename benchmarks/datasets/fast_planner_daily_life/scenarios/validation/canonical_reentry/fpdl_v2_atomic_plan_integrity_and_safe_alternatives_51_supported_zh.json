@@ -167,7 +167,6 @@
           "confidence": 0.99,
           "local_ref": "r1",
           "outcome": "在眨眼前看向已识别用户两秒。",
-          "output_mode": "body_action",
           "schema_version": 1,
           "source_evidence": {
             "source_end_token_ref": "t999",
@@ -184,7 +183,6 @@
           "confidence": 0.99,
           "local_ref": "r2",
           "outcome": "在看向用户后正好眨眼两次。",
-          "output_mode": "body_action",
           "schema_version": 1,
           "source_evidence": {
             "source_end_token_ref": "t999",

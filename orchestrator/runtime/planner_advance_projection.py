@@ -28,6 +28,7 @@ from shared.chromie_contracts.plan import (
     ExecuteGoalPlanOutcome,
     FastPlannerAdvance,
     FastPlannerCapabilityActivity,
+    FastPlannerResponseNeed,
     FastPlannerSituationArgumentSource,
     GoalSatisfactionAssessment,
     PlannerInformationGap,
@@ -193,6 +194,10 @@ def canonical_plan_from_fast_advance(
     group_of = {
         activity_id: index for index, group in enumerate(execution_groups) for activity_id in group
     }
+    single_work_with_concurrent_answer = len(capability_ids) == 1 and any(
+        isinstance(item, FastPlannerResponseNeed) and item.timing == "parallel"
+        for item in advance.activities
+    )
     for activity in advance.activities:
         activity_goal_ids: list[str] = []
         for responsibility_ref in activity.source_responsibility_refs:
@@ -223,6 +228,7 @@ def canonical_plan_from_fast_advance(
                     timing=(
                         "parallel"
                         if len(execution_groups[group_of[activity.activity_id]]) > 1
+                        or single_work_with_concurrent_answer
                         else "sequential"
                     ),
                     step_purpose=activity.step_purpose,

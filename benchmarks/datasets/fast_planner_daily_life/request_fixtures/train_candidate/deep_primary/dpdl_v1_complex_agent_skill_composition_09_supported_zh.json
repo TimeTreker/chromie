@@ -151,7 +151,6 @@
           "confidence": 0.99,
           "local_ref": "r1",
           "outcome": "作为学习重置的第一步，看向已识别用户两秒。",
-          "output_mode": "body_action",
           "schema_version": 1,
           "source_evidence": {
             "source_end_token_ref": "t999",
@@ -165,7 +164,6 @@
           "confidence": 0.99,
           "local_ref": "r2",
           "outcome": "作为学习重置的第二步，正好眨眼两次。",
-          "output_mode": "body_action",
           "schema_version": 1,
           "source_evidence": {
             "source_end_token_ref": "t999",

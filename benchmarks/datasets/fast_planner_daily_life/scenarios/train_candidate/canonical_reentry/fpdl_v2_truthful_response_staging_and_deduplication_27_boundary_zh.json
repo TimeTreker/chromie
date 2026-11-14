@@ -147,7 +147,6 @@
           "confidence": 0.99,
           "local_ref": "r1",
           "outcome": "保留仍在等待的眨眼 Goal，不重复或提前说话。",
-          "output_mode": "body_action",
           "schema_version": 1,
           "source_evidence": {
             "source_end_token_ref": "t999",

@@ -120,10 +120,8 @@ def apply_goal_meaning_update(goal: "SemanticGoal", update: dict[str, Any]) -> "
     by_ref = {item.local_ref: item for item in sources}
     if not sources or len(by_ref) != len(sources):
         raise ValueError("Goal meaning update requires unique accepted UMI sources")
-    retained_mode = goal.metadata.get("output_mode", "unspecified")
-    if any(item.output_mode not in {"unspecified", retained_mode}
-           for item in sources) and retained_mode != "unspecified":
-        raise ValueError("a changed outcome modality requires an explicitly sourced replacement Goal")
+    if goal.metadata.get("output_mode") not in {None, "unspecified"}:
+        raise ValueError("An intent-only update cannot requalify retained typed Goal constraints; use an explicitly sourced replacement Goal")
     criteria = list(goal.success_criteria or [goal.description])
     replaced = update["replace_requirement_indices"]
     if (not isinstance(replaced, list) or any(type(index) is not int or index < 0 or index >= len(criteria)
@@ -174,11 +172,6 @@ def apply_goal_meaning_update(goal: "SemanticGoal", update: dict[str, Any]) -> "
                   version=goal.version + 1,
                   source_responsibility_refs=list(dict.fromkeys([*goal.source_responsibility_refs, *by_ref])))
     values["metadata"]["requirement_sources"] = provenance
-    body_effect_families = sorted({
-        item.body_effect_family for item in sources if item.body_effect_family is not None
-    })
-    if body_effect_families:
-        values["metadata"]["body_effect_families"] = body_effect_families
     resource = values.get("resource_responsibility") or {}
     named_surfaces = [values["object"].get("bindings", {}), values["constraints"],
                       resource.get("resource", {}).get("attributes", {}),

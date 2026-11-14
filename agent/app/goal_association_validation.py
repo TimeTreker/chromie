@@ -173,29 +173,6 @@ def action_collection_bindings(
     return rejected
 
 
-def responsibility_output_mode_conflicts(
-    model_output: GoalAssociationModelOutput | GoalSegmentationModelOutput,
-    *,
-    request: CognitiveWorkRequest,
-) -> list[str]:
-    expected = {
-        item.local_ref: item.output_mode
-        for item in request.responsibilities
-        if item.output_mode != "unspecified"
-    }
-    conflicts: list[str] = []
-    for goal_index, goal in enumerate(model_output.new_goals):
-        for source_ref in goal.source_responsibility_refs:
-            required = expected.get(source_ref)
-            if required is None or goal.output_mode == required:
-                continue
-            conflicts.append(
-                f"new_goals[{goal_index}] source_ref={source_ref} "
-                f"expected={required} actual={goal.output_mode}"
-            )
-    return conflicts
-
-
 def binding_semantic_contract_conflicts(
     model_output: GoalAssociationModelOutput | GoalSegmentationModelOutput,
 ) -> list[str]:

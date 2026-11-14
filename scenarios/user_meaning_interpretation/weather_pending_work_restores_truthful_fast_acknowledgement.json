@@ -26,12 +26,11 @@
               "local_ref": "r1",
               "outcome": "今天北京下雨了没有？",
               "confidence": 0.95,
-              "output_mode": "information",
               "source_evidence": {
                 "source_start_token_ref": "t0",
                 "source_end_token_ref": "t9"
               },
-              "continuity_scope": "goal"
+              "value_review": false
             }
           ],
           "meaning_uncertainties": [],
@@ -40,8 +39,7 @@
               "authority": "planner",
               "responsibility_refs": [
                 "r1"
-              ],
-              "reason_summary": "Explicit authored fixture requests the existing cognitive owner."
+              ]
             }
           ]
         }
@@ -59,8 +57,7 @@
       {
         "local_ref": "r1",
         "outcome": "今天北京下雨了没有？",
-        "confidence": 0.95,
-        "output_mode": "information"
+        "confidence": 0.95
       }
     ]
   },

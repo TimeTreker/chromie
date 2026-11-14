@@ -638,8 +638,9 @@ class _CognitiveScenarioClient:
         gaps_by_goal = self.stub.get("fast_information_gaps") or {}
         for need in plan.communication_needs:
             if need.kind == "answer":
+                # A scripted sequential Plan must not acquire an overlap request.
                 activities.append(FastPlannerResponseNeed(
-                    activity_id=need.need_id, role="complete_response", timing="parallel",
+                    activity_id=need.need_id, role="complete_response", timing=need.facts.get("timing", "sequential"),
                     source_responsibility_refs=refs_for_goal_ids(list(need.source_goal_ids)),
                     rationale="The explicit scenario Work fixture establishes this answer obligation.",
                 ))
@@ -648,7 +649,7 @@ class _CognitiveScenarioClient:
                 outcome = outcomes.get(goal_id)
                 if need.kind == "input" and gaps_by_goal.get(goal_id):
                     activities.append(FastPlannerInputNeed(
-                        activity_id=f"clarify-{goal_id}", role="clarification", timing="parallel",
+                        activity_id=f"clarify-{goal_id}", role="clarification", timing=need.facts.get("timing", "sequential"),
                         source_responsibility_refs=refs_for_goal_ids([goal_id]),
                         information_gaps=gaps_by_goal[goal_id],
                     ))
@@ -706,6 +707,9 @@ class _CognitiveScenarioClient:
             act["addressed_need_ids"] = [need.need_id for need in needs]
             act["source_responsibility_refs"] = list(dict.fromkeys(ref for need in needs for ref in need.source_responsibility_refs))
             covered.update(act["addressed_need_ids"])
+            phases = {need.delivery_phase for need in needs if need.delivery_phase is not None}
+            if len(phases) == 1:
+                act["delivery_phase"] = next(iter(phases))
             if any(need.kind == "confirmation" for need in needs):
                 act["function"] = "ask"
                 act["delivery_phase"] = "pre_action"
@@ -986,7 +990,6 @@ def _evaluate_user_meaning_interpretation_expectations(
                 for field in (
                     "local_ref",
                     "outcome",
-                    "output_mode",
                     "relationship",
                     "target_goal_ids",
                     "resolved_gap_ids",
@@ -1419,15 +1422,6 @@ async def evaluate_cognitive_runtime_scenario(
         CognitiveResponsibilityProposal(
             local_ref=f"r{index}",
             outcome=str(item.get("description") or scenario.text),
-            output_mode=(
-                "information"
-                if str((item.get("metadata") or {}).get("resource_kind") or "") == "information"
-                else (
-                    "body_action"
-                    if str((item.get("metadata") or {}).get("output_mode") or "") == "body_action"
-                    else "stateful_effect"
-                )
-            ),
             confidence=float(
                 (stub.get("goal_association") or {}).get("confidence", 0.9)
             ),
@@ -1440,7 +1434,6 @@ async def evaluate_cognitive_runtime_scenario(
             CognitiveResponsibilityProposal(
                 local_ref="r1",
                 outcome=scenario.text,
-                output_mode="stateful_effect",
                 confidence=0.9,
             )
         ]

@@ -551,17 +551,11 @@ class GoalAssociationModelGoal(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     source_responsibility_refs: list[str] = Field(min_length=1, max_length=1)
-    output_mode: GoalOutputMode = Field(
-        default="other",
+    output_mode: GoalOutputMode | None = Field(
+        default=None,
         description=(
-            "Provider-neutral human outcome modality copied from User Meaning Interpretation. "
-            "information says the person wants information; stateful_effect says the "
-            "person wants a durable or future state change outside embodiment. Physical "
-            "motion, posture, gaze, gesture, manipulation, carrying, and handover are "
-            "body_action even when their physical result lasts. Neither category asserts "
-            "that a Capability, provider, execution lane, fresh Evidence, or Work is "
-            "required. Use exact embodied, media, or vocal modes only when those are "
-            "the requested observable outcome."
+            "Retained typed Goal modality for trusted legacy Goal carriers only. "
+            "Fresh WHAT-only UMI sources supply no execution or presentation classification."
         ),
     )
     media_operation: GoalMediaOperation = Field(

@@ -267,6 +267,20 @@ class InteractionRuntimeCoordinator:
             if not await self.speech_delivery_waiter(session_id, result.output):
                 delivered = False
                 continue
+            # Playback owns the rendered words. SC's source text may still
+            # contain formatting removed by TTS; copying it into Memory would
+            # conflict with a later exact-act receipt from the delivery Ledger.
+            playback = next((event for event in reversed(
+                self.interaction_ledger.events(str(session_id or "")) if self.interaction_ledger is not None else []
+            ) if event.owner == "playback_delivery"
+                and event.event_type == "speech_playback_completed"
+                and event.subject_id == result.output.get("speech_event_id")
+                and set(event.metadata.get("communicative_activity_ids") or [])
+                    == set(speech.metadata.get("communicative_activity_ids") or [])
+                and event.text), None)
+            if playback is None:
+                delivered = False
+                continue
             completion_goal_ids = [
                 str(value).strip()
                 for value in speech.metadata.get("communication_completion_goal_ids") or []
@@ -294,11 +308,14 @@ class InteractionRuntimeCoordinator:
                 "communication_completion_goal_ids": completion_goal_ids,
                 "evidence_refs": evidence_refs,
                 "speech_act": speech.metadata.get("speech_act"), "playback_completed": True,
+                "truth_stage": speech.metadata.get("truth_stage"),
+                "truth_stages": list(speech.metadata.get("truth_stages") or []),
+                "progress_kind": speech.metadata.get("progress_kind"),
             }
             if self.communicative_delivery_recorder is not None:
                 self.communicative_delivery_recorder(
                     session_id,
-                    speech.text,
+                    playback.text,
                     delivery_metadata,
                 )
             if (

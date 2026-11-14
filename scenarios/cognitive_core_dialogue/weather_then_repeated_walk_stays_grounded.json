@@ -29,12 +29,11 @@
                   "local_ref": "r1",
                   "outcome": "What is the weather in Beijing today?",
                   "confidence": 0.96,
-                  "output_mode": "information",
                   "source_evidence": {
                     "source_start_token_ref": "t0",
                     "source_end_token_ref": "t7"
                   },
-                  "continuity_scope": "goal"
+                  "value_review": false
                 }
               ],
               "meaning_uncertainties": [],
@@ -43,8 +42,7 @@
                   "authority": "planner",
                   "responsibility_refs": [
                     "r1"
-                  ],
-                  "reason_summary": "Explicit authored fixture requests the existing cognitive owner."
+                  ]
                 }
               ]
             }
@@ -60,8 +58,7 @@
           {
             "local_ref": "r1",
             "outcome": "What is the weather in Beijing today?",
-            "confidence": 0.96,
-            "output_mode": "information"
+            "confidence": 0.96
           }
         ]
       }
@@ -81,13 +78,11 @@
                   "local_ref": "r1",
                   "outcome": "walk forward for 15 seconds quickly",
                   "confidence": 0.97,
-                  "output_mode": "body_action",
                   "source_evidence": {
                     "source_start_token_ref": "t0",
                     "source_end_token_ref": "t5"
                   },
-                  "continuity_scope": "goal",
-                  "body_effect_family": "task_physical_effect"
+                  "value_review": false
                 }
               ],
               "meaning_uncertainties": [],
@@ -96,8 +91,7 @@
                   "authority": "planner",
                   "responsibility_refs": [
                     "r1"
-                  ],
-                  "reason_summary": "Explicit authored fixture requests the existing cognitive owner."
+                  ]
                 }
               ]
             }
@@ -113,9 +107,7 @@
           {
             "local_ref": "r1",
             "outcome": "walk forward for 15 seconds quickly",
-            "confidence": 0.97,
-            "output_mode": "body_action",
-            "body_effect_family": "task_physical_effect"
+            "confidence": 0.97
           }
         ],
         "history_contains": [
@@ -138,13 +130,11 @@
                   "local_ref": "r1",
                   "outcome": "walk forward for 15 seconds quickly",
                   "confidence": 0.97,
-                  "output_mode": "body_action",
                   "source_evidence": {
                     "source_start_token_ref": "t0",
                     "source_end_token_ref": "t5"
                   },
-                  "continuity_scope": "goal",
-                  "body_effect_family": "task_physical_effect"
+                  "value_review": false
                 }
               ],
               "meaning_uncertainties": [],
@@ -153,8 +143,7 @@
                   "authority": "planner",
                   "responsibility_refs": [
                     "r1"
-                  ],
-                  "reason_summary": "Explicit authored fixture requests the existing cognitive owner."
+                  ]
                 }
               ]
             }
@@ -170,9 +159,7 @@
           {
             "local_ref": "r1",
             "outcome": "walk forward for 15 seconds quickly",
-            "confidence": 0.97,
-            "output_mode": "body_action",
-            "body_effect_family": "task_physical_effect"
+            "confidence": 0.97
           }
         ],
         "history_contains": [

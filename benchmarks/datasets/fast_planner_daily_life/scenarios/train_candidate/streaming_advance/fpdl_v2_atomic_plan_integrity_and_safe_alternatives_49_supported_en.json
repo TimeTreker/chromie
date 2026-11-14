@@ -73,7 +73,6 @@
           "confidence": 0.99,
           "local_ref": "r1",
           "outcome": "Look at the identified user for two seconds before blinking.",
-          "output_mode": "body_action",
           "schema_version": 1,
           "source_evidence": {
             "source_end_token_ref": "t999",
@@ -90,7 +89,6 @@
           "confidence": 0.99,
           "local_ref": "r2",
           "outcome": "Blink exactly twice after looking at the user.",
-          "output_mode": "body_action",
           "schema_version": 1,
           "source_evidence": {
             "source_end_token_ref": "t999",

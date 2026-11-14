@@ -59,18 +59,7 @@ def test_goal_interpretation_daily_life_dataset_passes_current_contract() -> Non
         "time",
         "time_scope",
     }
-    assert set(summary["output_modes"]) == {
-        "body_action",
-        "humming",
-        "information",
-        "media_playback",
-        "nonverbal_vocalization",
-        "recitation",
-        "singing",
-        "speech",
-        "stateful_effect",
-        "styled_speech",
-    }
+    assert summary["value_review"] == {"false": 1666, "true": 0}
     assert summary["context_scenarios"] == 306
     assert summary["unresolved_scenarios"] == 68
     assert summary["digit_measurement_surface_bindings"] == 406
@@ -101,18 +90,22 @@ def test_goal_interpretation_daily_life_manifest_matches_file_tree() -> None:
     assert manifest["asset_contract"]["scenario_tree_sha256"] == scenario_tree_digest()
 
 
-def test_body_effect_reference_cannot_disagree_with_its_semantic_expectation() -> None:
+def test_value_review_reference_cannot_disagree_with_its_semantic_expectation() -> None:
     path = next(path for path in scenario_paths() if "compound" in path.name)
     original = json.loads(path.read_text(encoding="utf-8"))
     case = copy.deepcopy(original)
-    body_index = next(
-        index
-        for index, item in enumerate(case["target"]["reference_wire_output"]["responsibilities"])
-        if item["output_mode"] == "body_action"
-    )
-    case["target"]["semantic_expectations"]["responsibilities"][body_index]["body_effect_family"] = "gaze_or_orientation"
+    case["target"]["semantic_expectations"]["responsibilities"][0]["value_review"] = True
 
-    with pytest.raises(ValueError, match="body_effect_family expectation drift"):
+    with pytest.raises(ValueError, match="value_review expectation drift"):
         _validate_case_shape(path, case)
 
     _validate_case_shape(path, original)
+
+
+@pytest.mark.parametrize("retired", ["output_mode", "body_effect_family", "continuity_scope"])
+def test_reference_cannot_reintroduce_retired_umi_classification(retired) -> None:
+    path = scenario_paths()[0]
+    case = json.loads(path.read_text(encoding="utf-8"))
+    case["target"]["reference_wire_output"]["responsibilities"][0][retired] = "speech"
+    with pytest.raises(ValueError, match="crosses downstream authority"):
+        _validate_case_shape(path, case)

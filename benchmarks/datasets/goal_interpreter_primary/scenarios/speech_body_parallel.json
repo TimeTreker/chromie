@@ -6,7 +6,6 @@
   "expected": {
     "responsibilities": [
       {
-        "output_mode": "speech",
         "outcome_contains_any": [
           "hello",
           "greet"
@@ -21,7 +20,6 @@
         ]
       },
       {
-        "output_mode": "body_action",
         "outcome_contains_any": [
           "wave",
           "挥"
@@ -56,14 +54,13 @@
     "responsibilities": [
       {
         "local_ref": "r1",
-        "output_mode": "other",
         "outcome": "Say hello while waving.",
         "confidence": 1.0,
         "source_evidence": {
           "source_start_token_ref": "t0",
           "source_end_token_ref": "t4"
         },
-        "continuity_scope": "goal"
+        "value_review": false
       }
     ],
     "meaning_uncertainties": [],
@@ -72,8 +69,7 @@
         "authority": "planner",
         "responsibility_refs": [
           "r1"
-        ],
-        "reason_summary": "Explicit authored fixture requests the existing cognitive owner."
+        ]
       }
     ]
   },

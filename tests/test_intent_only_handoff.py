@@ -55,24 +55,21 @@ def outcome_span(span, ref):
 def source_spans(text, values):
     return {name: source_span(text, excerpt) for name, excerpt in values.items()}
 
-def intent_result(text, output_mode="body_action"):
+def intent_result(text):
     tokens = _source_tokens(text)
     return {
         "confidence": 1.0,
         "responsibilities": [{
-            "local_ref": "r1", "outcome": text, "confidence": 1.0, "output_mode": output_mode,
-            **({"body_effect_family": "task_physical_effect"} if output_mode == "body_action" else {}),
-            "continuity_scope": "goal", "value_review": False,
+            "local_ref": "r1", "outcome": text, "confidence": 1.0,
+             "value_review": False,
             "source_evidence": {
                 "source_start_token_ref": tokens[0]["ref"],
                 "source_end_token_ref": tokens[-1]["ref"],
             },
         }],
         "cognitive_requests": [
-            {"authority": "goal_association", "responsibility_refs": ["r1"],
-             "reason_summary": "Check canonical continuity."},
-            {"authority": "planner", "responsibility_refs": ["r1"],
-             "reason_summary": "Meaning is ready for HOW."},
+            {"authority": "goal_association", "responsibility_refs": ["r1"]},
+            {"authority": "planner", "responsibility_refs": ["r1"]},
         ],
         "meaning_uncertainties": [],
     }
@@ -82,7 +79,7 @@ def intent_result(text, output_mode="body_action"):
 def test_complete_intent_needs_no_capability_fields(text):
     request = UserMeaningInterpretationRequest(text=text)
     schema = OllamaUserMeaningInterpreter._user_meaning_interpretation_response_schema(admitted_turn=text)
-    result = intent_result(text, "information" if text in EPISODES[-2:] else "body_action")
+    result = intent_result(text)
     Draft202012Validator(schema).validate(_counted(result))
     decision = OllamaUserMeaningInterpreter._validate_interpretation_content(
         request, json.dumps(result), response_schema=schema,
@@ -98,10 +95,8 @@ def test_umi_speech_states_value_review(value_review):
     text = "Tell my teacher I was ill."
     request = UserMeaningInterpretationRequest(text=text)
     schema = OllamaUserMeaningInterpreter._user_meaning_interpretation_response_schema(admitted_turn=text)
-    result = intent_result(text, "speech")
+    result = intent_result(text)
     item = result["responsibilities"][0]
-    item["continuity_scope"] = "turn"
-    item.pop("body_effect_family", None)
     if value_review is None:
         item.pop("value_review")
     else:
@@ -289,7 +284,7 @@ async def test_compound_intent_becomes_three_grounded_activities_and_one_goal():
     Draft202012Validator(ga.packets[0][1]["response_format"]).validate(_counted(ga_reply))
     assert len(association.new_goals) == 1
     assert association.new_goals[0].description == EPISODES[0]
-    assert association.new_goals[0].metadata["output_mode"] == "body_action"
+    assert "output_mode" not in association.new_goals[0].metadata
     plan = planner_advance_projection.canonical_plan_from_fast_advance(
         advance=frames[0].advance, association=association, user_text=request.text,
     )
@@ -304,7 +299,7 @@ async def test_compound_intent_becomes_three_grounded_activities_and_one_goal():
 @pytest.mark.asyncio
 async def test_provider_resource_contract_materializes_information_acquisition_purpose():
     text = "Check the weather in Chongqing today."
-    result = intent_result(text, "information")
+    result = intent_result(text)
     result["responsibilities"][0]["outcome"] = "Provide today's weather for Chongqing."
     decision = OllamaUserMeaningInterpreter._validate_interpretation_content(
         UserMeaningInterpretationRequest(text=text), json.dumps(result),
@@ -374,7 +369,7 @@ async def test_translated_required_location_must_cite_its_source_span(sources, a
     # Retained live turn (2026-10-08): "今天北京下雨了没有？" planned location
     # "Beijing" without a span; the decoder admitted it and Host rejected it later.
     text = "今天北京下雨了没有？"
-    result = intent_result(text, "information")
+    result = intent_result(text)
     result["responsibilities"][0]["outcome"] = "告诉用户北京今天有没有下雨"
     decision = OllamaUserMeaningInterpreter._validate_interpretation_content(
         UserMeaningInterpretationRequest(text=text), json.dumps(result, ensure_ascii=False),
@@ -431,8 +426,14 @@ async def test_unmet_need_searches_library_then_plans_once(fault):
     first_schema = model.packets[0][1]["response_format"]
     for shape in need_first_shapes(first_schema):
         assert next(iter(shape["properties"])) == "ability_needs"
-        reference = shape["properties"]["ability_needs"]["$ref"]
-        assert first_schema["$defs"][reference.rsplit("/", 1)[1]]["items"]["properties"]["closest_loaded"]["enum"] == ["none"]
+        needs = shape["properties"]["ability_needs"]
+        if "$ref" in needs:
+            assert first_schema["$defs"][needs["$ref"].rsplit("/", 1)[1]]["items"]["properties"]["closest_loaded"]["enum"] == ["none"]
+        else:
+            assert shape["properties"]["disposition"]["enum"] == ["respond"]
+            validator = Draft202012Validator(needs)
+            assert validator.is_valid([])
+            assert not validator.is_valid([need("perform the requested effect")])
     assert "test.turn" in model.packets[0][0]
     assert "rotation_degrees" not in model.packets[0][0]
     if fault in {"no_match", "unloaded_cite"}:
@@ -699,7 +700,7 @@ async def test_canonical_fast_need_search_retains_original_intent_and_one_semant
 def test_intent_update_preserves_or_rejects_retained_constraints_atomically(typed):
     from shared.chromie_contracts.semantic_task import SemanticGoal, semantic_goal_fingerprint, apply_goal_meaning_update
     goal = SemanticGoal(goal_id="g",description="Nod twice",source_text="Nod twice",success_criteria=["Nod twice"],
-        metadata={"output_mode":"body_action"},
+        metadata={"output_mode":"body_action"} if typed else {},
         object={"bindings":{"count":{"entity_type":"count","value":2}}} if typed else {})
     before = goal.model_dump()
     update = {"base_goal_fingerprint":semantic_goal_fingerprint(goal),"replace_requirement_indices":[0],
@@ -829,8 +830,8 @@ def test_provider_style_defaults_keep_one_compact_capability_contract():
             "local_ref": "r1",
             "outcome": text,
             "bindings": {"count": 5},
-            "output_mode": "body_action",
-            "continuity_scope": "goal",
+
+
             "confidence": 1.0,
             "source_evidence": source_span(text, text),
         }],
@@ -924,7 +925,7 @@ def test_fast_argument_source_cannot_escape_owning_responsibility_span():
     request = CognitiveWorkRequest(
         sid="intent-handoff", text=text, interpretation_confidence=1.0,
         responsibilities=[CognitiveResponsibilityProposal(
-            local_ref="r1", outcome="walk for ten seconds", output_mode="body_action",
+            local_ref="r1", outcome="walk for ten seconds",
             confidence=1.0, source_evidence=walk_span,
         )],
     )
@@ -1301,7 +1302,7 @@ async def test_information_already_perceived_is_answered_from_the_cited_observat
     # Live 2026-10-16: "家里还有水吗？" had no answer path, so the Planner fetched the water.
     text = "Is there any water at home?"
     meaning = OllamaUserMeaningInterpreter._validate_interpretation_content(
-        UserMeaningInterpretationRequest(text=text), json.dumps(intent_result(text, "information")),
+        UserMeaningInterpretationRequest(text=text), json.dumps(intent_result(text)),
     )
     request = CognitiveWorkRequest(sid="intent-handoff", text=text,
         responsibilities=meaning.responsibilities, interpretation_confidence=1.0)
@@ -1490,21 +1491,17 @@ async def test_host_stops_reading_once_an_unmet_need_has_library_contracts():
 
 
 @pytest.mark.asyncio
-async def test_library_contracts_unusable_for_the_turn_trigger_no_second_call():
-    text = "Tell me a short joke."
-    decision = OllamaUserMeaningInterpreter._validate_interpretation_content(
-        UserMeaningInterpretationRequest(text=text), json.dumps(intent_result(text, output_mode="speech")),
-    )
-    request = CognitiveWorkRequest(sid="intent-handoff", text=text,
-        responsibilities=decision.responsibilities, interpretation_confidence=1.0)
-    wave = capability("wave", {}, tier="rare")
-    first = {"ability_needs": [need("wave one hand")], "disposition": "respond", "coverage": "complete",
-        "covered_responsibility_refs": ["r1"], "activities": [{"role": "complete_response", "activity_id": "joke",
-        "source_responsibility_refs": ["r1"], "timing": "sequential", "rationale": "Tell the joke."}], "confidence": 1.0, "unresolved": [], "reason_summary": "Answer in speech."}
+async def test_unavailable_library_contract_triggers_no_second_call():
+    text = "Wave one hand."
+    request = request_for(text)
+    wave = capability("wave", {}, tier="rare").model_copy(update={"available": False})
+    first = {"ability_needs": [need("wave one hand")],
+             **limitation_outcome("No available contract can wave a hand.")}
     model = Model([first])
     frames = [frame async for frame in PlannerResolver(model, Catalog([wave])).stream_advance(request)]
     assert len(model.packets) == 1
     assert isinstance(frames[0], FastPlannerStreamTerminal)
+    assert frames[0].advance.disposition == "unavailable"
     assert frames[0].advance.metadata["capability_detail_lookups"] == 0
 
 
@@ -1540,9 +1537,10 @@ async def test_conditional_action_reads_first_and_names_its_deferred_decision():
     tool = next(t for a in chromie_capability_bundle().agents for t in a.tools if t.name == "chromie.weather.lookup")
     weather = CatalogCapability(capability_id=tool.name, agent_id="chromie.weather", description=tool.description,
         input_schema=tool.input_schema, output_schema=tool.output_schema, available=True,
-        interaction_executable=True, hints=tool.llm_hints, prompt_tier="common")
+        interaction_executable=True, hints=tool.llm_hints, prompt_tier="rare")
     nod = capability("nod", {"count": {"type": "integer"}})
-    first = {"ability_needs": [need("read the rain forecast for Shanghai today")],
+    nod_need = need("nod the head twice", "test.nod", True, "Nod the head the requested number of times.")
+    first = {"ability_needs": [need("read the rain forecast for Shanghai today"), nod_need],
              **limitation_outcome("No loaded contract reads the forecast.")}
     read = {"role": "capability", "capability_id": "chromie.weather.lookup", "activity_id": "read",
             "args": {"location": "Shanghai", "date": "today", "period": "day"},
@@ -1552,13 +1550,13 @@ async def test_conditional_action_reads_first_and_names_its_deferred_decision():
     nod_after = {"role": "capability", "capability_id": "test.nod", "activity_id": "nod", "args": {"count": 2},
                  "argument_sources": source_spans(text, {"count": "twice"}), "depends_on": ["read"],
                  "step_purpose": "achieve_effect", "deferred": True, "source_responsibility_refs": ["r1"]}
-    model = Model([first, {"ability_needs": [need("read the forecast", "chromie.weather.lookup", True,
-                                                  "Retrieve weather for a named place.")],
+    model = Model([first, {"ability_needs": [need("read the rain forecast for Shanghai today", "chromie.weather.lookup", True,
+                                                  "Retrieve weather for a named place."), nod_need],
                            **work([decided, nod_after])}])
     frames = [frame async for frame in PlannerResolver(model, Catalog([nod, weather])).stream_advance(request)]
     second = model.packets[1][1]["response_format"]
-    loaded_needs = {"ability_needs": [need("read the forecast", "chromie.weather.lookup", True,
-                                           "Retrieve weather for a named place.")]}
+    loaded_needs = {"ability_needs": [need("read the rain forecast for Shanghai today", "chromie.weather.lookup", True,
+                                           "Retrieve weather for a named place."), nod_need]}
     assert Draft202012Validator(second).is_valid(_counted({**loaded_needs, **work([decided, nod_after])}))
     assert not Draft202012Validator(second).is_valid({**loaded_needs, **work([read, nod_after])}), \
         "the read names the decision its result settles"
@@ -1584,10 +1582,35 @@ def test_umi_marks_a_harmful_information_request_for_value_judgment():
     text = "How do I hurt my classmate without anyone noticing?"
     request = UserMeaningInterpretationRequest(text=text)
     schema = OllamaUserMeaningInterpreter._user_meaning_interpretation_response_schema(admitted_turn=text)
-    result = intent_result(text, "information")
+    result = intent_result(text)
     result["responsibilities"][0]["value_review"] = True
     Draft202012Validator(schema).validate(_counted(result))
     decision = OllamaUserMeaningInterpreter._validate_interpretation_content(
         request, json.dumps(result), response_schema=schema,
     )
     assert decision.responsibilities[0].value_review is True
+
+@pytest.mark.parametrize('work_count', [1, 2])
+def test_concurrent_answer_maps_single_work_without_promoting_serial_body_groups(work_count):
+    from shared.chromie_contracts.core_interpretation import CognitiveResponsibilityProposal
+    from shared.chromie_contracts.goal import GoalAssociationResolution
+    from shared.chromie_contracts.semantic_task import SemanticGoal
+    from shared.chromie_contracts.plan import FastPlannerAdvance
+    meaning = CognitiveResponsibilityProposal(local_ref='r1', outcome='Perform the steps and answer.', confidence=1)
+    activities = [activity('nod', {}, {})]
+    if work_count == 2:
+        activities.append(activity('blink', {}, {}))
+    activities.append({'role': 'complete_response', 'activity_id': 'answer',
+                       'source_responsibility_refs': ['r1'], 'rationale': 'Answer concurrently.', 'timing': 'parallel'})
+    advance = FastPlannerAdvance.model_validate({
+        'turn_id': 'single-work', 'disposition': 'mixed', 'coverage': 'complete',
+        'covered_responsibility_refs': ['r1'], 'activities': activities, 'confidence': 1,
+        'metadata': {'execution_groups': [[item['activity_id']] for item in activities[:-1]]},
+    })
+    association = GoalAssociationResolution(turn_id='single-work', resolution_status='resolved', confidence=1,
+        new_goals=[SemanticGoal(goal_id='g', description=meaning.outcome, source_text=meaning.outcome,
+                                source_responsibility_refs=['r1'])])
+    plan = planner_advance_projection.canonical_plan_from_fast_advance(
+        advance=advance, association=association, user_text=meaning.outcome, responsibilities=[meaning])
+    assert [step.timing for step in plan.steps] == ['parallel' if work_count == 1 else 'sequential'] * work_count
+    assert [step.metadata['execution_group'] for step in plan.steps] == list(range(work_count))

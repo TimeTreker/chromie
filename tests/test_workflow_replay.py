@@ -74,8 +74,8 @@ def test_actual_changed_evidence_does_not_receive_frozen_next_plan(tmp_path):
     with pytest.raises(AssertionError):
         asyncio.run(run_case(case, tmp_path, replay))
     assert replay.errors == ['request mismatch at fast-result']
-    # gi, ga, the need-first search pass and the conditional Plan were consumed.
-    assert replay.position == 4
+    # The weather contract is common: UMI, GA and one complete conditional Plan.
+    assert replay.position == 3
 
 
 @pytest.mark.parametrize('count', [None, 3])
@@ -115,6 +115,9 @@ class NeedFirstReplayModel(ReplayModel):
             reply = {'ability_needs': [self.unmet_need], **{k: v for k, v in reply.items() if k != 'ability_needs'}}
         return reply
 
+    async def generate_stream(self, prompt, **kwargs):
+        yield json.dumps(await self.generate(prompt, **kwargs))
+
 
 @pytest.mark.parametrize('mutation', ['valid','label_only','false_completion','missing_obligation','information_quantity'])
 def test_acquisition_count_exception_requires_complete_deferred_effect(mutation, tmp_path):
@@ -125,12 +128,16 @@ def test_acquisition_count_exception_requires_complete_deferred_effect(mutation,
             episode = Episode(case, replay, server.url, tmp_path)
             await episode.begin()
             request = episode.request.model_copy(deep=True)
-            search_pass, planned = case['model_steps'][2], case['model_steps'][3]
-            assert search_pass['need_search_pass'] and planned['name'] == 'fast-initial'
-            unmet = next(item for item in search_pass['response']['ability_needs'] if not item['fits'])
+            planned = case['model_steps'][2]
+            assert planned['name'] == 'fast-initial'
+            unmet = {**planned['response']['ability_needs'][0], 'closest_loaded': 'none',
+                     'closest_loaded_does': 'The library contract is not loaded yet.', 'fits': False}
             raw = replay.materialize(planned['response'])
             raw.pop('ability_needs')
             catalog = copy.deepcopy(case['catalog'])
+            for entry in catalog:
+                if entry['capability_id'] == 'chromie.weather.lookup':
+                    entry['prompt_tier'] = 'rare'
             gid = episode.goal
             if mutation == 'label_only':
                 for capability in catalog:
@@ -148,10 +155,13 @@ def test_acquisition_count_exception_requires_complete_deferred_effect(mutation,
                 request.context['goal_association_resolution']['new_goals'][0]['object'] = {'bindings':typed}
                 request.context['active_goal_snapshots'][0]['goal']['object'] = {'bindings':copy.deepcopy(typed)}
             model = NeedFirstReplayModel(raw, unmet)
-            result = await PlannerResolver(model, StaticCatalog(catalog)).resolve(request)
+            class LookupCatalog(StaticCatalog):
+                async def prompt_entries(self, *, scope, refresh=False):
+                    return [entry for entry in self.items if scope != 'common' or entry.prompt_tier == 'common']
+            result = await PlannerResolver(model, LookupCatalog(catalog)).resolve(request)
             if mutation == 'valid':
-                # The Goal filter hides the forecast read behind a body action; the Planner's
-                # own unmet need loads it, and the one Planner composes the conditional Plan.
+                # A library contract is explicitly unloaded in this lookup contrast.
+                # The fixed primary need loads it before the single complete Plan.
                 assert model.calls == 2
                 assert result.disposition == 'execute', result.metadata
                 assert not result.metadata.get('failure_class')

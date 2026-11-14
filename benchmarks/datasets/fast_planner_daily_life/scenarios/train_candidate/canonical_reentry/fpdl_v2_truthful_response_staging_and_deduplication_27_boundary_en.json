@@ -147,7 +147,6 @@
           "confidence": 0.99,
           "local_ref": "r1",
           "outcome": "Keep the pending blink Goal without duplicate or premature speech.",
-          "output_mode": "body_action",
           "schema_version": 1,
           "source_evidence": {
             "source_end_token_ref": "t999",

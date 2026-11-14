@@ -62,6 +62,7 @@ from orchestrator.runtime.response_plan import (
     initial_social_response_needs, social_response_answered_refs,
 )
 from orchestrator.runtime.long_running_social_skill import apply_social_skill_decision, with_social_skill_context
+from orchestrator.runtime.capability_runtime import StalePlanningSubmissionError
 from orchestrator.runtime import planner_advance_projection
 
 if TYPE_CHECKING:
@@ -391,7 +392,8 @@ class GoalDrivenRuntimeCoordinator:
             None,
         )
         self._auxiliary_execution_tasks: set[asyncio.Task[Any]] = set()
-        self._social_turns: dict[str, tuple[str, asyncio.Task[Any], str]] = {}
+        # request, task, source turn, source session, supplied-Need obligation
+        self._social_turns: dict[tuple[str, str], tuple[str, asyncio.Task[Any], str, str, bool]] = {}
         self._social_dispatches: dict[str, str] = {}
         # Value Judgment verdicts given in a turn, keyed "capability:<id>" or
         # "responsibility:<UMI local_ref>", so a later Plan of the same turn reuses them.
@@ -410,10 +412,10 @@ class GoalDrivenRuntimeCoordinator:
         for interaction_id in ids:
             await self.adapter.interaction_runtime.runtime.cancel_interaction(interaction_id)
 
-    async def _cancel_social_turn(self, previous: tuple[str, asyncio.Task[Any], str] | None) -> None:
+    async def _cancel_social_turn(self, previous: tuple[str, asyncio.Task[Any], str, str, bool] | None) -> None:
         if previous is None:
             return
-        request_id, task, _ = previous
+        request_id, task, *_ = previous
         if not task.done():
             task.cancel()
             await asyncio.gather(task, return_exceptions=True)
@@ -421,7 +423,7 @@ class GoalDrivenRuntimeCoordinator:
         if interaction_id is not None:
             await self.adapter.interaction_runtime.runtime.cancel_interaction(interaction_id)
 
-    def _work_outran_unanswered_turn(self, key: str, request_id: str, snapshot: dict[str, Any] | None, sid: str) -> bool:
+    def _work_outran_unanswered_turn(self, key: tuple[str, str], request_id: str, snapshot: dict[str, Any] | None, sid: str) -> bool:
         """Only Work progress, not a newer SC decision, made the decision of a turn without any reply stale."""
         entry, spoken = self._social_turns.get(key), {"speech_scheduled", "speech_playback_started", "speech_playback_completed"}
         return bool(entry and entry[0] == request_id and snapshot is not None and self.interaction_ledger is not None
@@ -429,7 +431,7 @@ class GoalDrivenRuntimeCoordinator:
                     and not any(event.event_type in spoken for event in self.interaction_ledger.events(sid)))
 
     async def _finish_or_cancel_social_turn(
-        self, previous: tuple[str, asyncio.Task[Any], str] | None, *, turn_id: str,
+        self, previous: tuple[str, asyncio.Task[Any], str, str, bool] | None, *, turn_id: str,
     ) -> None:
         if previous is not None and previous[2] == turn_id and previous[0] in self._social_dispatches:
             # A same-turn state update does not retract already submitted expression.
@@ -492,7 +494,11 @@ class GoalDrivenRuntimeCoordinator:
                     _semantic_lineage_from_context(social_context), plan,
                 ),
             )
-        pending = plan is None if work_decision_pending is None else work_decision_pending
+        planner_refs = self._cognitive_request_responsibility_refs(work_request, "planner")
+        pending = (
+            plan is None and bool(planner_refs)
+            if work_decision_pending is None else work_decision_pending
+        )
         resolved_trigger = trigger or ("work_state" if plan is not None else "interpretation")
         resolved_source_refs = list(source_refs or ([plan.plan_id] if plan is not None else [turn_id]))
         resolved_goal_ids = list(goal_ids or (list(plan.goal_ids) if plan is not None else []))
@@ -511,6 +517,9 @@ class GoalDrivenRuntimeCoordinator:
             communication_needs=list(communication_needs or []),
             context=ContextAssembly.project_context({
                 **social_context, "work_decision_pending": pending,
+                "pending_work_responsibility_refs": (
+                    planner_refs or [item.local_ref for item in work_request.responsibilities]
+                ) if pending else [],
                 **({"canonical_plan_resolution": plan.prompt_projection()} if plan is not None else {}),
                 "history": list(work_request.history),
                 "interaction_context": self._interaction_context(sid=sid, context=social_context),
@@ -530,7 +539,39 @@ class GoalDrivenRuntimeCoordinator:
         if self.policy.mode != "apply" or user_turn_prohibits_speech(work_request.context.get("user_turn_envelope")):
             return None
         sid = str(work_request.sid or "")
-        key = self._goal_association_lock_key(work_request.context, sid)
+        conversation = self._goal_association_lock_key(work_request.context, sid)
+        key = (conversation, turn_id)
+        required = bool(communication_needs or (plan is not None and plan.communication_needs))
+        def overtaken(source_sid: str = sid) -> bool:
+            if required or self.context_refresh is None:
+                return False
+            live = self.context_refresh(source_sid)
+            if self._goal_association_lock_key(live, source_sid) != conversation:
+                return False
+            # Admission publishes ordered user rows before UMI. Read their IDs
+            # only: later people's words never enter this older turn's meaning.
+            history = live.get("history")
+            if not isinstance(history, list):
+                return False
+            own = [index for index, row in enumerate(history) if isinstance(row, dict)
+                   and row.get("role") == "user" and row.get("sid") == source_sid]
+            return bool(own and any(isinstance(row, dict) and row.get("role") == "user"
+                                   and row.get("sid") and row.get("sid") != source_sid
+                                   for row in history[own[-1] + 1:]))
+        if overtaken():
+            logger.info("social_state_obsolete_source sid=%s turn=%s", sid, turn_id)
+            return None
+        # Retain pending independent turns and same-turn question continuity,
+        # without accumulating completed entries for older turns.
+        displaced = []
+        for old_key, entry in tuple(self._social_turns.items()):
+            if old_key[0] == conversation and old_key != key and entry[1].done():
+                self._social_turns.pop(old_key, None)
+            elif (old_key[0] == conversation and old_key != key and not required and not entry[4]
+                  and (self.context_refresh is None or overtaken(entry[3]))):
+                # Keep it registered until cancellation finishes: an immediate
+                # protective interrupt must still find both pending tasks.
+                displaced.append((old_key, entry))
         previous = self._social_turns.get(key)
         primary_plan = plan.model_copy(deep=True) if plan is not None else None
         request = self._state_social_request(
@@ -542,12 +583,16 @@ class GoalDrivenRuntimeCoordinator:
         execution_snapshot: dict[str, Any] | None = None
         def current() -> bool:
             entry = self._social_turns.get(key)
-            return entry is not None and entry[0] == request.request_id and (
+            return entry is not None and entry[0] == request.request_id and not overtaken() and (
                 execution_snapshot is None
                 or self.adapter.interaction_runtime.runtime.execution_state_is_current(execution_snapshot)
             )
         async def run() -> None:
             nonlocal execution_snapshot
+            for old_key, entry in displaced:
+                await self._cancel_social_turn(entry)
+                if self._social_turns.get(old_key) is entry:
+                    self._social_turns.pop(old_key, None)
             await self._finish_or_cancel_social_turn(previous, turn_id=turn_id)
             if not current():
                 return
@@ -611,7 +656,12 @@ class GoalDrivenRuntimeCoordinator:
                 response.metadata["presentation_already_dispatched"] = True
             return result, response
         task = asyncio.create_task(run(), name="social-interpretation:" + turn_id)
-        self._social_turns[key] = (request.request_id, task, turn_id)
+        self._social_turns[key] = (request.request_id, task, turn_id, sid, required)
+        def forget_finished(completed: asyncio.Task[Any]) -> None:
+            entry = self._social_turns.get(key)
+            if entry is not None and entry[1] is completed and (required or overtaken()):
+                self._social_turns.pop(key, None)
+        task.add_done_callback(forget_finished)
         self._track_auxiliary_execution_task(task, session_id=sid)
         return task
 
@@ -619,13 +669,17 @@ class GoalDrivenRuntimeCoordinator:
         self, session: Any, *, plan: CanonicalPlan, work_request: CognitiveWorkRequest,
         session_id: str, language: str, context: dict[str, Any],
         evidence_refs: list[str] | None = None,
+        planning_commit: dict[str, Any] | None = None,
     ) -> InteractionResponse:
         """Let SC fulfill established needs without a second Work judgment."""
         if plan.response_text or plan.communicative_acts or plan.auxiliary_activities or any(
             outcome.response_text for outcome in plan.goal_outcomes
         ):
             raise ValueError("SC cannot review or rewrite a Planner-authored communicative decision")
-        key = self._goal_association_lock_key(context, session_id)
+        if planning_commit is not None:
+            self.adapter.interaction_runtime.runtime.require_current_planning_commit(planning_commit)
+        key = (self._goal_association_lock_key(context, session_id),
+               str(work_request.source_turn_provenance.get("turn_id") or session_id))
         previous = self._social_turns.pop(key, None)
         await self._finish_or_cancel_social_turn(
             previous, turn_id=str(work_request.source_turn_provenance.get("turn_id") or session_id),
@@ -661,6 +715,8 @@ class GoalDrivenRuntimeCoordinator:
             evidence_refs=list(evidence_refs or []), communication_needs=list(plan.communication_needs),
             context=with_social_skill_context(self._social_skill_runtime(), source_context),
         ).model_copy(deep=True)
+        if planning_commit is not None:
+            self.adapter.interaction_runtime.runtime.require_current_planning_commit(planning_commit)
         try:
             result = await self._observe_workflow_stage(
                 sid=session_id, stage="social_cognition", input_payload=request,
@@ -684,6 +740,10 @@ class GoalDrivenRuntimeCoordinator:
                 "error_type": type(exc).__name__,
                 "error": str(exc),
             }) from exc
+        if planning_commit is not None:
+            # The exact model result remains auditable, but an obsolete Work
+            # proposal cannot apply its expression/Skill decision or be adapted.
+            self.adapter.interaction_runtime.runtime.require_current_planning_commit(planning_commit)
         current_interaction = self._interaction_context(sid=session_id, context=current_context, goal_ids=plan.goal_ids)
         for act in result.activities:
             validate_communicative_activity_identity(
@@ -1180,6 +1240,16 @@ class GoalDrivenRuntimeCoordinator:
                 metadata=metadata,
             )
             raise
+        except StalePlanningSubmissionError as exc:
+            self._record_workflow_stage(
+                sid=sid, stage=stage,
+                started_monotonic_ms=started_monotonic_ms,
+                finished_monotonic_ms=time.perf_counter() * 1000.0,
+                status="stale", input_payload=input_payload,
+                output_payload=exc.evidence(), errors=[], attempt=attempt,
+                metadata=metadata,
+            )
+            raise
         except Exception as exc:
             self._record_workflow_stage(
                 sid=sid,
@@ -1552,8 +1622,7 @@ class GoalDrivenRuntimeCoordinator:
             not association.associations
             and bool(association.new_goals)
             and all(
-                str((goal.metadata or {}).get("output_mode") or "") == "speech"
-                and bool(str(goal.goal_id or "").strip())
+                bool(str(goal.goal_id or "").strip())
                 for goal in association.new_goals
             )
         )
@@ -1582,6 +1651,14 @@ class GoalDrivenRuntimeCoordinator:
                         "source": "social_cognition_communicative_completion",
                         "delivery_role": "response",
                         "speech_event_id": speeches[0].id,
+                        "playback_completed": True,
+                        "truth_stages": sorted({item.metadata.get("truth_stage") for item in speeches
+                                                if item.metadata.get("truth_stage")}),
+                        "addressed_need_ids": list(dict.fromkeys(ref for item in speeches
+                            for ref in item.metadata.get("addressed_need_ids") or [])),
+                        "source_responsibility_refs": list(dict.fromkeys(ref for item in speeches
+                            for ref in item.metadata.get("source_responsibility_refs") or [])),
+                        "communication_needs": list((interaction.metadata.get("social_cognition_request") or {}).get("communication_needs") or []),
                         "evidence_refs": list(dict.fromkeys(
                             ref for item in speeches for ref in [
                                 f"communicative_delivery:{item.id}",
@@ -2089,6 +2166,21 @@ class GoalDrivenRuntimeCoordinator:
             raise
         except CognitiveStageFailure as exc:
             return await self._finish_after_stage_failure(run, exc)
+        except StalePlanningSubmissionError as exc:
+            # This rejects only one no-longer-current proposal. It does not
+            # cancel user meaning, Goals, prepared requirements or newer Work,
+            # and is never a reason for another semantic/model repair call.
+            return self._finish(
+                mode=self.policy.mode, status="skipped", association=run.association,
+                fast_plan=run.fast_plan, terminal_plan=run.terminal_plan,
+                goal_state_results=run.goal_state_results, timings=run.timings,
+                started=run.started, metadata={
+                    **self._resolution_path_metadata(run),
+                    "stage_diagnostics": run.stage_diagnostics,
+                    "host_commit_status": "rejected_stale",
+                    "planning_submission_rejection": exc.evidence(),
+                },
+            )
         except Exception as exc:
             return await self._finish_after_runtime_failure(run, exc)
 
@@ -3287,6 +3379,7 @@ class GoalDrivenRuntimeCoordinator:
                 run.planning_commit = await runtime.reserve_planning_submission(
                     run.planning_snapshot, plan_id=run.terminal_plan.plan_id,
                     fingerprint=canonical_plan_fingerprint(run.terminal_plan),
+                    covered_goal_ids=list(run.terminal_plan.goal_ids),
                     prepared_activity_ids=[*selected_prepared, *run.terminal_plan.cancel_activity_ids],
                 )
 
@@ -3404,6 +3497,7 @@ class GoalDrivenRuntimeCoordinator:
                 operation=self.resolve_plan_interaction(
                     run.session, plan=run.terminal_plan, work_request=run.work_request,
                     session_id=run.sid, language=run.language, context=planner_response_context,
+                    planning_commit=run.planning_commit,
                 ),
             )
             run.timings["runtime_adapter"] = (time.perf_counter() - run.stage) * 1000.0
@@ -3455,12 +3549,9 @@ class GoalDrivenRuntimeCoordinator:
 
         await self._cancel_uncommitted_fast_work(run, exc.stage)
 
-        # Parallel cognition cannot retroactively turn an already delivered
-        # conversational Responsibility into a user-visible task failure. Once
-        # Social Cognition actually delivered the fresh speech-only turn, GA and
-        # Planner are optional bookkeeping/HOW cognition for that completed social
-        # act. Preserve their diagnostic failure, but do not apologize, retry, or
-        # re-deliver the same answer. Non-speech Work never enters this containment.
+        # Preserve delivered answers with explicit Need coverage. A delivered
+        # question about UMI's unresolved meaning also stands while awaiting the
+        # person, but establishes no Goal completion or successful Work.
         await self._finish_independent_social_interaction(run)
         delivered_current_interaction = bool(
             run.interaction is not None
@@ -3472,14 +3563,26 @@ class GoalDrivenRuntimeCoordinator:
         # An act's broader source scope cannot override explicit pending Needs.
         answered_refs = social_response_answered_refs(run.interaction) if run.interaction is not None else set()
         conversational_only = bool(run.work_request.responsibilities) and all(
-            item.output_mode == "speech" and item.local_ref in answered_refs
+            item.local_ref in answered_refs
             for item in run.work_request.responsibilities
         )
-        if delivered_current_interaction and conversational_only and run.interaction is not None:
+        awaiting_meaning = False
+        if delivered_current_interaction and exc.stage == "goal_association" and not run.planner_refs and run.interaction is not None:
+            request_payload = run.interaction.metadata.get("social_cognition_request")
+            resolution_payload = run.interaction.metadata.get("social_cognition_resolution")
+            if isinstance(request_payload, dict) and isinstance(resolution_payload, dict):
+                request = SocialCognitionRequest.model_validate(request_payload)
+                resolution = SocialCognitionResolution.model_validate(resolution_payload)
+                awaiting_meaning = (
+                    {item.local_ref for item in run.work_request.responsibilities}
+                    <= {item.local_ref for item in request.responsibilities}
+                    and answer_awaited(resolution, request)
+                )
+        if delivered_current_interaction and (conversational_only or awaiting_meaning) and run.interaction is not None:
             run.direct_social_completion_results = (
                 self._reconcile_delivered_direct_social_response(
                     association=run.association, interaction=run.interaction, sid=run.sid,
-                ) if run.association is not None else []
+                ) if conversational_only and run.association is not None else []
             )
             return self._finish(
                 mode=self.policy.mode,

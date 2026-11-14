@@ -6,7 +6,6 @@
   "expected": {
     "responsibilities": [
       {
-        "output_mode": "body_action",
         "outcome_contains_any": [
           "gaze",
           "look",
@@ -38,15 +37,13 @@
     "responsibilities": [
       {
         "local_ref": "r1",
-        "output_mode": "body_action",
         "outcome": "Look at me for three seconds.",
         "confidence": 1.0,
         "source_evidence": {
           "source_start_token_ref": "t0",
           "source_end_token_ref": "t6"
         },
-        "continuity_scope": "goal",
-        "body_effect_family": "gaze_or_orientation"
+        "value_review": false
       }
     ],
     "meaning_uncertainties": [],
@@ -55,8 +52,7 @@
         "authority": "planner",
         "responsibility_refs": [
           "r1"
-        ],
-        "reason_summary": "Explicit authored fixture requests the existing cognitive owner."
+        ]
       }
     ]
   },

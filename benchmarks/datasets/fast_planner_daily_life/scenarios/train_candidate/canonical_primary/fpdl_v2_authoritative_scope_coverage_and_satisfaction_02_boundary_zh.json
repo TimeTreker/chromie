@@ -139,7 +139,6 @@
           "confidence": 0.99,
           "local_ref": "r1",
           "outcome": "说一句鼓励的话。",
-          "output_mode": "speech",
           "schema_version": 1,
           "source_evidence": {
             "source_end_token_ref": "t999",
@@ -153,7 +152,6 @@
           "confidence": 0.99,
           "local_ref": "r2",
           "outcome": "正好眨眼两次。",
-          "output_mode": "body_action",
           "schema_version": 1,
           "source_evidence": {
             "source_end_token_ref": "t999",
@@ -167,7 +165,6 @@
           "confidence": 0.99,
           "local_ref": "r3",
           "outcome": "向前走五秒。",
-          "output_mode": "body_action",
           "schema_version": 1,
           "source_evidence": {
             "source_end_token_ref": "t999",

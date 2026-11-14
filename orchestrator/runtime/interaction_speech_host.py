@@ -15,6 +15,23 @@ from shared.chromie_contracts.interaction import (
 )
 
 
+def _validate_speech_truth_reuse(metadata: dict[str, Any], event: dict[str, Any]) -> None:
+    """Replay preserves the semantic facts from the original SC invocation."""
+    def stages(facts: dict[str, Any]) -> list[str]:
+        singular, plural = facts.get("truth_stage"), facts.get("truth_stages") or []
+        if singular:
+            if plural and plural != [singular]:
+                raise ValueError("Communicative Activity truth fields conflict")
+            return [singular]
+        return plural
+
+    # Ingress carries one SC act; Plan projection carries its one-element stage
+    # list. Compare those equivalent facts without rewriting the retained event,
+    # inventing a missing stage, or collapsing a multi-act stage sequence.
+    if stages(metadata) != stages(event) or metadata.get("progress_kind") != event.get("progress_kind"):
+        raise ValueError("Communicative Activity truth cannot change under one identity")
+
+
 async def cancel_interaction_speech(
     host: Any,
     request: CapabilityRequest,
@@ -153,6 +170,7 @@ async def schedule_interaction_speech(
                     continue
                 if host.normalize_tts_candidate(str(args.get("text") or "")) != item.get("text"):
                     raise ValueError("Communicative Activity wording cannot change under one identity")
+                _validate_speech_truth_reuse(metadata, item)
                 return str(item.get("status") or "")
             return ""
 
@@ -312,6 +330,7 @@ async def schedule_interaction_speech(
             if existing_event is not None:
                 if host.normalize_tts_candidate(str(args.get("text") or "")) != existing_event.get("text"):
                     raise ValueError("Communicative Activity wording cannot change under one identity")
+                _validate_speech_truth_reuse(metadata, existing_event)
                 if existing_event.get("status") == "not_delivered":
                     existing_event = None
             if existing_event is not None:
@@ -343,12 +362,12 @@ async def schedule_interaction_speech(
                     if isinstance(item, int)
                     or (isinstance(item, str) and item.isdigit())
                 ]
-                speech_event = host._register_turn_speech_event(
+                speech_event = host.playback_delivery.register_turn_speech_event(
                     session_id=session_id,
                     origin_session_id=origin_session_id,
                     generation=int(scheduled.get("generation") or 0),
                     orders=orders,
-                    text=text,
+                    normalized_text=host.normalize_tts_candidate(text),
                     stage=(
                         str(metadata.get("phase") or "interaction_speech")
                         if isinstance(metadata, dict)
@@ -388,6 +407,9 @@ async def schedule_interaction_speech(
                     wording_owner=(
                         str(metadata.get("wording_owner") or "") if isinstance(metadata, dict) else ""
                     ),
+                    truth_stage=metadata.get("truth_stage") if isinstance(metadata, dict) else None,
+                    truth_stages=metadata.get("truth_stages") if isinstance(metadata, dict) else None,
+                    progress_kind=metadata.get("progress_kind") if isinstance(metadata, dict) else None,
                     turn_id=(
                         str(metadata.get("turn_id") or session_id or "")
                         if isinstance(metadata, dict)

@@ -128,21 +128,22 @@ The following specialized tools remain useful at their owning boundaries:
 The repository policy checker is the canonical aggregate gate. Specialized
 checks do not create separate policy authority.
 
-## Size ratchets and blocking ownership checks
+## Size review and blocking ownership checks
 
-Runtime structure size is a ratchet: it may shrink but not grow. Do not split
-files, move methods or trim useful evidence merely to pass the gate; move new
-behavior to its owner instead of growing the composition root or a god file.
+In every phase, including before target-evidence closure, file length,
+method/property count, initializer size and document/reading-path count are
+review measurements, not mechanical pass conditions. Extract or consolidate
+when ownership, independent testing, configuration authority or failure semantics
+become clearer. Do not split files, move methods or trim useful evidence merely
+to change a count. Review must establish why behavior belongs to its owner.
 
-`scripts/check_runtime_structure.py` fails when VoiceAssistant method/property
-counts, initializer lines or initialized attributes rise above `size_baselines`,
-or when a file listed in `file_line_baselines` grows above its recorded line
-count, both in `config/runtime_structure_ratchets.json`. It also rejects missing
-collaborators, lifecycle state returning to the composition root, forbidden
-compatibility methods and direct legacy Host model calls. A class under its
-baselines may still be wrong; review must still establish correct ownership and
-an understandable implementation. When a change shrinks a measured value, lower
-the baseline in the same change. Raising a baseline requires a reviewed reason.
+`scripts/check_runtime_structure.py` reports VoiceAssistant method/property
+counts, initializer lines, initialized attributes and file lengths against the
+review baselines in `config/runtime_structure_ratchets.json`. Positive and negative
+deltas remain visible; growth alone does not fail the gate. Missing collaborators,
+lifecycle state returning to the composition root, forbidden compatibility methods,
+direct legacy Host model calls and malformed baseline configuration still fail.
+Keep the measured revision explicit when updating a baseline after review.
 
 `scripts/check_docs.py` reports owner-document lines, core reading-path length and
 maintained/root-doc Markdown counts using `config/documentation_authority.json`.

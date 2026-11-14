@@ -74,7 +74,6 @@
           "confidence": 0.99,
           "local_ref": "r1",
           "outcome": "Blink a user-chosen number of times that is not yet specified.",
-          "output_mode": "body_action",
           "schema_version": 1,
           "source_evidence": {
             "source_end_token_ref": "t999",

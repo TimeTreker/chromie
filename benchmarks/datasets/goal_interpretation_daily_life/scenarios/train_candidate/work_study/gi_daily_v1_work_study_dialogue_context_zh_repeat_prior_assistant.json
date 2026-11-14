@@ -29,13 +29,11 @@
         {
           "local_ref": "r1",
           "outcome": "复述上一条已接受的 Chromie 发言 (你刚才说了什么)",
-          "output_mode": "speech",
           "confidence": 1.0,
           "source_evidence": {
             "source_start_token_ref": "t0",
             "source_end_token_ref": "t6"
           },
-          "continuity_scope": "turn",
           "value_review": false
         }
       ],
@@ -47,7 +45,6 @@
       "responsibilities": [
         {
           "local_ref": "r1",
-          "output_mode": "speech",
           "outcome_contains_any": [
             "复述",
             "刚才",
@@ -55,7 +52,8 @@
           ],
           "required_intent_details": {
             "prior_assistant_utterance": "会议改到三号房间。"
-          }
+          },
+          "value_review": false
         }
       ],
       "unresolved": false,
@@ -70,11 +68,14 @@
       "activities",
       "binding_items",
       "bindings",
+      "body_effect_family",
       "capability_id",
+      "continuity_scope",
       "coordination",
       "execution_lane",
       "goal_id",
       "information_gaps",
+      "output_mode",
       "plan",
       "provider_id",
       "relationship",

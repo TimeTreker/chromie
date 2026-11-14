@@ -17,22 +17,19 @@
       "confidence": 0.91,
       "responsibilities": [
         {
-          "schema_version": 1,
           "local_ref": "r1",
           "outcome": "tell the user a short joke about robots",
           "confidence": 0.91,
-          "output_mode": "speech",
-          "continuity_scope": "goal"
+          "value_review": false
         }
       ],
       "meaning_uncertainties": [],
       "cognitive_requests": [
         {
-          "authority": "social_cognition",
+          "authority": "planner",
           "responsibility_refs": [
             "r1"
-          ],
-          "reason_summary": "Explicit authored fixture requests the existing cognitive owner."
+          ]
         }
       ]
     }
@@ -48,8 +45,7 @@
       {
         "local_ref": "r1",
         "outcome": "tell the user a short joke about robots",
-        "confidence": 0.91,
-        "output_mode": "speech"
+        "confidence": 0.91
       }
     ]
   }

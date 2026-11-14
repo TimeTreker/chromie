@@ -471,7 +471,7 @@ def reference_case(family, action, value_index, form):
 
 
 def current_contract_reference(case):
-    """Author existing required WHAT metadata and remove retired GA and Planner wire fields.
+    """Migrate reviewed WHAT-only wire and immutable need-first identity explicitly.
 
     This is explicit corpus maintenance, never part of load_case or strict replay.
     The action is an authored scenario parameter, not inferred from model output.
@@ -481,16 +481,16 @@ def current_contract_reference(case):
     per-Goal ``goal_outcomes[*].satisfaction`` the reply still carries.
     """
     case = copy.deepcopy(case)
-    action = case.get('parameters', {}).get('action', 'blink')
-    body_family = {'walk': 'task_physical_effect', 'blink': 'social_expression',
-                   'nod': 'social_expression', 'shake': 'social_expression'}
-    multi = case.get('coverage_family') in {'multi_goal', 'multi_goal_omission', 'plan_conflicting_resource'}
     for step in case['model_steps']:
         if step['role'] == 'umi':
-            for index, responsibility in enumerate(step['response']['responsibilities']):
-                if responsibility['output_mode'] == 'body_action':
-                    selected = ('walk' if action == 'blink' else 'blink') if multi and index == 1 else action
-                    responsibility['body_effect_family'] = body_family[selected]
+            raw = step['response']
+            raw.pop('schema_version', None)
+            for responsibility in raw['responsibilities']:
+                for field in ('output_mode', 'body_effect_family', 'continuity_scope'):
+                    responsibility.pop(field, None)
+                responsibility.setdefault('value_review', False)
+            for request in raw.get('cognitive_requests', []):
+                request.pop('reason_summary', None)
         elif step['role'] == 'ga':
             if (step['response'].get('decision') not in {None, 'create_goals'}
                     or step['response'].get('non_goal_responsibility_refs')):
@@ -499,6 +499,33 @@ def current_contract_reference(case):
             step['response'].pop('non_goal_responsibility_refs', None)
         elif step['role'] == 'fast' and isinstance(step['response'], dict):
             step['response'].pop('goal_satisfaction', None)
+            if case.get('coverage_family') == 'plan_false_satisfaction':
+                # Keep the accepted ability of the unchanged positive contrast.
+                # The fault changes realization to a zero-Work response, not WHAT.
+                step['response']['ability_needs'] = [
+                    {'need': f'realize {item["capability"]}',
+                     'closest_loaded': item['capability'],
+                     'closest_loaded_does': f'declared contract of {item["capability"]}'[:80],
+                     'fits': True}
+                    for item in case['expected_provider_calls']]
+    # The complete common weather contract is now visible without a UMI category
+    # filter. Its old synthetic unmet-prefix call is no longer a valid transaction.
+    # Preserve its WHAT wording in the single complete authored Plan instead.
+    obsolete_search = set()
+    for position, (before, after) in enumerate(zip(case['model_steps'], case['model_steps'][1:])):
+        if before['name'].endswith('-search'):
+            accepted = before['response']['ability_needs']
+            loaded = after['response']['ability_needs']
+            if len(accepted) != len(loaded):
+                raise ValueError('Contract lookup cannot change authored ability-need count')
+            for prior, current in zip(accepted, loaded):
+                current['need'] = prior['need']
+            common_ids = {item['capability_id'] for item in case['catalog']
+                          if item.get('prompt_tier') == 'common'}
+            if all(item['fits'] and item['closest_loaded'] in common_ids for item in loaded):
+                obsolete_search.add(position)
+    case['model_steps'] = [step for position, step in enumerate(case['model_steps'])
+                           if position not in obsolete_search]
     return case
 
 
@@ -521,7 +548,6 @@ def _intent_reference(case):
                     r.pop(key, None)
                 if forbidden is not None:
                     r['binding_items'] = {'invented_owner_field':forbidden}
-                r['continuity_scope'] = 'turn' if r['output_mode'] == 'speech' else 'goal'
             refs = list(dict.fromkeys(r['local_ref'] for r in raw['responsibilities']))
             if 'unresolved' in raw:
                 raw['meaning_uncertainties'] = [
@@ -533,8 +559,6 @@ def _intent_reference(case):
                 'reason_summary': 'Run the explicitly authored role transaction.'}]
         elif step['role'] == 'ga':
             raw['cognitive_requests'] = []
-            if any(r['output_mode'] == 'speech' for r in primary):
-                raw['non_goal_responsibility_refs'] = []
             for g in raw.get('new_goals', []):
                 mutant = g.get('bindings') if family == 'ga_binding_mutation' else None
                 for key in tuple(g):
@@ -574,7 +598,7 @@ def _intent_reference(case):
                     'escalation_reason': raw.get('escalation_reason', ''),
                 }
     case['reference_review'] = 'Owner-approved GI/GA intent-authority migration; Planner quotes and expected values authored before replay; non-independent.'
-    case['provenance']['authority_migration'] = 'GI preserves complete intent/type, GA inherits intent and owns continuity, Planner authors arguments and source-bound readiness.'
+    case['provenance']['authority_migration'] = 'UMI preserves complete contextual WHAT; GA inherits meaning and owns continuity; Planner authors methods, Work, Needs, arguments and source-bound readiness.'
     return case
 
 

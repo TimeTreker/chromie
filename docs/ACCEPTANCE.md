@@ -31,6 +31,13 @@ check, not permission to delay physical Work or change cognition decisions.
 Focused lifecycle and live-text evidence is recorded in Status; broader qualification
 and physical delivery remain separate.
 
+Observation chronology uses correlated Runtime receipt timestamps on the session
+clock and observed playback onset (completion only for older logs without onset),
+never synthesis scheduling time or the Agent's elapsed duration. Reused playback
+orders are separate scheduled instances; failed, aborted or partly played speech
+does not prove complete utterance delivery. Type-sequence checks still require the
+semantic rubric to identify which utterance fulfilled the requested effect.
+
 ## Scope of validation and semantic evidence
 
 For implementers, reviewers, and operators, this section owns the validation-claim
@@ -819,8 +826,12 @@ an acceptance-runner option, not a product behavior switch. Every case still own
 its normal Host teardown and a fresh provider/service/safe-idle preflight; invalid
 state prevents that case's input admission and execution. Do not bypass guards,
 reset an emergency, change source, or restart services to manufacture coverage.
-This option rejects `--allow-non-sim`. Failed dependent turns can still end their
-own multi-turn episode; subsequent independent cases are attempted.
+This option rejects `--allow-non-sim`. Within a multi-turn episode it also attempts
+later turns through their normal preflight, preserving the same conversation and
+every earlier failure. An ordinary turn exception is retained as a failed turn;
+outer cancellation or the case deadline can still end the episode, with any
+unattempted turns reported explicitly. An abandoned, interrupted session is a
+failure rather than a reason to wait for its normal completion deadline.
 
 The summary retains every `integrity_failure`, case-attempt coverage and pass rate
 over the entire selected set. A blocked case scores as a failure, not a skipped

@@ -22,14 +22,12 @@
         {
           "local_ref": "r1",
           "outcome": "稳稳地向左移动三米",
-          "output_mode": "body_action",
           "confidence": 1.0,
           "source_evidence": {
             "source_start_token_ref": "t0",
             "source_end_token_ref": "t8"
           },
-          "continuity_scope": "goal",
-          "body_effect_family": "task_physical_effect"
+          "value_review": false
         }
       ],
       "meaning_uncertainties": [],
@@ -38,15 +36,13 @@
           "authority": "goal_association",
           "responsibility_refs": [
             "r1"
-          ],
-          "reason_summary": "Preserve canonical continuity for the requested independent outcome."
+          ]
         },
         {
           "authority": "planner",
           "responsibility_refs": [
             "r1"
-          ],
-          "reason_summary": "Determine the Work or information acquisition needed for the requested outcome."
+          ]
         }
       ]
     },
@@ -55,7 +51,6 @@
       "responsibilities": [
         {
           "local_ref": "r1",
-          "output_mode": "body_action",
           "outcome_contains_any": [
             "移动",
             "走"
@@ -65,7 +60,7 @@
             "distance": "三米",
             "speed": "稳稳地"
           },
-          "body_effect_family": "task_physical_effect"
+          "value_review": false
         }
       ],
       "unresolved": false,
@@ -80,11 +75,14 @@
       "activities",
       "binding_items",
       "bindings",
+      "body_effect_family",
       "capability_id",
+      "continuity_scope",
       "coordination",
       "execution_lane",
       "goal_id",
       "information_gaps",
+      "output_mode",
       "plan",
       "provider_id",
       "relationship",

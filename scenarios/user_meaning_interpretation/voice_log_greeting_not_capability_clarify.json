@@ -24,25 +24,15 @@
               "local_ref": "r1",
               "outcome": "Hello, how are you.",
               "confidence": 0.94,
-              "output_mode": "speech",
               "source_evidence": {
                 "source_start_token_ref": "t0",
                 "source_end_token_ref": "t5"
               },
-              "continuity_scope": "goal",
               "value_review": false
             }
           ],
           "meaning_uncertainties": [],
-          "cognitive_requests": [
-            {
-              "authority": "social_cognition",
-              "responsibility_refs": [
-                "r1"
-              ],
-              "reason_summary": "Explicit authored fixture requests the existing cognitive owner."
-            }
-          ]
+          "cognitive_requests": []
         }
       }
     ]
@@ -58,8 +48,7 @@
       {
         "local_ref": "r1",
         "outcome": "Hello, how are you.",
-        "confidence": 0.94,
-        "output_mode": "speech"
+        "confidence": 0.94
       }
     ]
   }

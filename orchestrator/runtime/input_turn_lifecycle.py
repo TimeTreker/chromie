@@ -18,6 +18,7 @@ PendingVadAudio: TypeAlias = bytes | tuple[bytes, bool, int | None]
 
 @dataclass
 class InputTurnLifecycle:
+    admission_lock: asyncio.Lock = field(default_factory=asyncio.Lock)
     loop: asyncio.AbstractEventLoop | None = None
     mic_queue: asyncio.Queue = field(
         default_factory=lambda: asyncio.Queue(maxsize=50)
@@ -166,6 +167,7 @@ class InputTurnLifecycle:
         return tuple(tasks)
 
     def reset(self) -> None:
+        self.admission_lock = asyncio.Lock()
         self.loop = None
         self.vad_leftover = b""
         self.vad_segment_started_during_playback = False

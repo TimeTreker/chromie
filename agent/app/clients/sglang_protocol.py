@@ -8,6 +8,7 @@ from typing import Any
 from ..inference_compute import CognitionComputeClass, compute_rank
 
 from shared.chromie_contracts.json_schema import expose_intersection_shapes
+from ..planner_native_schema import share_planner_source_contracts
 
 
 def sglang_priority(
@@ -41,7 +42,8 @@ def candidate_compatible_schema(
                 node.pop("uniqueItems", None)
                 removed.append(f"{path}.uniqueItems")
             for key, value in node.items():
-                visit(value, f"{path}.{key}")
+                if key not in {"const", "enum", "default", "examples"}:
+                    visit(value, f"{path}.{key}")
         elif isinstance(node, list):
             for index, value in enumerate(node):
                 visit(value, f"{path}[{index}]")
@@ -84,56 +86,47 @@ def _stream_decoder_constraints(node: Any, *, _seen: set[int] | None = None) -> 
                 if not (isinstance(bound, (int, float)) and not isinstance(bound, bool)
                         and float(bound).is_integer()):
                     node.pop(key, None)
-        for value in node.values():
-            _stream_decoder_constraints(value, _seen=seen)
+        for key, value in node.items():
+            if key not in {"const", "enum", "default", "examples"}:
+                _stream_decoder_constraints(value, _seen=seen)
     elif isinstance(node, list):
         for value in node:
             _stream_decoder_constraints(value, _seen=seen)
 
 
-def _share_stream_source_spans(schema: dict[str, Any]) -> None:
-    """Keep identical provenance grammars shared across Capability/state branches."""
-    definitions = schema.setdefault("$defs", {})
-    known: dict[str, str] = {}
+def share_planner_schema_contracts(schema: dict[str, Any]) -> None:
+    """Share identical contracts without dropping or translating constraints.
 
-    def visit(node: Any) -> None:
-        if isinstance(node, dict):
-            sources = node.get("properties", {}).get("argument_sources", {})
-            for name, contract in list(sources.get("properties", {}).items()):
-                if not isinstance(contract, dict) or "$ref" in contract:
-                    continue
-                encoded = json.dumps(contract, ensure_ascii=False, separators=(",", ":"))
-                if encoded not in known:
-                    key = f"FastArgumentSourceSpan{len(known)}"
-                    while key in definitions:
-                        key += "_"
-                    definitions[key] = contract
-                    known[encoded] = key
-                sources["properties"][name] = {"$ref": f"#/$defs/{known[encoded]}"}
-            for key, value in node.items():
-                if key != "$defs":
-                    visit(value)
-        elif isinstance(node, list):
-            for value in node:
-                visit(value)
+    The serving adapter and offline meta-validation use the same lossless graph
+    projection; qualification still retains the exact original production packet.
+    """
+    share_planner_source_contracts(schema)
+    _share_stream_activity_branches(schema)
 
-    visit(schema)
 
 
 def _share_stream_activity_branches(schema: dict[str, Any]) -> None:
-    """Compile each distinct Activity branch once across decision states.
+    """Compile each distinct Activity/state contract once across states.
 
     Decision states repeat the same Capability branches; XGrammar compiles every inline
     copy, so a two-Responsibility turn's grammar took 2.7 s instead of 1.1 s. Identical
     branches become one shared definition; the decoded language is unchanged.
+    Parallel timing alternatives also repeat whole slot unions in nested arrays.
+    Sharing only their leaf branches still recompiles those unions at every position.
+    Decision and Activity fields repeat too; share them bottom-up, preserving every
+    keyword and the original property order rather than dropping constraints.
     """
     definitions = schema.setdefault("$defs", {})
     known: dict[str, str] = {}
+    # Replacements can release duplicate containers. Keep visited nodes alive
+    # until this pass ends so their ids cannot be reused for unvisited nodes.
+    visited: dict[int, Any] = {}
 
     def share(branch: Any) -> Any:
         if not isinstance(branch, dict) or "$ref" in branch:
             return branch
-        encoded = json.dumps(branch, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+        visit(branch)
+        encoded = json.dumps(branch, ensure_ascii=False, separators=(",", ":"))
         if encoded not in known:
             key = f"FastActivityBranch{len(known)}"
             while key in definitions:
@@ -142,20 +135,53 @@ def _share_stream_activity_branches(schema: dict[str, Any]) -> None:
             known[encoded] = key
         return {"$ref": f"#/$defs/{known[encoded]}"}
 
-    for state in schema.get("oneOf") or []:
-        activities = state.get("properties", {}).get("activities", {}) if isinstance(state, dict) else {}
-        items = activities.get("items")
-        if not isinstance(items, dict) or not isinstance(items.get("oneOf"), list):
-            continue
-        items["oneOf"] = [share(branch) for branch in items["oneOf"]]
-        # A decided Responsibility's own Activity offers the same branches.
-        prefix = activities.get("prefixItems")
-        if isinstance(prefix, list):
-            activities["prefixItems"] = [
-                {**member, "oneOf": [share(branch) for branch in member["oneOf"]]}
-                if isinstance(member, dict) and isinstance(member.get("oneOf"), list) else share(member)
-                for member in prefix
-            ]
+    def slot(member: Any) -> Any:
+        if not isinstance(member, dict) or "$ref" in member:
+            return member
+        for key in ("oneOf", "anyOf"):
+            if isinstance(member.get(key), list):
+                member[key] = [share(branch) for branch in member[key]]
+        return share(member)
+
+    def array(contract: Any) -> Any:
+        if not isinstance(contract, dict):
+            return contract
+        if "$ref" in contract:
+            return contract
+        if isinstance(contract.get("items"), dict):
+            contract["items"] = slot(contract["items"])
+        if isinstance(contract.get("prefixItems"), list):
+            contract["prefixItems"] = [slot(member) for member in contract["prefixItems"]]
+        for key in ("oneOf", "anyOf", "allOf"):
+            if isinstance(contract.get(key), list):
+                contract[key] = [array(alternative) for alternative in contract[key]]
+        return contract
+
+    def visit(node: Any) -> None:
+        if isinstance(node, (dict, list)):
+            if id(node) in visited:
+                return
+            visited[id(node)] = node
+        if isinstance(node, dict):
+            activities = (node.get("properties") or {}).get("activities")
+            if activities is not None:
+                node["properties"]["activities"] = array(activities)
+            for key, value in node.items():
+                if key == "properties" and isinstance(value, dict):
+                    for name, contract in list(value.items()):
+                        visit(contract)
+                        value[name] = share(contract)
+                elif key not in {"$defs", "const", "enum", "default", "examples"}:
+                    visit(value)
+        elif isinstance(node, list):
+            for value in node:
+                visit(value)
+
+    # Existing shared states may also own arrays. Do not visit definitions just
+    # created by this pass: turning one into a reference to itself changes admission.
+    for definition in tuple(definitions.values()):
+        visit(definition)
+    visit(schema)
 
 
 def _bound_ga_ownership_rows(schema: dict[str, Any]) -> None:
@@ -177,6 +203,23 @@ def _bound_ga_ownership_rows(schema: dict[str, Any]) -> None:
         rows = schema.get("properties", {}).get(name)
         if isinstance(rows, dict):
             rows["maxItems"] = min(rows.get("maxItems", len(association_refs)), len(association_refs))
+    if len(association_refs) == 1:
+        # contains/not in the authoritative allOf are ignored by XGrammar. With
+        # one source, the complete ownership partition is exactly these two
+        # shapes. Keep all fields and both legal decisions; never repair output.
+        properties = schema.get("properties", {})
+        branches = []
+        for owner in ("associations", "new_goals"):
+            if properties.get(owner, {}).get("maxItems") == 0:
+                continue
+            fields = copy.deepcopy(properties)
+            for name in ("associations", "new_goals"):
+                fields[name]["minItems"] = 1 if name == owner else 0
+                fields[name]["maxItems"] = 1 if name == owner else 0
+            branches.append({"type": "object", "additionalProperties": False,
+                             "properties": fields, "required": list(schema.get("required", []))})
+        schema.pop("anyOf", None)
+        schema["oneOf"] = branches
 
 
 def _complete_ga_change_branches(schema: dict[str, Any]) -> None:
@@ -324,11 +367,26 @@ def _ga_relationship_branches(schema: dict[str, Any]) -> None:
         return {"type": "object", "additionalProperties": False, "properties": shape,
                 "required": [*association.get("required", []), *([required_field] if required_field else [])]}
 
+    ordinary = [name for name in relationships if name not in {"modify", "clarify", "merge"}]
     branches = [
         *([branch(updates, "requirement_changes")] if updates and can_change else []),
         *([branch(updates, "resolved_gap_ids")] if updates and can_resolve else []),
-        branch([name for name in relationships if name not in {"modify", "clarify"}], None),
+        *([branch(ordinary, None)] if ordinary else []),
     ]
+    if "merge" in relationships:
+        targets = (fields.get("target_goal_ids") or {}).get("items", {}).get("enum")
+        # The DTO normalizes target identities before requiring two distinct
+        # Goals. Prefix pairs preserve every legal order without relying on
+        # unsupported uniqueItems or enumerating factorial-sized whole lists.
+        pairs = itertools.permutations(targets, 2) if isinstance(targets, list) else [None]
+        for pair in pairs:
+            merged = branch(["merge"], None)
+            ids = merged["properties"]["target_goal_ids"]
+            ids["minItems"] = max(2, ids.get("minItems", 0))
+            if pair is not None:
+                ids["prefixItems"] = [{"type": "string", "const": goal_id} for goal_id in pair]
+                ids["maxItems"] = len(targets)
+            branches.append(merged)
     association.pop("allOf", None)
     association.pop("anyOf", None)
     association["oneOf"] = branches
@@ -361,8 +419,7 @@ def _openai_response_format(response_format: Any) -> dict[str, Any] | None:
             # their existing shape for decoding; original DTO/Host rules remain.
             expose_intersection_shapes(schema)
         if schema.get("title") == "FastPlannerWorkAdvanceOutput":
-            _share_stream_source_spans(schema)
-            _share_stream_activity_branches(schema)
+            share_planner_schema_contracts(schema)
         if schema.get("title") in {
             "GoalAssociationModelOutput", "GoalSegmentationModelOutput",
             "AgentSkillSelectionModelOutput",
@@ -458,7 +515,19 @@ def assert_no_sglang_reasoning(payload: dict[str, Any]) -> None:
                 raise ValueError("SGLang response exposed reasoning output")
 
 
+def _raise_sglang_provider_error(payload: dict[str, Any]) -> None:
+    error = payload.get("error")
+    if error is None:
+        return
+    message = error.get("message", "unknown provider failure") if isinstance(error, dict) else error
+    # A compilation error can append the complete private Schema to its message.
+    # Retain the cause without copying that payload into downstream failure notices.
+    message = str(message).split("req.grammar_key", 1)[0].strip()[:500]
+    raise ValueError("SGLang provider error: " + message)
+
+
 def sglang_completion_content(payload: dict[str, Any]) -> tuple[str, str | None]:
+    _raise_sglang_provider_error(payload)
     assert_no_sglang_reasoning(payload)
     choices = payload.get("choices")
     if not isinstance(choices, list) or not choices or not isinstance(choices[0], dict):
@@ -475,6 +544,7 @@ def sglang_completion_content(payload: dict[str, Any]) -> tuple[str, str | None]
 
 
 def sglang_stream_delta(payload: dict[str, Any]) -> tuple[str, str | None]:
+    _raise_sglang_provider_error(payload)
     assert_no_sglang_reasoning(payload)
     choices = payload.get("choices")
     if not isinstance(choices, list) or not choices or not isinstance(choices[0], dict):

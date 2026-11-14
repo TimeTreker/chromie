@@ -159,7 +159,6 @@
           "confidence": 0.99,
           "local_ref": "r1",
           "outcome": "仅在指定未来时间 Goal 就绪后查询杭州天气。",
-          "output_mode": "information",
           "schema_version": 1,
           "source_evidence": {
             "source_end_token_ref": "t999",

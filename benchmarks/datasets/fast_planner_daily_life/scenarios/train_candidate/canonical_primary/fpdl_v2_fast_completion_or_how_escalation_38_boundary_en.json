@@ -113,7 +113,6 @@
           "confidence": 0.99,
           "local_ref": "r1",
           "outcome": "Check the forecast and conditionally create the reminder only when rain is forecast.",
-          "output_mode": "stateful_effect",
           "schema_version": 1,
           "source_evidence": {
             "source_end_token_ref": "t999",

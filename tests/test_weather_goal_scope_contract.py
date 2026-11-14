@@ -71,17 +71,13 @@ async def test_weather_goal_to_planner_preserves_information_and_temporal_scope(
     source = UserMeaningInterpretationRequest(text=text)
     schema = OllamaUserMeaningInterpreter._user_meaning_interpretation_response_schema(admitted_turn=text)
     primary = {"confidence": 1.0, "responsibilities": [{
-        "local_ref": "r1", "outcome": text, "output_mode": "information", "confidence": 1.0,
-        "continuity_scope": "goal",
+        "local_ref": "r1", "outcome": text, "confidence": 1.0, "value_review": False,
+
         "source_evidence": {"source_start_token_ref": "t0",
             "source_end_token_ref": _source_tokens(text)[-1]["ref"]},
     }], "cognitive_requests": [
-        {"authority": "goal_association", "responsibility_refs": ["r1"],
-         "reason_summary": "Check canonical continuity."},
-        {"authority": "social_cognition", "responsibility_refs": ["r1"],
-         "reason_summary": "Consider interaction."},
-        {"authority": "planner", "responsibility_refs": ["r1"],
-         "reason_summary": "Meaning is ready for HOW."},
+        {"authority": "goal_association", "responsibility_refs": ["r1"]},
+        {"authority": "planner", "responsibility_refs": ["r1"]},
     ], "meaning_uncertainties": []}
     interpreted = OllamaUserMeaningInterpreter._validate_interpretation_content(
         source, json.dumps(primary), response_schema=schema,
@@ -108,7 +104,7 @@ async def test_weather_goal_to_planner_preserves_information_and_temporal_scope(
     validator.validate(ga_wire)
     assert resolution.resolution_status == "resolved"
     canonical = resolution.new_goals[0]
-    assert canonical.metadata["output_mode"] == "information"
+    assert "output_mode" not in canonical.metadata
     assert canonical.source_responsibility_refs == ["r1"]
     assert canonical.description == text
     assert not canonical.object.get("bindings")
@@ -233,7 +229,7 @@ async def test_fast_query_location_cites_span_of_own_intent_and_original_source(
         start = next(t["ref"] for t in tokens if t["surface"] == "Beijing")
         own_span = {"source_start_token_ref": start, "source_end_token_ref": tokens[-1]["ref"]}
     request = CognitiveWorkRequest(text=text, responsibilities=[{
-        "local_ref": "r1", "outcome": outcome, "output_mode": "information",
+        "local_ref": "r1", "outcome": outcome,
         "confidence": 1.0, "bindings": bindings, "source_evidence": own_span,
     }], context={"user_turn_envelope": {
         "turn_id": "source-literal-test", "original_input": {"text": "  " + text + "\n"},
@@ -289,7 +285,7 @@ async def test_weather_location_context_derives_from_grounded_location(
     request = CognitiveWorkRequest(
         text=text,
         responsibilities=[{
-            "local_ref": "r1", "outcome": text, "output_mode": "information",
+            "local_ref": "r1", "outcome": text,
             "confidence": 1.0, "bindings": {},
             "source_evidence": {
                 "source_start_token_ref": "t0",
@@ -413,7 +409,7 @@ def test_declared_realization_arguments_are_written_not_implied_by_default() -> 
         interaction_executable=True, hints=tool.llm_hints, idempotent=True, side_effect_free=True)
     request = CognitiveWorkRequest(sid="w", text="what's the weather in chongqing?", language="en-US",
         responsibilities=[{"local_ref": "r1", "outcome": "the weather in chongqing", "bindings": {"location": "chongqing"},
-                           "output_mode": "information", "continuity_scope": "goal", "confidence": 1.0}],
+                             "confidence": 1.0}],
         interpretation_confidence=1.0)
     schema = fast_streaming_advance_response_schema(["r1"], responsibilities=request.responsibilities,
         capabilities=[fast_capability_payload(weather, include_side_effect_free=True)])
@@ -446,7 +442,7 @@ def test_a_repetition_count_is_written_not_implied_by_default() -> None:
             "duration_s": {"type": "number", "minimum": 1.0, "maximum": 10.0, "default": 4.0}}},
         effects=["physical_motion"], available=True, interaction_executable=True)
     responsibility = CognitiveResponsibilityProposal(
-        local_ref="r1", outcome="点两下头", output_mode="body_action", continuity_scope="goal", confidence=1.0)
+        local_ref="r1", outcome="点两下头",   confidence=1.0)
     schema = fast_streaming_advance_response_schema(
         ["r1"], responsibilities=[responsibility], capabilities=[nod.model_dump(mode="json")])
 
@@ -500,8 +496,8 @@ async def test_fast_weather_collapses_duplicate_read_after_default_cleanup() -> 
             "local_ref": "r1",
             "outcome": "the weather today in chongqing",
             "bindings": {"location": "chongqing", "time_reference": "today"},
-            "output_mode": "information",
-            "continuity_scope": "goal",
+
+
             "confidence": 1.0,
         }],
         interpretation_confidence=1.0,

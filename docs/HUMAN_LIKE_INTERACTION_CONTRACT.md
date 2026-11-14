@@ -59,20 +59,17 @@ understanding and continuity; they are not permission to replace a clear new
 Responsibility with an older Goal merely because that Goal is active, recent, or the
 only candidate.
 
-`continuity_scope=turn` means interaction lifetime, not "no Goal" and not "no Planner".
-A joke, greeting, direct answer, or ordinary chat can have a short-lived interaction Goal and
-Planner may still reason about HOW/`respond` when UMI requests it; Social Cognition remains the
-exact wording owner. Goal Association decides whether the current Responsibility associates with
-retained Goal history and what supported relationship holds, or that it starts a new Goal. It
-never re-authors WHAT: trusted lifecycle code only records the new Goal, materializing its
-identity from the UMI Responsibility, using interaction lifetime for turn-scoped meaning and
-longer working/persistent lifetime when the Responsibility remains open. An utterance that truly
-continues, refines, corrects, cancels, resumes, or otherwise changes retained meaning is still
-associated by GA to that existing Goal rather than reinterpreted.
+UMI authors complete contextual meaning, not a lifetime or output category. GA decides
+whether that Responsibility associates with retained Goal history or starts a new Goal;
+trusted code materializes the complete accepted meaning unchanged. Planner chooses methods,
+Skills and necessary Work, while SC owns exact wording. Runtime derives lifecycle from
+actual outstanding Work, communication Needs and verified delivery. A short interaction may
+still have a canonical Goal and a Planner decision. A continuing, correcting, cancelling
+or resumed request is associated by GA to the existing Goal using its complete meaning.
 
 Standing interpretation-time Social Cognition sees the current accepted Responsibilities
 and prior delivered interaction, but broad unbound Goal/Work memory is withheld until
-GA/Planner/Runtime supplies exact current-turn binding. For a non-speech task at this
+GA/Planner/Runtime supplies exact current-turn binding. While a Planner decision is pending at this
 early stage, SC may acknowledge receipt or intended checking only as `pre_evidence`; it
 must not state or repeat a task result until Planner/Evidence establishes that result.
 This preserves human conversational continuity without letting background work capture a
@@ -291,7 +288,7 @@ Host apology over an already committed or delivered SC Communicative Activity.
 User Meaning Interpretation reads bounded Session Context: recent admitted dialogue,
 active/recent Goals and versions, current Activity/task state, pending
 clarifications, and relevant Evidence. It emits contextual Responsibility evidence
-with complete intent, requested result type, source provenance and bounded unresolved meaning. It may understand an answer
+with complete contextual intent, source provenance and bounded unresolved meaning. It may understand an answer
 against a pending clarification, but it does not decide that a Capability parameter is
 missing, create a planning `InformationGap`, classify one as blocking, or choose how it
 should be resolved. Every fresh admitted addressed turn mechanically starts Social
@@ -308,16 +305,13 @@ only exact-wording owner. Absence of accepted assistant dialogue is represented 
 bounded dialogue, never by a textual sentinel that a model could repeat as semantic
 content. Prior accepted dialogue may resolve the current intent without inventing
 an additional request. UMI preserves complete natural-language intent and cites its
-source and requested result type; it does not extract parameter bindings or Goal
-relationships. The result type keeps ordinary communication distinct from requested
-physical effects without selecting any Capability.
-A compound request may remain one Responsibility only when it is one independently
-satisfiable human outcome. Independently requested observable effects remain separate
-Responsibilities even when the person asks for them concurrently; UMI preserves the
-coordination with `parallel_with`/ordering relations and Planner realizes Activities. GA
-relates those outcomes to retained Goals; Planner decomposes implementation steps and
-resolves their parameters against full Capability contracts. Missing execution details
-are Planner gaps, not UMI uncertainty.
+source; it does not author output categories, parameter bindings or Goal relationships.
+Explicit requested physical effects and expressive forms stay in the intention.
+A compound intention may remain one Responsibility with every effect, modifier,
+condition, negation and coordination relation intact. Planner decomposes it into
+Activities and resolves parameters against the full Capability contracts. GA never
+resegments accepted meaning. Missing execution details are Planner gaps, not UMI
+uncertainty.
 SC communicates the actual state reported by these owners through speech and eligible
 Social Attention. Runtime admission and execution safety remain independent.
 
@@ -885,7 +879,7 @@ and required arguments are sufficiently supported.
 
 User Meaning Interpretation is an internal stage of the Goal-Driven Cognitive Core. It
 receives admitted evidence and emits provider-neutral Responsibility proposals,
-complete natural-language intentions, requested result types, source evidence and bounded unresolved meaning. It
+complete contextual natural-language intentions, source evidence and bounded unresolved meaning. It
 does not emit planning InformationGaps, input-source policy, conversational progress,
 route/intent labels, Activities, or Capabilities.
 The same UMI result starts SC, Planner and GA independently. SC owns ordinary

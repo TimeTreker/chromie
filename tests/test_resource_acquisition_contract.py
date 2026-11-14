@@ -983,9 +983,9 @@ class ResourceAcquisitionContractTests(unittest.TestCase):
                         "resource": "a bottle of water",
                         "source": "100 meters ahead",
                     },
-                    "output_mode": "body_action",
-                    "body_effect_family": "task_physical_effect",
-                    "continuity_scope": "goal",
+
+
+
                     "confidence": 0.9,
                 }
             ],
@@ -1002,5 +1002,5 @@ class ResourceAcquisitionContractTests(unittest.TestCase):
             {name: value["value"] for name, value in created.object["bindings"].items()},
             request.responsibilities[0].bindings,
         )
-        self.assertEqual(created.metadata["output_mode"], "body_action")
-        self.assertEqual(created.metadata["body_effect_families"], ["task_physical_effect"])
+        self.assertNotIn("output_mode", created.metadata)
+        self.assertNotIn("body_effect_families", created.metadata)

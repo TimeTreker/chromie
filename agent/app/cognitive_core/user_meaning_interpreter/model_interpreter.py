@@ -378,11 +378,6 @@ def _compact_goal_meaning_context(
             }
         compact.append(
             {
-                "status": str(
-                    item.get("responsibility_status")
-                    or goal.get("responsibility_status")
-                    or "open"
-                ),
                 "description": description[:320],
                 "object": goal_object,
                 "constraints": (
@@ -723,7 +718,7 @@ class OllamaUserMeaningInterpreter:
             f"{_bounded_json(interaction_context, max_chars=1800)}\n"
             f"{role_memory_context(request.context, role='umi')}"
             "First resolve the current expression against the immediately preceding conversational "
-            "proposition, then choose the observable result type of that complete meaning. An acceptance of "
+            "proposition, preserve the complete requested result of that meaning. An acceptance of "
             "an offered effect, or a selection answering which effect/resource is wanted, requests that "
             "effect with its still-applicable object and recipient. Represent the effect itself, not an "
             "acknowledgement of agreement, a promise, gratitude, or the fact that a choice was made. "
@@ -732,11 +727,17 @@ class OllamaUserMeaningInterpreter:
             "proposition define the new meaning; an older Goal description is continuity evidence, not a "
             "substitute current obligation. Refusal, deferral and conditions constrain whether the effect "
             "is requested now. Politeness accompanying one accepted effect does not create an independent "
-            "speech Responsibility. A prior Goal's output_mode describes its older meaning; never inherit "
-            "that mode instead of interpreting the current accepted effect. Resolve ellipsis, pronouns and "
-            "omitted details from bounded context before classification. Preserve the complete resolved "
+            "speech Responsibility. Resolve ellipsis, pronouns and "
+            "omitted details from bounded context before interpretation. Preserve the complete resolved "
             "WHAT without canonical Goal/referent identity; GA owns association. Context alone never "
             "authorizes a new effect: the current expression must accept, select, request or modify it.\n\n"
+            "Construct each Responsibility as a complete human outcome, including any condition or "
+            "before/after/while relation to another requested effect. Name that other effect in the "
+            "outcome itself: splitting a sentence must not sever its relations. List position, source "
+            "tokens and a cognitive-request rationale do not preserve a relation omitted from WHAT. "
+            "Preserve all requested effects without duplicating them or adding order the person did "
+            "not request. A complete compound outcome is valid; Planner owns Activity decomposition. "
+            "Do not emit bindings or execution steps.\n\n"
             "Apply the system meaning-and-cognitive-orchestration contract to this "
             "authoritative turn and bounded human-meaning Context. Return one complete "
             "schema-valid JSON decision only."
@@ -763,114 +764,19 @@ class OllamaUserMeaningInterpreter:
             name: schema["properties"][name] for name in schema["required"]
         }
         item = schema["$defs"]["CognitiveResponsibilityProposal"]
-        base_item_value_review_description = item["properties"]["value_review"]["description"]
-        fields = (
-            "local_ref",
-            "output_mode",
-            "body_effect_family",
-            "continuity_scope",
-            "outcome",
-            "confidence",
-            "source_evidence",
-        )
-        item["properties"] = {name: item["properties"][name] for name in fields}
-        item["required"] = [name for name in fields if name != "body_effect_family"]
-        item["properties"]["outcome"]["description"] = (
+        fields = ("local_ref", "outcome", "value_review", "confidence", "source_evidence")
+        properties = {name: item["properties"][name] for name in fields}
+        properties["local_ref"] = {"type": "string", "enum": [f"r{i}" for i in range(1, 13)]}
+        properties["outcome"]["description"] = (
             "Complete natural-language user request with every material detail, in the source language. "
             "Never a category name, code or underscore-separated identifier."
         )
-        item["properties"]["output_mode"]["description"] = (
-            "Expected human result type only; the complete request belongs in outcome. "
-            "Any value other than speech requires continuity_scope=goal; only ordinary "
-            "current-conversation speech may be continuity_scope=turn."
-        )
-        item["properties"]["output_mode"]["enum"].remove("unspecified")
-        item["properties"]["output_mode"].pop("default", None)
-        item["properties"]["body_effect_family"]["description"] = (
-            "Required exactly when output_mode=body_action. Classify the requested observable WHAT, "
-            "not HOW: task_physical_effect for locomotion/posture/manipulation/carrying/handover; "
-            "social_expression for an explicitly requested gesture/facial expression; "
-            "gaze_or_orientation for explicitly requested looking/attention orientation."
-        )
-        item["properties"]["continuity_scope"]["description"] = (
-            "Expected Responsibility lifetime, not routing. Use turn for ordinary conversational "
-            "speech expected to complete within this interaction; this may still materialize a "
-            "short-lived interaction Goal and may still use Planner. Use goal for every non-speech "
-            "result and for speech that must remain open beyond the immediate interaction or changes "
-            "retained Goal meaning. GA independently decides association with retained Goal history."
-        )
-        item["properties"]["continuity_scope"].pop("default", None)
-        item["properties"]["local_ref"] = {
-            "type": "string", "enum": [f"r{i}" for i in range(1, 13)],
+        properties["value_review"] = {"type": "boolean", "description": properties["value_review"]["description"]}
+        properties["source_evidence"] = {"$ref": "#/$defs/ResponsibilitySourceEvidence"}
+        schema["$defs"]["CognitiveResponsibilityProposal"] = {
+            "type": "object", "additionalProperties": False,
+            "properties": properties, "required": list(fields),
         }
-        item["properties"]["source_evidence"] = {
-            "$ref": "#/$defs/ResponsibilitySourceEvidence",
-        }
-
-        # Make Planner-readiness semantics visible to the native decoder instead
-        # of leaving output_mode and continuity_scope as an unconstrained cross
-        # product. Ordinary speech may be interaction-first or explicitly
-        # continuity-bearing; every non-speech result is structurally goal-scoped.
-        # Put turn first for speech so a small greedy model is not biased toward
-        # fabricating Work/Goal continuity for ordinary conversation.
-        base_item = copy.deepcopy(item)
-        speech_item = copy.deepcopy(base_item)
-        speech_item["properties"]["output_mode"] = {
-            "type": "string",
-            "const": "speech",
-            "description": item["properties"]["output_mode"]["description"],
-        }
-        speech_item["properties"]["continuity_scope"] = {
-            "type": "string",
-            "enum": ["turn", "goal"],
-            "description": item["properties"]["continuity_scope"]["description"],
-        }
-        speech_item["properties"]["body_effect_family"] = {"type": "null"}
-        # Whether the request would deceive or harm someone is part of WHAT is asked;
-        # stating it here, before any reply or Work, lets Value Judgment decide first.
-        # Every result type may state it: a harmful request need not use a reviewed
-        # Capability. Speech must state it; elsewhere an omitted mark means false, so
-        # frozen non-speech references stay valid.
-        def _state_value_review(branch: dict[str, Any], *, required: bool) -> None:
-            branch["properties"] = {
-                **{key: value for key, value in branch["properties"].items() if key not in {"confidence", "source_evidence"}},
-                "value_review": {"type": "boolean", "description": base_item_value_review_description},
-                **{key: branch["properties"][key] for key in ("confidence", "source_evidence")},
-            }
-            if required:
-                branch["required"] = [*branch.get("required", []), "value_review"]
-
-        _state_value_review(speech_item, required=True)
-        body_item = copy.deepcopy(base_item)
-        body_item["properties"]["output_mode"] = {
-            "type": "string", "const": "body_action",
-            "description": item["properties"]["output_mode"]["description"],
-        }
-        body_item["properties"]["continuity_scope"] = {
-            "type": "string", "const": "goal",
-            "description": item["properties"]["continuity_scope"]["description"],
-        }
-        body_item["required"] = [*body_item.get("required", []), "body_effect_family"]
-        work_item = copy.deepcopy(base_item)
-        work_item["properties"]["output_mode"] = {
-            "type": "string",
-            "enum": [
-                value
-                for value in item["properties"]["output_mode"]["enum"]
-                if value not in {"speech", "body_action"}
-            ],
-            "description": item["properties"]["output_mode"]["description"],
-        }
-        work_item["properties"]["continuity_scope"] = {
-            "type": "string",
-            "const": "goal",
-            "description": item["properties"]["continuity_scope"]["description"],
-        }
-        work_item["properties"]["body_effect_family"] = {"type": "null"}
-        _state_value_review(body_item, required=False)
-        _state_value_review(work_item, required=False)
-        item.clear()
-        item["oneOf"] = [speech_item, body_item, work_item]
         schema["properties"]["responsibilities"]["maxItems"] = 12
         uncertainty = schema["$defs"]["UserMeaningUncertainty"]
         uncertainty["properties"] = {
@@ -890,10 +796,10 @@ class OllamaUserMeaningInterpreter:
         activation = schema["$defs"]["CognitiveActivationRequest"]
         activation["properties"] = {
             name: activation["properties"][name]
-            for name in ("authority", "responsibility_refs", "reason_summary")
+            for name in ("authority", "responsibility_refs")
         }
         activation["required"] = [
-            "authority", "responsibility_refs", "reason_summary"
+            "authority", "responsibility_refs"
         ]
         activation["properties"]["authority"] = {
             "type": "string",
@@ -998,10 +904,9 @@ class OllamaUserMeaningInterpreter:
             )
         proposals = parsed.get("responsibilities")
         fields = {
-            "local_ref", "outcome", "output_mode", "body_effect_family", "continuity_scope",
-            "value_review", "confidence", "source_evidence",
+            "local_ref", "outcome", "value_review", "confidence", "source_evidence",
         }
-        required_fields = fields - {"body_effect_family", "value_review"}
+        required_fields = fields
         for item in proposals if isinstance(proposals, list) else []:
             if not isinstance(item, dict):
                 continue  # Closed DTO handles malformed objects.
@@ -1013,23 +918,21 @@ class OllamaUserMeaningInterpreter:
             if "source_evidence" not in item:
                 raise ValueError("UMI Responsibility lacks source_evidence")
             if required_fields - set(item):
-                raise ValueError("UMI requires authored meaning, confidence and source evidence")
-            if item["output_mode"] == "unspecified":
-                raise ValueError("UMI must state the requested result type")
-            if response_schema is not None:
-                if item["output_mode"] == "body_action" and not item.get("body_effect_family"):
-                    raise ValueError("UMI body_action Responsibility requires body_effect_family")
-                if item["output_mode"] != "body_action" and item.get("body_effect_family") is not None:
-                    raise ValueError("UMI body_effect_family is valid only for body_action")
-                if item["output_mode"] == "speech" and not isinstance(item.get("value_review"), bool):
-                    raise ValueError("UMI speech Responsibility must state value_review")
-            for name in ("local_ref", "outcome", "output_mode"):
+                raise ValueError("UMI requires authored meaning, value_review, confidence and source evidence")
+            if not isinstance(item.get("value_review"), bool):
+                raise ValueError("UMI Responsibility must state value_review")
+            for name in ("local_ref", "outcome"):
                 if not isinstance(item[name], str) or not item[name].strip():
                     raise ValueError(f"User Meaning Interpretation requires authored {name}")
             if item["local_ref"] not in {f"r{i}" for i in range(1, 13)}:
                 raise ValueError("UMI requires a declared turn-local Responsibility reference")
             if isinstance(item["confidence"], bool) or not isinstance(item["confidence"], (int, float)):
                 raise ValueError("UMI requires numeric Responsibility confidence")
+        for activation in parsed.get("cognitive_requests") or []:
+            if isinstance(activation, dict) and set(activation) - {"authority", "responsibility_refs"}:
+                raise _UserMeaningInterpretationAuthorityViolation(
+                    "UMI cognitive activation contains downstream rationale or fields"
+                )
         _derive_source_span_starts(request, parsed)
         decision = UserMeaningInterpretationDecision.model_validate(parsed)
         _validate_primary_source_evidence(request, parsed)

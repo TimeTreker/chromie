@@ -47,13 +47,12 @@
         {
           "local_ref": "r1",
           "outcome": "明天下午提醒我把汤从冰箱拿出来",
-          "output_mode": "stateful_effect",
           "confidence": 1.0,
           "source_evidence": {
             "source_start_token_ref": "t0",
             "source_end_token_ref": "t3"
           },
-          "continuity_scope": "goal"
+          "value_review": false
         }
       ],
       "meaning_uncertainties": [],
@@ -62,15 +61,13 @@
           "authority": "goal_association",
           "responsibility_refs": [
             "r1"
-          ],
-          "reason_summary": "Preserve canonical continuity for the requested independent outcome."
+          ]
         },
         {
           "authority": "planner",
           "responsibility_refs": [
             "r1"
-          ],
-          "reason_summary": "Determine the Work or information acquisition needed for the requested outcome."
+          ]
         }
       ]
     },
@@ -79,7 +76,6 @@
       "responsibilities": [
         {
           "local_ref": "r1",
-          "output_mode": "stateful_effect",
           "outcome_contains_any": [
             "提醒"
           ],
@@ -87,7 +83,8 @@
             "proposition": "把汤从冰箱拿出来",
             "recipient": "我",
             "time_scope": "明天下午"
-          }
+          },
+          "value_review": false
         }
       ],
       "unresolved": false,
@@ -105,11 +102,14 @@
       "activities",
       "binding_items",
       "bindings",
+      "body_effect_family",
       "capability_id",
+      "continuity_scope",
       "coordination",
       "execution_lane",
       "goal_id",
       "information_gaps",
+      "output_mode",
       "plan",
       "provider_id",
       "relationship",

@@ -23,12 +23,10 @@
               "local_ref": "r1",
               "outcome": "Please do it.",
               "confidence": 0.35,
-              "output_mode": "speech",
               "source_evidence": {
                 "source_start_token_ref": "t0",
                 "source_end_token_ref": "t3"
               },
-              "continuity_scope": "goal",
               "value_review": false
             }
           ],
@@ -42,15 +40,7 @@
               ]
             }
           ],
-          "cognitive_requests": [
-            {
-              "authority": "social_cognition",
-              "responsibility_refs": [
-                "r1"
-              ],
-              "reason_summary": "Explicit authored fixture requests the existing cognitive owner."
-            }
-          ]
+          "cognitive_requests": []
         }
       },
       {
@@ -62,12 +52,10 @@
               "local_ref": "r1",
               "outcome": "Please do it.",
               "confidence": 0.35,
-              "output_mode": "speech",
               "source_evidence": {
                 "source_start_token_ref": "t0",
                 "source_end_token_ref": "t3"
               },
-              "continuity_scope": "goal",
               "value_review": false
             }
           ],
@@ -81,15 +69,7 @@
               ]
             }
           ],
-          "cognitive_requests": [
-            {
-              "authority": "social_cognition",
-              "responsibility_refs": [
-                "r1"
-              ],
-              "reason_summary": "Explicit authored fixture requests the existing cognitive owner."
-            }
-          ]
+          "cognitive_requests": []
         }
       }
     ]
@@ -108,8 +88,7 @@
       {
         "local_ref": "r1",
         "outcome": "Please do it.",
-        "confidence": 0.35,
-        "output_mode": "speech"
+        "confidence": 0.35
       }
     ]
   },

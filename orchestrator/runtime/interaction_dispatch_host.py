@@ -20,9 +20,10 @@ from orchestrator.runtime.planner_reentry import (
 from orchestrator.runtime.session import (
     now_ms,
     record_session_workflow_stage,
+    record_stale_planning_submission,
     summarize_provider_start_evidence,
 )
-from orchestrator.runtime.capability_runtime import CapabilityRuntimeResult
+from orchestrator.runtime.capability_runtime import CapabilityRuntimeResult, StalePlanningSubmissionError
 from shared.chromie_contracts.interaction import (
     InteractionResponse,
 )
@@ -31,6 +32,21 @@ from shared.chromie_contracts.user_turn import (
 )
 from orchestrator.runtime import cognitive_outcome_host
 from orchestrator.runtime import planner_reentry_host
+
+
+def finish_stale_planning_submission(
+    host: Any, session_id: str | None, *, evidence: dict[str, Any],
+    mark_session_done: bool = True,
+) -> None:
+    """Reject only the obsolete proposal; preserve Goals and other owned Work."""
+    record_stale_planning_submission(host, session_id, evidence=evidence)
+    if not mark_session_done:
+        return
+    state = host.sessions.state.get(session_id or "")
+    if state is not None:
+        state["llm_done"] = True
+        state["planning_submission_status"] = "stale"
+    host.maybe_session_done(session_id)
 
 
 def launch_interaction(
@@ -102,6 +118,11 @@ async def dispatch_detached_interaction(
             session_id=session_id,
             confirmed_request_ids=confirmed_request_ids,
         )
+    except StalePlanningSubmissionError as exc:
+        finish_stale_planning_submission(
+            host, session_id, evidence=exc.evidence(), mark_session_done=mark_session_done,
+        )
+        return None
     except Exception as exc:
         record_session_workflow_stage(
             host,
@@ -217,6 +238,11 @@ async def consume_detached_non_cognitive_dispatch(
             response, execution, session_id=session_id,
             log_event="interaction_history_after_delivery",
         )
+    elif any(speech.metadata.get("wording_owner") == "social_cognition" for speech in response.speech):
+        # Word-free Plans with only a response use this consumer too. Authored
+        # SC text is deliberately excluded from pre-dispatch history; join the
+        # playback authority here so the next turn sees the delivered reply.
+        await host.interaction_runtime.record_social_delivery(response, execution, session_id=session_id)
     record_execution_experience_safely(
         prepare_response=host._prepared_interaction_response_for_record,
         record_experience=host._record_experience,
@@ -361,6 +387,9 @@ async def consume_detached_cognitive_dispatch(
             interaction_id=response.interaction_id,
             status="failed",
         )
+
+    if any(speech.metadata.get("wording_owner") == "social_cognition" for speech in response.speech):
+        await host.interaction_runtime.record_social_delivery(response, execution, session_id=session_id)
 
     record_session_workflow_stage(
         host,

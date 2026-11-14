@@ -26,12 +26,11 @@
               "local_ref": "r1",
               "outcome": "嗯，我用的耳麦，他那个。",
               "confidence": 0.45,
-              "output_mode": "information",
               "source_evidence": {
                 "source_start_token_ref": "t0",
                 "source_end_token_ref": "t11"
               },
-              "continuity_scope": "goal"
+              "value_review": false
             }
           ],
           "meaning_uncertainties": [
@@ -49,8 +48,7 @@
               "authority": "planner",
               "responsibility_refs": [
                 "r1"
-              ],
-              "reason_summary": "Explicit authored fixture requests the existing cognitive owner."
+              ]
             }
           ]
         }
@@ -64,12 +62,11 @@
               "local_ref": "r1",
               "outcome": "嗯，我用的耳麦，他那个。",
               "confidence": 0.45,
-              "output_mode": "information",
               "source_evidence": {
                 "source_start_token_ref": "t0",
                 "source_end_token_ref": "t11"
               },
-              "continuity_scope": "goal"
+              "value_review": false
             }
           ],
           "meaning_uncertainties": [
@@ -87,8 +84,7 @@
               "authority": "planner",
               "responsibility_refs": [
                 "r1"
-              ],
-              "reason_summary": "Explicit authored fixture requests the existing cognitive owner."
+              ]
             }
           ]
         }
@@ -109,8 +105,7 @@
       {
         "local_ref": "r1",
         "outcome": "嗯，我用的耳麦，他那个。",
-        "confidence": 0.45,
-        "output_mode": "information"
+        "confidence": 0.45
       }
     ]
   },

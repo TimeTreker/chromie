@@ -42,6 +42,11 @@ async def stage_interaction_confirmation(
     if not confirmation_request_ids:
         return False
 
+    if response.metadata.get("planning_commit") is not None:
+        # Catalog/confirmation lookup can yield while a newer Plan commits.
+        # Validate again immediately before publishing a confirmation token.
+        await host.interaction_runtime.runtime.validate_planning_submission(response)
+
     confirmation_prompt = str(
         (response.metadata or {}).get("confirmation_prompt") or ""
     ).strip()

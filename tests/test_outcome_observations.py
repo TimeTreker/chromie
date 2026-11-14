@@ -413,7 +413,7 @@ class OutcomeObservationTests(unittest.TestCase):
                         "source": "session_tts_playback",
                         "tts_order": 0,
                         "workflow_event_index": 0,
-                        "elapsed_ms": 1200.0,
+                        "elapsed_ms": 2400.0,
                     },
                     "planned_sequence": 0,
                 }
@@ -540,3 +540,80 @@ class OutcomeObservationTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+@pytest.mark.parametrize('wave_start,expected', [
+    (1, ['capability.soridormi.wave_hand', 'speech.output']),
+    (4, ['capability.soridormi.wave_hand', 'speech.output']),
+    (9, ['speech.output', 'capability.soridormi.wave_hand']),
+])
+def test_observation_order_uses_playback_onset_and_correlated_receipt(wave_start, expected):
+    summary = {
+        'interaction_response': {'capabilities': [{'request_id': 'wave', 'capability_id': 'soridormi.wave_hand',
+                                                  'capability_version': '1', 'args': {}}], 'speech': []},
+        'execution': {'results': [{'request_id': 'wave', 'capability_id': 'soridormi.wave_hand',
+                                  'capability_version': '1', 'status': 'completed',
+                                  'started_at': f'2026-11-11T00:00:0{wave_start}Z',
+                                  'finished_at': f'2026-11-11T00:00:{wave_start + 1:02d}Z'}]},
+        'timings_ms': {'agent_ms': 99000},
+        'session_state': {'started_at_utc': '2026-11-11T00:00:00+00:00', 'workflow_events': [
+            {'event': 'tts_schedule', 'elapsed_ms': 2000, 'message': "order=0 generation=0 text='A reply.'"},
+            {'event': 'playback_start', 'elapsed_ms': 6000, 'message': 'order=0 generation=0'},
+            {'event': 'playback_end', 'elapsed_ms': 8000, 'message': 'order=0'},
+        ]},
+    }
+    assert [x['type'] for x in collect_observations(summary)] == expected
+
+
+def test_reused_tts_order_does_not_deliver_a_later_unplayed_utterance():
+    from scripts.outcome_observations import _completed_tts_playback
+    summary = {'session_state': {'workflow_events': [
+        {'event': 'tts_schedule', 'elapsed_ms': 1, 'message': "order=0 generation=0 text='Acknowledged.'"},
+        {'event': 'playback_start', 'elapsed_ms': 2, 'message': 'order=0 generation=0'},
+        {'event': 'playback_end', 'elapsed_ms': 3, 'message': 'order=0'},
+        {'event': 'tts_schedule', 'elapsed_ms': 4, 'message': "order=0 generation=0 text='Unplayed reply.'"},
+    ]}}
+    assert [x['text'] for x in _completed_tts_playback(summary)] == ['Acknowledged.']
+
+
+def test_one_played_chunk_does_not_prove_the_whole_speech_was_delivered():
+    summary = {'interaction_response': {'speech': [{'id': 'reply', 'text': 'First. Second.'}]},
+               'execution': {'results': [{'request_id': 'reply', 'capability_id': 'chromie.speak', 'status': 'completed'}]},
+               'session_state': {'workflow_events': [
+                   {'event': 'tts_schedule', 'elapsed_ms': 1, 'message': "order=0 text='First.'"},
+                   {'event': 'playback_start', 'elapsed_ms': 2, 'message': 'order=0'},
+                   {'event': 'playback_end', 'elapsed_ms': 3, 'message': 'order=0'},
+                   {'event': 'tts_schedule', 'elapsed_ms': 4, 'message': "order=1 text='Second.'"},
+               ]}}
+    observations = collect_observations(summary)
+    assert not any(x.get('text') == 'First. Second.' and x['status'] == 'completed' for x in observations)
+    assert any(x.get('text') == 'First.' and x['status'] == 'completed' for x in observations)
+
+
+@pytest.mark.parametrize('event', ['playback_stream_incomplete', 'playback_aborted_by_interrupt', 'playback_skip_empty'])
+def test_failed_playback_cannot_be_proved_by_a_later_end_event(event):
+    from scripts.outcome_observations import _completed_tts_playback
+    summary = {'session_state': {'workflow_events': [
+        {'event': 'tts_schedule', 'elapsed_ms': 1, 'message': "order=0 generation=0 text='Incomplete.'"},
+        {'event': 'playback_start', 'elapsed_ms': 2, 'message': 'order=0 generation=0'},
+        {'event': event, 'elapsed_ms': 3, 'message': 'order=0 generation=0'},
+        {'event': 'playback_end', 'elapsed_ms': 4, 'message': 'order=0'},
+    ]}}
+    assert _completed_tts_playback(summary) == []
+
+
+def test_identical_delivered_utterances_keep_their_separate_speech_metadata():
+    events = []
+    for start in (0, 10):
+        events += [
+            {'event': 'tts_schedule', 'elapsed_ms': start, 'message': "order=0 text='Same reply.'"},
+            {'event': 'playback_start', 'elapsed_ms': start + 1, 'message': 'order=0'},
+            {'event': 'playback_end', 'elapsed_ms': start + 2, 'message': 'order=0'},
+        ]
+    summary = {'interaction_response': {'speech': [
+        {'id': 'first', 'text': 'Same reply.', 'metadata': {'act': 'first'}},
+        {'id': 'second', 'text': 'Same reply.', 'metadata': {'act': 'second'}},
+    ]}, 'session_state': {'workflow_events': events}}
+    observed = collect_observations(summary)
+    assert [(x['status'], x['metadata']) for x in observed] == [
+        ('completed', {'act': 'first'}), ('completed', {'act': 'second'})]

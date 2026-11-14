@@ -3010,19 +3010,17 @@ def qualify_planner_capability_payload(
     Capability metadata rather than pass-specific resolver behavior.
     """
 
-    output_mode_qualified = qualify_capability_catalog_for_output_modes(
-        capabilities,
-        authoritative_goals=authoritative_goals,
-    )
-    domain_qualified = qualify_capability_catalog_for_information_domains(
-        output_mode_qualified,
-        authoritative_goals=authoritative_goals,
-        retained_capability_ids=retained_capability_ids,
-    )
-    return qualify_capability_catalog_for_typed_binding_values(
-        domain_qualified,
-        authoritative_goals=authoritative_goals,
-    )
+    # Catalog exposure is the union of each Goal's mechanically possible contracts.
+    # A retained typed sibling cannot filter the unknown needs of a fresh WHAT-only
+    # Goal. The primary need fit and per-Goal admission checks still authorize Work.
+    allowed: set[str] = set()
+    for scope in ([goal] for goal in authoritative_goals) if authoritative_goals else [[]]:
+        by_mode = qualify_capability_catalog_for_output_modes(capabilities, authoritative_goals=scope)
+        by_domain = qualify_capability_catalog_for_information_domains(
+            by_mode, authoritative_goals=scope, retained_capability_ids=retained_capability_ids)
+        allowed.update(item["capability_id"] for item in qualify_capability_catalog_for_typed_binding_values(
+            by_domain, authoritative_goals=scope))
+    return [item for item in capabilities if item.get("capability_id") in allowed]
 
 
 def planner_contract_diagnostics(

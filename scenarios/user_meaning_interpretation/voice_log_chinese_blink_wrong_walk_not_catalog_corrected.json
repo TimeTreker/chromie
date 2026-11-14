@@ -27,13 +27,11 @@
               "local_ref": "r1",
               "outcome": "眨两小眼睛。",
               "confidence": 0.93,
-              "output_mode": "body_action",
               "source_evidence": {
                 "source_start_token_ref": "t0",
                 "source_end_token_ref": "t5"
               },
-              "continuity_scope": "goal",
-              "body_effect_family": "social_expression"
+              "value_review": false
             }
           ],
           "meaning_uncertainties": [],
@@ -42,8 +40,7 @@
               "authority": "planner",
               "responsibility_refs": [
                 "r1"
-              ],
-              "reason_summary": "Explicit authored fixture requests the existing cognitive owner."
+              ]
             }
           ]
         }
@@ -61,9 +58,7 @@
       {
         "local_ref": "r1",
         "outcome": "眨两小眼睛。",
-        "confidence": 0.93,
-        "output_mode": "body_action",
-        "body_effect_family": "social_expression"
+        "confidence": 0.93
       }
     ]
   }

@@ -67,17 +67,24 @@ The serving adapter forwards this option for ordinary JSON requests as well
 as tagged formats. This prevents layout from exhausting the output budget;
 string values, semantic Schema/DTO rules and primary-call ownership are unchanged.
 
-UMI hands off complete natural-language intentions, their existing provider-neutral
-`output_mode`, confidence and source evidence alongside immutable original input.
+UMI hands off complete contextual natural-language intentions, required value review,
+confidence and source evidence alongside immutable original input. UMI authors no
+`output_mode`, `body_effect_family` or `continuity_scope`.
 All actions, modifiers, quantities, units, negation and relations stay in `outcome`.
 One compound intention can remain one Responsibility. UMI authors no argument table,
-Goal relationship or activation timestamp. GA owns continuity; its new Goal text and
-result type are exact Host projections of UMI. SC owns communication and Social
+Goal relationship or activation timestamp. GA owns continuity; its new Goal text is an exact Host projection of UMI. SC owns communication and Social
 Attention, receives the same intent concurrently, and has first compute priority.
 
 Planner owns Activity decomposition, capability choice, argument realization and
 waiting. It receives complete common contracts plus the full library index; one
 bounded detail request can precede its complete plan. Locked or unavailable capabilities grant no execution.
+
+An answer beside executable Work always has a primary Planner-authored response
+Need with explicit timing and position, including an answer grounded in current
+perception. Host carries the decision's observation references into that exact
+Need without moving it or choosing timing. An activity-free perception answer may
+be projected only when there is no executable Work to order it against. Provider
+parallel eligibility and Capability-only dependency validation still apply.
 Planner `argument_sources` carry closed `UserTurnEnvelope` token spans instead of
 model-retyped quotes. Trusted code materializes canonical `source_quote` text from those
 spans; canonical parameter resolutions and time conditions retain their existing quote

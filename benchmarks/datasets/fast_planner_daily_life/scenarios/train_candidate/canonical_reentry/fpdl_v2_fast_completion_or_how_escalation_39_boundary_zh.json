@@ -142,7 +142,6 @@
           "confidence": 0.99,
           "local_ref": "r1",
           "outcome": "查询天气，并且只有预计下雨时才有条件地创建提醒。",
-          "output_mode": "stateful_effect",
           "schema_version": 1,
           "source_evidence": {
             "source_end_token_ref": "t999",

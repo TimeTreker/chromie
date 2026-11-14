@@ -67,9 +67,6 @@ def goal_association_response_schema(
     *,
     responsibility_count: int | None = None,
     responsibility_refs: list[str] | None = None,
-    responsibility_output_modes: dict[str, str] | None = None,
-    responsibility_continuity_scopes: dict[str, str] | None = None,
-    responsibility_information_refs: set[str] | None = None,
     responsibility_bindings: dict[str, dict[str, Any]] | None = None,
     meaning_uncertainty_refs: list[str] | None = None,
     association_min_confidence: float = 0.0,
@@ -102,11 +99,6 @@ def goal_association_response_schema(
         and " ".join(str(gap.get("gap_id") or "").strip().split())
     ]
     responsibility_refs = list(responsibility_refs or [])
-    responsibility_output_modes = dict(responsibility_output_modes or {})
-    responsibility_continuity_scopes = dict(responsibility_continuity_scopes or {})
-    responsibility_information_refs = set(
-        responsibility_information_refs or set()
-    )
     responsibility_bindings = {
         str(source_ref): dict(bindings)
         for source_ref, bindings in (responsibility_bindings or {}).items()
@@ -240,15 +232,16 @@ def goal_association_response_schema(
     constrain(schema)
     change_schema = schema.get("$defs", {}).get("GoalAssociationModelRequirementChange")
 
-    def same_modality_refs(snapshot: dict[str, Any]) -> list[str]:
-        # A requirement keeps its Goal's outcome modality; a changed modality needs a new Goal
-        # (apply_goal_meaning_update). Live 2026-10-27: "我在上海上班。" (speech) replaced the
-        # umbrella question's (information) requirement and Host rejected the turn.
-        mode = ((snapshot.get("goal") or {}).get("metadata") or {}).get("output_mode") or "unspecified"
-        return [ref for ref in responsibility_refs if mode == "unspecified"
-                or responsibility_output_modes.get(ref, "unspecified") in {"unspecified", mode}]
-
-    changeable = [(snapshot, same_modality_refs(snapshot)) for snapshot in candidate_goals]
+    # GA judges compatibility against complete WHAT and retained constraints.
+    # Host never derives a fresh result category to select relationship candidates.
+    changeable = []
+    for snapshot in candidate_goals:
+        goal = snapshot.get("goal") or snapshot
+        if (goal.get("metadata") or {}).get("output_mode") not in {None, "unspecified"}:
+            continue  # Intent-only UMI cannot requalify a retained typed contract.
+        if (goal.get("object", {}).get("bindings") or goal.get("constraints") or goal.get("resource_responsibility")) and not any((responsibility_bindings or {}).values()):
+            continue
+        changeable.append((snapshot, responsibility_refs))
     if isinstance(change_schema, dict):
         change_schema["oneOf"] = [
             {

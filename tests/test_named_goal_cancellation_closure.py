@@ -496,7 +496,7 @@ class RetainedGoalWorkCancellationTests(unittest.IsolatedAsyncioTestCase):
         snapshot = await coordinator.runtime.planning_state_snapshot(["goal-a"], "turn-new")
         new = response("new")
         new.metadata["retained_work_activities"] = coordinator.runtime.planning_work_activities(snapshot)
-        new.metadata["planning_commit"] = await coordinator.runtime.reserve_planning_submission(snapshot,
+        new.metadata["planning_commit"] = await coordinator.runtime.reserve_planning_submission(snapshot, covered_goal_ids=snapshot["goal_ids"],
             plan_id=new.metadata["canonical_plan_id"], fingerprint=new.metadata["canonical_plan_fingerprint"], prepared_activity_ids=[])
         await coordinator.runtime.record_planning_submission(new, lambda: state.record_interaction_response("new", new))
         second = await coordinator.runtime.submit(new)

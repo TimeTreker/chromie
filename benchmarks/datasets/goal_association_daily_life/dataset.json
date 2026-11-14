@@ -4,11 +4,11 @@
     "contrast_set_size": 15,
     "path_pattern": "scenarios/<split>/<category>/<scenario-id>.json",
     "scenario_count": 1500,
-    "scenario_tree_sha256": "2ba2e1a8edb4ef81efa4a0f820742c3081b9776b14aa6a8acbaa52e0101d1d2f",
+    "scenario_tree_sha256": "de39b566eaa5650a841f68c4222cb65896bd29abde11c02f5a94c703a570864b",
     "semantic_seed_count": 100
   },
   "authority": "offline qualification evidence only; never production Goal policy",
-  "claim_boundary": "Current-contract assistant-authored reference corpus: 1300 Host-accepted references and 200 retained typed-state negatives. Historical restatement inputs use speech while preserving terminal Goal identity and meaning. Not independently reviewed, model-qualified, training-eligible, service, voice, simulator, hardware, or release evidence.",
+  "claim_boundary": "Current-contract assistant-authored reference corpus: 1300 Host-accepted references and 200 retained typed-state negatives rejected by both production Schema and Host. Historical restatement preserves complete WHAT and terminal Goal identity without a fresh output classification. Not independently reviewed, model-qualified, training-eligible, service, voice, simulator, hardware, or release evidence.",
   "coverage_contract": {
     "categories": {
       "cancel_active": 100,
@@ -35,7 +35,7 @@
     "scenario_count": 1500,
     "schema_expectations": {
       "accept": 1300,
-      "accept_host_reject": 200
+      "reject": 200
     },
     "splits": {
       "frozen_test": 450,
@@ -47,5 +47,12 @@
   "dataset_id": "chromie.goal_association_daily_life.v1",
   "issue": "https://github.com/TimeTreker/chromie/issues/34",
   "schema_version": 1,
-  "title": "Goal Association Daily-Life Continuity Corpus"
+  "title": "Goal Association Daily-Life Continuity Corpus",
+  "what_only_wire_migration": {
+    "independent_semantic_review": false,
+    "native_model_calls": 0,
+    "negative_boundary": "The same 200 immutable typed-state updates now fail earlier at native Schema as well as Host. No negative was converted to acceptance.",
+    "owner_authorized_contract": "WHAT-only UMI; Planner owns HOW; SC owns communication",
+    "scope": "Retire only fresh UMI classifications and their obsolete oracles; retained canonical Goal constraints, inputs, complete WHAT, source ranges, relationships and splits preserved."
+  }
 }

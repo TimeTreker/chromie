@@ -103,7 +103,6 @@
           "confidence": 0.99,
           "local_ref": "r1",
           "outcome": "Perform one cheerful sung sentence.",
-          "output_mode": "singing",
           "schema_version": 1,
           "source_evidence": {
             "source_end_token_ref": "t999",

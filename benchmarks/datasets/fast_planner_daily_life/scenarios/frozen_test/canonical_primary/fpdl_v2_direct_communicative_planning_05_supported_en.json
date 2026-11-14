@@ -74,7 +74,6 @@
           "confidence": 0.99,
           "local_ref": "r1",
           "outcome": "Provide one warm concise sentence about a difficult afternoon.",
-          "output_mode": "speech",
           "schema_version": 1,
           "source_evidence": {
             "source_end_token_ref": "t999",

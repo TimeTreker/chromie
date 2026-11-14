@@ -10,11 +10,13 @@ from __future__ import annotations
 
 import ast
 import json
+import os
 import re
 import sys
 import tokenize
 import unicodedata
 from pathlib import Path
+from collections.abc import Iterator
 from urllib.parse import unquote
 
 try:
@@ -203,29 +205,23 @@ TEXT_SCAN_FILENAMES = {
 }
 
 
+def _maintained_files() -> Iterator[Path]:
+    """Prune already-excluded caches before scanning their contents."""
+    for directory, children, filenames in os.walk(ROOT):
+        children[:] = [name for name in children if name not in IGNORED_MARKDOWN_DIRS]
+        for name in filenames:
+            path = Path(directory) / name
+            if path.is_file():
+                yield path
+
+
 def markdown_files() -> list[Path]:
-    files: list[Path] = []
-    for path in ROOT.rglob("*.md"):
-        relative_parts = path.relative_to(ROOT).parts
-        parent_parts = relative_parts[:-1]
-        if any(part in IGNORED_MARKDOWN_DIRS for part in parent_parts):
-            continue
-        if path.is_file():
-            files.append(path)
-    return sorted(files)
+    return sorted(path for path in _maintained_files() if path.suffix == ".md")
 
 
 def repository_text_files() -> list[Path]:
-    files: list[Path] = []
-    for path in ROOT.rglob("*"):
-        if not path.is_file():
-            continue
-        relative_parts = path.relative_to(ROOT).parts
-        if any(part in IGNORED_MARKDOWN_DIRS for part in relative_parts[:-1]):
-            continue
-        if path.suffix.lower() in TEXT_SCAN_SUFFIXES or path.name in TEXT_SCAN_FILENAMES:
-            files.append(path)
-    return sorted(files)
+    return sorted(path for path in _maintained_files()
+        if path.suffix.lower() in TEXT_SCAN_SUFFIXES or path.name in TEXT_SCAN_FILENAMES)
 
 
 def check_semantic_project_naming(errors: list[str]) -> None:
@@ -487,14 +483,7 @@ def _retired_planner_name_scan_excluded(path: Path) -> bool:
 
 
 def python_files() -> list[Path]:
-    files: list[Path] = []
-    for path in ROOT.rglob("*.py"):
-        relative_parts = path.relative_to(ROOT).parts
-        if any(part in IGNORED_MARKDOWN_DIRS for part in relative_parts[:-1]):
-            continue
-        if path.is_file():
-            files.append(path)
-    return sorted(files)
+    return sorted(path for path in _maintained_files() if path.suffix == ".py")
 
 
 def python_comment_and_docstring_lines(path: Path) -> list[tuple[int, str]]:

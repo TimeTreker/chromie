@@ -900,11 +900,6 @@ def _load_user_meaning_interpreter_manifest(path: Path) -> dict[str, Any]:
                     f"User Meaning Interpreter case {case_id} responsibility "
                     f"{responsibility_index} is not an object"
                 )
-            if not isinstance(responsibility.get("output_mode"), str):
-                raise QualificationFailure(
-                    f"User Meaning Interpreter case {case_id} responsibility "
-                    f"{responsibility_index} lacks output_mode"
-                )
             outcome_contains_any = responsibility.get("outcome_contains_any")
             if (
                 not isinstance(outcome_contains_any, list)
@@ -1174,11 +1169,11 @@ def _evaluate_complete_intent(
     from agent.app.cognitive_core.user_meaning_interpreter.model_interpreter import _source_tokens
 
     errors: dict[str, list[str]] = {key: [] for key in (
-        "decomposition", "outcome", "output_mode", "intent_details",
+        "decomposition", "outcome", "intent_details",
         "source_evidence", "intent_relations", "unresolved",
     )}
     responsibilities = decision.get("responsibilities") or []
-    modes: list[set[str]] = [set() for _ in responsibilities]
+    owned_units: list[int] = [0 for _ in responsibilities]
     for unit in case["expected"]["responsibilities"]:
         matches = [index for index, item in enumerate(responsibilities)
                    if all(any(fragment.casefold() in str(item.get("outcome", "")).casefold()
@@ -1190,13 +1185,10 @@ def _evaluate_complete_intent(
                 f"{unit['required_intent_fragments']!r}"
             )
         for index in matches:
-            modes[index].add(unit["output_mode"])
+            owned_units[index] += 1
     for index, item in enumerate(responsibilities):
-        if not modes[index]:
+        if not owned_units[index]:
             errors["decomposition"].append(f"Responsibility {index} has no requested intent unit")
-        expected_mode = next(iter(modes[index])) if len(modes[index]) == 1 else "other"
-        if item.get("output_mode") != expected_mode:
-            errors["output_mode"].append(f"Responsibility {index} result type must be {expected_mode}")
     joined = " ".join(str(item.get("outcome", "")) for item in responsibilities).casefold()
     for alternatives in case["expected"].get("intent_relations", []):
         if not any(fragment.casefold() in joined for fragment in alternatives):
@@ -1204,8 +1196,7 @@ def _evaluate_complete_intent(
     tokens = {token["ref"]: token for token in _source_tokens(case["text"])}
     for item in wire.get("responsibilities", []):
         if set(item) - {
-            "local_ref", "outcome", "output_mode", "body_effect_family",
-            "continuity_scope", "confidence", "source_evidence",
+            "local_ref", "outcome", "value_review", "confidence", "source_evidence",
         }:
             errors["intent_details"].append("UMI authored a downstream contract field")
         evidence = item.get("source_evidence") or {}

@@ -65,7 +65,7 @@ def test_integrated_fast_validation_drops_exact_unbound_optional_default_after_g
     text = "turn left"
     decision = OllamaUserMeaningInterpreter._validate_interpretation_content(
         UserMeaningInterpretationRequest(text=text),
-        '{"confidence":1.0,"responsibilities":[{"local_ref":"r1","outcome":"turn left","output_mode":"body_action","continuity_scope":"goal","confidence":1.0,"source_evidence":{"source_start_token_ref":"t0","source_end_token_ref":"t1"}}],"meaning_uncertainties":[],"cognitive_requests":[{"authority":"planner","responsibility_refs":["r1"],"reason_summary":"Plan the requested turn."}]}',
+        '{"confidence":1.0,"responsibilities":[{"local_ref":"r1","outcome":"turn left","value_review":false,"confidence":1.0,"source_evidence":{"source_start_token_ref":"t0","source_end_token_ref":"t1"}}],"meaning_uncertainties":[],"cognitive_requests":[{"authority":"planner","responsibility_refs":["r1"]}]}',
     )
     request = CognitiveWorkRequest(
         sid="default-owner", text=text, responsibilities=decision.responsibilities,
@@ -123,7 +123,7 @@ def test_integrated_fast_validation_preserves_schema_valid_planner_how_override(
     text = "turn left"
     decision = OllamaUserMeaningInterpreter._validate_interpretation_content(
         UserMeaningInterpretationRequest(text=text),
-        '{"confidence":1.0,"responsibilities":[{"local_ref":"r1","outcome":"turn left","output_mode":"body_action","continuity_scope":"goal","confidence":1.0,"source_evidence":{"source_start_token_ref":"t0","source_end_token_ref":"t1"}}],"meaning_uncertainties":[],"cognitive_requests":[{"authority":"planner","responsibility_refs":["r1"],"reason_summary":"Plan the requested turn."}]}',
+        '{"confidence":1.0,"responsibilities":[{"local_ref":"r1","outcome":"turn left","value_review":false,"confidence":1.0,"source_evidence":{"source_start_token_ref":"t0","source_end_token_ref":"t1"}}],"meaning_uncertainties":[],"cognitive_requests":[{"authority":"planner","responsibility_refs":["r1"]}]}',
     )
     request = CognitiveWorkRequest(
         sid="default-owner-nondefault", text=text, responsibilities=decision.responsibilities,

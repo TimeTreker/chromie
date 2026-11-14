@@ -1296,7 +1296,7 @@ def test_communication_order_preserves_gi_relation_after_exact_ga_join():
         {"goal_id": "g-answer", "source_responsibility_refs": ["answer"]},
     ]}}
     responsibilities = [CognitiveResponsibilityProposal(local_ref="answer", outcome="Speak after the action.",
-        output_mode="speech", confidence=1, bindings={"after": ["action"]})]
+         confidence=1, bindings={"after": ["action"]})]
     validate_goal_responsibility_outcomes(output, authoritative_goals=[], context=context,
                                          responsibilities=responsibilities)
     for before, after in ((["motion"], []), ([], [])):

@@ -212,7 +212,6 @@
           "confidence": 0.99,
           "local_ref": "r1",
           "outcome": "Report whether rain is expected from the scoped trusted weather Evidence.",
-          "output_mode": "information",
           "schema_version": 1,
           "source_evidence": {
             "source_end_token_ref": "t999",

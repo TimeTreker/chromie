@@ -257,7 +257,7 @@ class CognitiveGatewayReflexTests(unittest.IsolatedAsyncioTestCase):
                         confidence=1.0,
                         responsibilities=[{
                             "local_ref": "r1", "outcome": "requested body action",
-                            "output_mode": "body_action", "confidence": 1.0,
+                             "confidence": 1.0,
                         }],
                     )
 
@@ -660,7 +660,8 @@ class CognitiveGatewayReflexTests(unittest.IsolatedAsyncioTestCase):
         assistant.session_log = MethodType(session_log, assistant)
         assistant.maybe_session_done = MethodType(maybe_session_done, assistant)
 
-        await assistant.handle_routed_text(text, "sid-stop")
+        async with assistant.input_turn_lifecycle.admission_lock:
+            await asyncio.wait_for(assistant.handle_routed_text(text, "sid-stop"), timeout=1)
 
         self.assertEqual(
             network_calls,

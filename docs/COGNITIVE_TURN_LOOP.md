@@ -78,6 +78,21 @@ remain Social Cognition decisions. If Work finishes before an early progress
 result returns, the obsolete progress cannot be queued after the final result.
 Neither text similarity nor event-name rules may replace this division of work.
 
+An exact Plan reservation may expire while SC is awaiting its primary decision or
+before Host publication/Runtime dispatch. Runtime keeps its strict version, Plan
+identity and fingerprint checks. Normal stale-proposal suppression additionally
+requires every Goal covered by that Plan to have a current validated successor
+Plan or qualified canonical satisfaction. Coverage is copied from the validated
+Canonical Plan, never inferred from its wider watched context. The rejection
+records versions and successor/fulfillment provenance without applying the old
+expression/Skill decision, provider effects or confirmation token. Uncovered,
+partially covered or invalidated replacements remain failures with notification;
+cancellation, refusal or a missing Goal alone does not prove a required answer
+was delivered. Goals, prepared meaning and other Work are not semantically
+cancelled by this check. Foreground, result/provider/restart/time re-entry and
+speech delivery retain their own session-finalization authority. Identity/model
+corruption and service failures remain hard; no semantic repair call is added.
+
 Failure handling preserves independent truth. Invalid communication creates no
 utterance and cannot undo valid Work. Invalid planning creates no executable Work
 and cannot invalidate a truthful already-delivered act. Required unanswered
@@ -276,7 +291,7 @@ composer or execution specialist.
 | Module | Authoritative input | Authoritative output | Must not decide |
 |---|---|---|---|
 | Cognitive Gateway | captured turn, bounded Host context, deterministic protective controls | admitted immutable `UserTurnEnvelope` or protective outcome | user Goal, Capability, Plan, or social expression |
-| User Meaning Interpretation | admitted turn plus bounded Situation/continuity context | complete provider-neutral intentions, result types, source evidence and unresolved meaning | Capability input gaps, clarification policy, Goal continuity, or Work |
+| User Meaning Interpretation | admitted turn plus bounded Situation/continuity context | complete contextual intentions, source evidence and unresolved meaning | Capability input gaps, clarification policy, Goal continuity, or Work |
 | Planner (one pass; PLANNER-AUTHORITY-001) | UMI Responsibilities plus applicable Goal, Situation, Work, Evidence, schemas/catalog, and trusted context | complete desired `CanonicalPlan`, word-free communication Needs, Capability Work and honest limitations | canonical Goal identity, execution truth, or Host/runtime mutation |
 | Goal Association | unchanged UMI result plus bounded retained Goals | Existing-Goal association or a decision that a Responsibility starts a new Goal, plus source-preserving updates only when an existing Goal is selected | New Goal WHAT, `requires_replan`, Work compatibility, Capability, or next action |
 | Planner current-state re-entry | Canonical Goals, open Responsibilities, Situation, Evidence, and bounded queued/running/completed Work after a meaningful state transition | 0..N desired Activity changes, including explicit reuse/cancel/replace/follow-up/response decisions | execution truth or mutation without Runtime validation |
@@ -1198,6 +1213,12 @@ once if the referenced event becomes `not_delivered`. Text equality is checked
 only to preserve event payload integrity. Independent result, failure,
 limitation, clarification, confirmation, progress, and completion stages retain
 their own delivery obligations.
+
+Speech registration, playback events and the Ledger preserve SC's original
+`truth_stage`, any batched `truth_stages`, and `progress_kind`. Playback changes
+delivery status, never those semantic facts. Reusing an Activity identity cannot
+upgrade a pre-evidence receipt into a grounded answer or result. Missing historical
+stage metadata remains unknown; it is never inferred from successful playback.
 
 Cross-lane awareness is transported through the append-only `Interaction
 Ledger`. Existing owners append only typed facts they are qualified to observe:

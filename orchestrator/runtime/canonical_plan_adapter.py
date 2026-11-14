@@ -20,6 +20,7 @@ from pydantic import ValidationError
 from shared.chromie_contracts.execution_outcome import (
     claim_qualification_policy_sha256,
 )
+from shared.chromie_contracts.execution_lanes import LaneCoordinationGroup
 from shared.chromie_contracts.interaction import (
     InteractionResponse,
     InteractionSpeech,
@@ -700,18 +701,27 @@ class CanonicalPlanRuntimeAdapter:
         if not isinstance(auxiliary, InteractionResponse):
             response.metadata["social_expression_admission"] = auxiliary
             return response
+        admitted = []
+        reasons = list(auxiliary.metadata.get("auxiliary_reasons") or [])
         for request in auxiliary.capabilities:
             anchor = request.metadata.get("anchor_id")
             speeches = [speech for speech in response.speech
                         if anchor in speech.metadata.get("communicative_activity_ids", [])]
             if len(speeches) == 1:
                 speech = speeches[0]
+                if speech.metadata.get("coordination_id"):
+                    reasons.append(f"primary_coordination_reserved:{request.capability_id}")
+                    continue
                 identity = "sc:" + hashlib.sha256(f"{social_cognition.request_id}|{anchor}".encode()).hexdigest()[:24]
                 shared = {"coordination_id": identity, "lane_start_policy": "prepared_start"}
                 request.metadata.update(shared)
                 speech.metadata.update({**shared, "execution_lane": "vocal"})
             self._record_auxiliary_behavior_request(request, session_id=session_id)
-        response.capabilities.extend(auxiliary.capabilities)
+            admitted.append(request)
+        response.capabilities.extend(admitted)
+        response.metadata["social_expression_admission"] = {
+            "status": "accepted" if admitted else "rejected",
+            "materialized_count": len(admitted), "reasons": reasons}
         return response
 
     async def build_execution_only_response(
@@ -763,8 +773,8 @@ class CanonicalPlanRuntimeAdapter:
                 repair_of_activity_ids=act.repair_of_activity_ids,
             )
         needs = {need.need_id: need for need in plan.communication_needs}
-        responding_goals = {item.goal_id for item in plan.goal_outcomes if item.disposition == "respond"}
         stages = []
+        coordination = []
         for act in resolution.activities:
             if not act.text.strip():
                 continue
@@ -773,13 +783,28 @@ class CanonicalPlanRuntimeAdapter:
             completion_goals = sorted({
                 goal_id for need in addressed
                 if need.kind == "answer" and resolution.need_outcomes[need.need_id] == "covered"
-                for goal_id in need.source_goal_ids if goal_id in responding_goals
+                for goal_id in need.source_goal_ids
+                if act.truth_stage in {"context_grounded", "post_evidence"}
             })
             confirmation = "confirmation" in kinds
             waiting = confirmation or "input" in kinds
             completion = bool(completion_goals) and not set(act.source_goal_ids).intersection(plan.executable_goal_ids())
+            concurrent = any(need.owner == "planner" and need.kind == "answer"
+                             and need.facts.get("timing") == "parallel" for need in addressed)
+            coordination_id = None
+            if concurrent and plan.steps:
+                if any(step.metadata.get("depends_on") for step in plan.steps):
+                    raise ValueError("one prepared-start answer group cannot contain dependent Work")
+                coordination_id = "need:" + hashlib.sha256(
+                    f"{plan.plan_id}|{act.activity_id}".encode()).hexdigest()[:24]
+                coordination.append(LaneCoordinationGroup(
+                    coordination_id=coordination_id, lanes=["vocal", "activity"],
+                    activity_step_ids=[step.step_id for step in plan.steps],
+                    reason_summary="Preserve the primary Planner's concurrent answer Need."))
             stages.append(ResponseStage(
                 text=act.text, delivery_phase=act.delivery_phase,
+                coordination_id=coordination_id,
+                delivery_role="activity_companion" if coordination_id else "response",
                 speech_act="ask_confirmation" if confirmation else "ask_clarification" if waiting else act.function,
                 commitment_state="waiting_for_user" if waiting else "completed" if completion else "none",
                 must_not_claim_completion=not (completion and not waiting),
@@ -801,6 +826,7 @@ class CanonicalPlanRuntimeAdapter:
             projection_id=f"sc_{resolution.snapshot_digest[:20]}",
             canonical_plan_id=plan.plan_id, canonical_plan_fingerprint=fingerprint,
             canonical_plan=plan, response_plan=ResponsePlan(activities=stages),
+            lane_coordination=coordination,
             social_cognition_request=request, social_cognition=resolution,
             metadata={"authority": "social_cognition", "task_plan_immutable": True},
         )
@@ -819,7 +845,7 @@ class CanonicalPlanRuntimeAdapter:
         if any(act.auxiliary_activities for act in resolution.activities):
             response = await self.prepare_social_response(response, social_cognition=resolution,
                 session_id=session_id, turn_id=str(request.source_turn.get("turn_id") or request.request_id),
-                context=social_context)
+                context=social_context, primary_plan=plan)
         return response
 
 
@@ -1301,8 +1327,14 @@ class CanonicalPlanRuntimeAdapter:
             ordered_context_grounded_after_work = (
                 phase == "final"
                 and set(speech_metadata["truth_stages"]) == {"context_grounded"}
-                and not set(projected.get("covers_goal_ids") or []).intersection(
-                    executable_goal_ids
+                and (
+                    not set(projected.get("covers_goal_ids") or []).intersection(executable_goal_ids)
+                    or (social_response and projected.get("must_not_claim_completion") is True
+                        and bool(projected.get("communication_after_step_ids"))
+                        and bool(projected.get("addressed_need_ids"))
+                        and set(projected["addressed_need_ids"]) <= {
+                            need.need_id for need in plan.communication_needs
+                            if need.owner == "planner" and need.kind == "answer"})
                 )
             )
             if ordered_context_grounded_after_work:

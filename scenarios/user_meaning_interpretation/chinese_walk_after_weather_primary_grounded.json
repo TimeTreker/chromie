@@ -27,13 +27,11 @@
               "local_ref": "r1",
               "outcome": "往前跑个十来秒，速度点。",
               "confidence": 0.97,
-              "output_mode": "body_action",
               "source_evidence": {
                 "source_start_token_ref": "t0",
                 "source_end_token_ref": "t11"
               },
-              "continuity_scope": "goal",
-              "body_effect_family": "task_physical_effect"
+              "value_review": false
             }
           ],
           "meaning_uncertainties": [],
@@ -42,8 +40,7 @@
               "authority": "planner",
               "responsibility_refs": [
                 "r1"
-              ],
-              "reason_summary": "Explicit authored fixture requests the existing cognitive owner."
+              ]
             }
           ]
         }
@@ -61,9 +58,7 @@
       {
         "local_ref": "r1",
         "outcome": "往前跑个十来秒，速度点。",
-        "confidence": 0.97,
-        "output_mode": "body_action",
-        "body_effect_family": "task_physical_effect"
+        "confidence": 0.97
       }
     ]
   },

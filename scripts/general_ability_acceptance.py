@@ -342,9 +342,23 @@ def _provenance_attachment_rejected(cognitive: dict[str, Any]) -> bool:
 
 def _failed_workflow_stage(summary: dict[str, Any]) -> dict[str, Any] | None:
     session = summary.get("session_state") or {}
-    return next((item for item in session.get("cognitive_workflow_stages") or []
-                 if isinstance(item, dict) and item.get("status") in {"error", "failed"}
-                 and not _declared_safe_non_completion(summary, item)), None)
+    failed = next((item for item in session.get("cognitive_workflow_stages") or []
+                   if isinstance(item, dict) and item.get("status") in {"error", "failed"}
+                   and not _declared_safe_non_completion(summary, item)), None)
+    if failed is not None:
+        return failed
+    execution = summary.get("execution") or {}
+    if execution.get("status") not in {"error", "failed"}:
+        return None
+    # Execution can finish after the retained cognitive-stage snapshot. Its
+    # authoritative failed result still blocks the next case; a successful Plan
+    # is not evidence that its Runtime execution succeeded.
+    completion = {
+        "stage": "trusted_capability_runtime_completion", "status": execution["status"],
+        "errors": [item for item in execution.get("results") or []
+                   if isinstance(item, dict) and item.get("status") in {"error", "failed"}],
+    }
+    return None if _declared_safe_non_completion(summary, completion) else completion
 
 
 def _declared_safe_non_completion(summary: dict[str, Any], stage: dict[str, Any]) -> bool:
@@ -2123,7 +2137,11 @@ async def _run_live_case(
         )
         for index, turn in enumerate(case.turns, 1)
     ]
-    raw_results = await run_check_sequence(namespaces, evidence_dir=case_dir)
+    raw_results = await run_check_sequence(
+        namespaces,
+        evidence_dir=case_dir,
+        continue_after_failure=bool(getattr(args, "keep_going", False)),
+    )
     turn_results: list[dict[str, Any]] = []
     episode_errors: list[str] = []
     for index, turn in enumerate(case.turns):

@@ -226,7 +226,7 @@ def build_association_prompt(
         "The current UMI Responsibility is foreground semantic truth; retained Goals are history. "
         "A conversational Responsibility may associate with a retained social Goal when its accepted "
         "meaning actually continues that Goal, and a task Responsibility may associate with retained "
-        "task continuity. continuity_scope is context only, not an association rule. "
+        "task continuity. Preserve accepted natural-language meaning without inventing a result category or lifetime. "
         "Use only responsibility_status=open candidates as mutable association targets. Terminal "
         "Goals are immutable historical evidence and cannot receive modify/cancel/resume operations. "
         "Choose relationships only when supported by accepted current meaning and retained Goal "
@@ -236,7 +236,7 @@ def build_association_prompt(
         "supersedes_goal_ids may identify open Goals explicitly replaced by current meaning. "
         "An independent additional task has neither relationship. A terminal Goal may be related "
         "historical context but cannot be superseded; a Goal cannot be both related and superseded. "
-        "For requirement changes, select exact retained Goal requirements and exact current UMI source "
+        "An intent-only source cannot rewrite retained typed Goal contracts or bindings. Preserve them on that Goal revision, or use a fully sourced replacement Goal when the person changes them. For requirement changes, select exact retained Goal requirements and exact current UMI source "
         "refs; Host copies the new values from UMI. Do not author descriptions, output modes, resource "
         "structure, provider choices, execution details, or response wording. Planner owns HOW; SC owns "
         "interaction wording. A reported user emotion or situation may be evidence for continuity only "
@@ -249,8 +249,7 @@ def build_association_prompt(
         + "\nUMI Responsibilities JSON:\n"
         + required_json([
             {"local_ref": item.local_ref, "outcome": item.outcome,
-             "confidence": item.confidence, "output_mode": item.output_mode,
-             "continuity_scope": item.continuity_scope,
+             "confidence": item.confidence,
              "source_evidence": item.source_evidence.model_dump() if item.source_evidence else None}
             for item in request.responsibilities
         ], None, label="UMI Responsibility evidence")

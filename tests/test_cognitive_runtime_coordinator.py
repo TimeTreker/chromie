@@ -847,7 +847,7 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
                         snapshot_digest=request.snapshot_digest(), model_call_count=1,
                         disposition="communicate", reason_summary="Acknowledge the admitted request.",
                         activities=[{"activity_id": "initial-ack", "text": "我听到了。",
-                            "function": "acknowledge", "truth_stage": "context_grounded"}])
+                            "function": "acknowledge", "truth_stage": "pre_evidence", "progress_kind": "think"}])
                 return await super().resolve_social_cognition(session, request=request, **kwargs)
 
         client = Client(association=new_goal_association(), fast_plans=[respond_plan()])
@@ -1932,6 +1932,83 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
         self.assertIn("orchestrator.cognitive_runtime", modules)
         self.assertIn("orchestrator.canonical_plan_adapter", modules)
         self.assertIn("total", result.timings_ms)
+
+    def test_plan_becoming_stale_during_sc_never_applies_its_decision(self):
+        for changed_goal in ("goal-1", "unrelated"):
+            with self.subTest(changed_goal=changed_goal):
+                runtime = FakeRuntime()
+                built = []
+                stages = []
+
+                class Client(ScriptedClient):
+                    async def resolve_social_cognition(self, session, *, request, **kwargs):
+                        result = await super().resolve_social_cognition(session, request=request, **kwargs)
+                        if request.trigger == "work_state":
+                            snapshot = await runtime.runtime.planning_state_snapshot([changed_goal], "new-turn")
+                            await runtime.runtime.reserve_planning_submission(
+                                snapshot, covered_goal_ids=snapshot["goal_ids"], plan_id="new-plan", fingerprint="new-fp", prepared_activity_ids=[],
+                            )
+                        return result
+
+                class Adapter(CanonicalPlanRuntimeAdapter):
+                    async def build_social_cognition_response(self, **kwargs):
+                        built.append(kwargs["request"].trigger)
+                        return await super().build_social_cognition_response(**kwargs)
+
+                client = Client(association=new_goal_association(), fast_plans=[respond_plan()])
+                coordinator = GoalDrivenRuntimeCoordinator(
+                    agent_client=client, adapter=Adapter(runtime), policy=CognitiveRuntimePolicy(mode="apply"),
+                    workflow_stage_sink=lambda _sid, **stage: stages.append(stage),
+                )
+                result = self.run_resolution(coordinator, client)
+                self.assertEqual(client.calls.count("stream"), 1)
+                self.assertEqual(client.calls.count("association"), 1)
+                self.assertEqual(len([r for r in client.social_requests if r.trigger == "work_state"]), 1)
+                if changed_goal == "goal-1":
+                    self.assertEqual(result.status, "skipped", result.fallback_reason)
+                    self.assertIsNone(result.interaction_response)
+                    self.assertEqual(result.metadata["host_commit_status"], "rejected_stale")
+                    self.assertNotIn("work_state", built)
+                    self.assertTrue(any(s["status"] == "stale" for s in stages))
+                    self.assertFalse(any(s["status"] == "failed" for s in stages))
+                else:
+                    self.assertEqual(result.status, "applied", result.fallback_reason)
+                    self.assertIn("work_state", built)
+
+    def test_stale_plan_cannot_hide_invalid_social_model_output(self):
+        from orchestrator.runtime.cognitive_runtime import CognitiveStageFailure
+        from shared.chromie_contracts.core_interpretation import CognitiveWorkRequest
+        runtime = FakeRuntime()
+
+        class Client(ScriptedClient):
+            async def resolve_social_cognition(self, session, *, request, **kwargs):
+                result = await super().resolve_social_cognition(session, request=request, **kwargs)
+                snapshot = await runtime.runtime.planning_state_snapshot(["goal-1"], "new-turn")
+                await runtime.runtime.reserve_planning_submission(
+                    snapshot, covered_goal_ids=snapshot["goal_ids"], plan_id="new", fingerprint="new", prepared_activity_ids=[],
+                )
+                return result.model_copy(update={"request_id": "wrong-request"})
+
+        async def run():
+            snapshot = await runtime.runtime.planning_state_snapshot(["goal-1"], "old-turn")
+            guard = await runtime.runtime.reserve_planning_submission(
+                snapshot, covered_goal_ids=snapshot["goal_ids"], plan_id="old", fingerprint="old", prepared_activity_ids=[],
+            )
+            client = Client(association=new_goal_association(), fast_plans=[])
+            coordinator = GoalDrivenRuntimeCoordinator(
+                agent_client=client, adapter=CanonicalPlanRuntimeAdapter(runtime),
+                policy=CognitiveRuntimePolicy(mode="apply"),
+            )
+            with self.assertRaises(CognitiveStageFailure) as failure:
+                await coordinator.resolve_plan_interaction(
+                    None, plan=work_fixture(respond_plan()),
+                    work_request=CognitiveWorkRequest(text="hello", responsibilities=[{"local_ref": "r1", "outcome": "hello"}]),
+                    session_id="old-turn", language="en", context={}, planning_commit=guard,
+                )
+            self.assertEqual(failure.exception.failure_metadata["failure_domain"], "cognitive_service")
+            self.assertEqual(len(client.social_requests), 1)
+
+        asyncio.run(run())
 
     def test_workflow_sink_receives_owned_stage_inputs_outputs_and_timing(self):
         client = ScriptedClient(
@@ -3505,13 +3582,13 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
                 {
                     "local_ref": "r1",
                     "outcome": "blink twice",
-                    "output_mode": "body_action",
+
                     "confidence": 0.97,
                 },
                 {
                     "local_ref": "r2",
                     "outcome": "tell a short joke",
-                    "output_mode": "speech",
+
                     "bindings": {},
                     "confidence": 0.97,
                 },

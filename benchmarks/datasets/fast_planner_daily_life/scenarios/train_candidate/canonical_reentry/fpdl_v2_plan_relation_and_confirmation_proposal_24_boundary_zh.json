@@ -128,7 +128,6 @@
           "confidence": 0.99,
           "local_ref": "r1",
           "outcome": "创建工作日重复提醒，或提出用户明确允许的2099年9月4日一次性替代方案。",
-          "output_mode": "stateful_effect",
           "schema_version": 1,
           "source_evidence": {
             "source_end_token_ref": "t999",

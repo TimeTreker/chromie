@@ -71,6 +71,17 @@ payload. Planner failures remain non-retryable and authorize no execution.
 Canonical planning uses `contract_failure` containment: an empty rejected Plan, without
 invented clarification speech, and no other planner repairs it. Streaming returns a typed `before_commit` failure.
 
+`StalePlanningSubmissionError` is a proven obsolete reservation: all of its
+validated Plan's Goal IDs have current successor reservations/accepted Work or
+qualified satisfaction. Runtime preserves that exact coverage separately from
+watched context, records version and successor provenance, and skips only the
+old proposal. Merely changed, partly covered, absent, cancelled or refused Goals
+cannot silently lose unanswered work: without complete proof the ordinary hard
+failure/notification path remains. Check before Plan-bound SC application, Host
+side effects/confirmation, publication and Runtime admission, including re-entry.
+Session owners retain closure authority. Invalid Plan identity/model output and
+service failures remain hard; stale suppression invokes no semantic repair.
+
 The Planner's native argument contract requires a source span for a required, unbound
 string enum when none of its choices could be a literal copy from an owning
 Responsibility outcome. This exposes the existing Host provenance requirement
@@ -120,6 +131,17 @@ owners replace duplicate Conversation aggregate and retained Host task history.
 Situation-specific disclosure-safe relational memory is selected after that
 projection. The complete retained request still passes ordinary transport budget
 admission; no required fact is shortened to fit a local section quota.
+
+Pending Social Cognition is scoped by conversation and immutable source turn,
+not by the order UMI or Planner happens to finish. The Host uses admitted user-row
+identities only to expire obsolete optional expression; no future utterance enters
+an older semantic packet. Required communication Needs remain independent across
+turns, and a Plan may finish or replace only its own source's SC predecessor.
+A new foreground input can replace old optional speech; explicit protective
+interruption still cancels every registered scope. A displaced task remains
+registered until cancellation finishes so an immediate stop cannot orphan it.
+The text console joins pending social tasks and raises retained delivery failures
+before reporting turn completion, including when the main Work proposal was skipped.
 
 SC re-entry is still part of the admitted user turn. A supplied communication Need
 that is already fulfilled by an exact same-turn act requires that act's unchanged
@@ -198,6 +220,12 @@ pending or delivered in the current turn. Returning its unchanged identity and
 words lets Runtime reuse playback and await its completion; a nonverbal gesture
 or silence cannot stand in for this coverage witness. An acknowledgement alone
 does not satisfy an answer Need. Silence retains pending Need accounting.
+After the exact playback attempt completes, SC delivery records the correlated
+`playback_delivery` Ledger event's rendered text in dialogue Memory. It never copies
+unrendered model text into a delivered-word record or relaxes wording identity to
+hide a formatting mismatch. A missing, foreign, wrong-Activity or incomplete event
+cannot establish Memory, preference delivery or communicative Goal completion.
+
 Playback-qualified dialogue history merges repeated receipts for the exact same
 session, turn and communicative Activity identity. Final Need/Evidence metadata
 updates the existing delivered record rather than adding another utterance; the

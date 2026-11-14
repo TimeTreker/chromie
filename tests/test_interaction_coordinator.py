@@ -1938,6 +1938,42 @@ class PreparedWorkTests(unittest.IsolatedAsyncioTestCase):
 
 
 class SpeechCompletionAuthorityTests(unittest.IsolatedAsyncioTestCase):
+    async def test_delivery_without_correlated_playback_words_cannot_record_or_close(self):
+        from orchestrator.runtime.capability_runtime import CapabilityRuntimeResult
+        from orchestrator.runtime.interaction_ledger import InteractionLedger
+        from shared.chromie_contracts.interaction import CapabilityResult
+
+        for kind in ("missing", "foreign_event", "different_activity", "not_completed"):
+            with self.subTest(kind=kind):
+                recorded, closed = [], []
+                ledger = InteractionLedger()
+                if kind != "missing":
+                    ledger.record_playback_event({
+                        "event_id": "other" if kind == "foreign_event" else "playback",
+                        "session_id": "sid", "status": "scheduled" if kind == "not_completed" else "playback_completed",
+                        "text": "Actual words.", "communicative_activity_ids": ["other" if kind == "different_activity" else "answer"],
+                    })
+
+                async def delivery(_sid, _output):
+                    return True
+
+                runtime = InteractionRuntimeCoordinator(
+                    lambda args: {}, interaction_ledger=ledger, speech_delivery_waiter=delivery,
+                    communicative_delivery_recorder=lambda *args: recorded.append(args),
+                    communicative_goal_completion_recorder=lambda *args: closed.append(args),
+                )
+                response = InteractionResponse(interaction_id="reply", speech=[{
+                    "id": "speech", "text": "Proposed words.", "metadata": {
+                        "wording_owner": "social_cognition", "communicative_activity_ids": ["answer"],
+                        "communication_completion_goal_ids": ["goal"], "evidence_refs": ["evidence"],
+                    }}])
+                execution = CapabilityRuntimeResult(interaction_id="reply", status="completed", results=[
+                    CapabilityResult(request_id="speech", capability_id="chromie.speak", status="completed",
+                                     output={"speech_event_id": "playback"})])
+                self.assertFalse(await runtime.record_social_delivery(response, execution, session_id="sid"))
+                self.assertEqual(recorded, [])
+                self.assertEqual(closed, [])
+
     async def test_evidence_bound_social_delivery_records_memory_and_closes_exact_goals(self):
         from orchestrator.runtime.capability_runtime import CapabilityRuntimeResult
         from shared.chromie_contracts.interaction import CapabilityResult, InteractionSpeech
@@ -1985,6 +2021,9 @@ class SpeechCompletionAuthorityTests(unittest.IsolatedAsyncioTestCase):
             )],
         )
 
+        from tests.cognitive_work_test_support import mock_completed_speech_ledger
+        coordinator.interaction_ledger = mock_completed_speech_ledger(
+            response, execution, session_id="sid-weather")
         await coordinator.record_social_delivery(response, execution, session_id="sid-weather")
 
         self.assertEqual(len(recorded), 1)

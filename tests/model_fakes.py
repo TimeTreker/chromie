@@ -8,6 +8,8 @@ call's ``response_format`` (for example ``declared_ability_needs``).
 
 from __future__ import annotations
 
+import json
+from collections.abc import AsyncIterator
 from typing import Any, Callable
 
 Shape = Callable[[Any, Any], Any]
@@ -37,6 +39,10 @@ class _RecordingModel:
         if self.shape is not None:
             return self.shape(reply, kwargs.get("response_format"))
         return reply
+
+    async def generate_stream(self, prompt: str, **kwargs: Any) -> AsyncIterator[str]:
+        reply = await self.generate(prompt, **kwargs)
+        yield json.dumps(reply, ensure_ascii=False) if isinstance(reply, dict) else reply
 
 
 class FakeOllama(_RecordingModel):

@@ -4,7 +4,7 @@
       "lexical overlap selects the wrong Goal",
       "terminal or paused lifecycle is ignored",
       "one GI Responsibility is dropped or duplicated",
-      "GA changes GI output_mode or invents Planner HOW",
+      "GA changes accepted UMI WHAT or invents Planner HOW",
       "mixed continuity is dropped or duplicated across association and creation"
     ],
     "phenomena": [
@@ -98,13 +98,13 @@
       "history": [],
       "interpretation_confidence": 1.0,
       "language": "en-US",
+      "meaning_uncertainties": [],
       "planner_reentry_scope": null,
       "responsibilities": [
         {
           "confidence": 1.0,
           "local_ref": "r1",
           "outcome": "reject: Move backward for 7 seconds. (No, reject that pending goal.)",
-          "output_mode": "body_action",
           "schema_version": 1,
           "source_evidence": {
             "source_end_token_ref": "tok_r1_end",
@@ -114,8 +114,7 @@
       ],
       "schema_version": 1,
       "sid": "ga_daily_v1_03_04_reject_pending",
-      "text": "No, reject that pending goal.",
-      "meaning_uncertainties": []
+      "text": "No, reject that pending goal."
     }
   },
   "invariants": {
@@ -137,25 +136,6 @@
   "split": "train_candidate",
   "target": {
     "contract_gap": null,
-    "schema_expectation": "accept",
-    "semantic_expectations": {
-      "candidate_goal_ids": [
-        "goal_03_04_a"
-      ],
-      "must_map_every_responsibility_exactly_once": true,
-      "must_preserve_gi_output_mode": true,
-      "responsibility_count": 1,
-      "responsibility_map": [
-        {
-          "operation": "association",
-          "relationship": "reject",
-          "source_ref": "r1",
-          "target_goal_ids": [
-            "goal_03_04_a"
-          ]
-        }
-      ]
-    },
     "reference_model_output": {
       "associations": [
         {
@@ -171,27 +151,46 @@
           ]
         }
       ],
-      "confidence": 1.0,
-      "reason_summary": "Map every accepted GI Responsibility exactly once.",
-      "referent_updates": [],
-      "resolved_references": [],
       "cognitive_requests": [
         {
           "authority": "social_cognition",
+          "reason_summary": "Decide interaction using the established canonical continuity facts.",
           "responsibility_refs": [
             "r1"
-          ],
-          "reason_summary": "Decide interaction using the established canonical continuity facts."
+          ]
         },
         {
           "authority": "planner",
+          "reason_summary": "Determine the remaining Work or control delta from the accepted Goal continuity.",
           "responsibility_refs": [
             "r1"
-          ],
-          "reason_summary": "Determine the remaining Work or control delta from the accepted Goal continuity."
+          ]
         }
       ],
-      "new_goals": []
+      "confidence": 1.0,
+      "new_goals": [],
+      "reason_summary": "Map every accepted GI Responsibility exactly once.",
+      "referent_updates": [],
+      "resolved_references": []
+    },
+    "schema_expectation": "accept",
+    "semantic_expectations": {
+      "candidate_goal_ids": [
+        "goal_03_04_a"
+      ],
+      "must_map_every_responsibility_exactly_once": true,
+      "must_preserve_umi_what": true,
+      "responsibility_count": 1,
+      "responsibility_map": [
+        {
+          "operation": "association",
+          "relationship": "reject",
+          "source_ref": "r1",
+          "target_goal_ids": [
+            "goal_03_04_a"
+          ]
+        }
+      ]
     }
   }
 }

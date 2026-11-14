@@ -27,10 +27,12 @@ from .planner_model_contract import (
     parse_ability_needs,
     stable_plan_id,
     take_ability_needs,
+    need_first_response_schema,
+    validate_ability_need_realization,
     take_activity_count,
+    decode_need_timings,
 )
 from .planner_schema import (
-    need_first_response_schema,
     readiness_first_response_schema,
     scoped_reporting_response_schema,
     planner_readiness_response_schema,
@@ -68,7 +70,6 @@ from .planner_validation import (
     normalize_common_planner_output,
     qualify_planner_capability_payload,
     fast_activity_execution_groups,
-    qualify_capability_catalog_for_output_mode_values,
     validate_explicit_numeric_parameter_grounding,
     validate_external_response_evidence_boundary,
     validate_goal_binding_argument_grounding,
@@ -220,21 +221,11 @@ class PlannerResolver:
                 current, catalog, entries = await fast_capability_context(self.catalog, request, loaded_ids)
                 current.context["planner_target_evidence_context"] = trusted_target_prompt_context(current.context)
                 target_ref = trusted_target_ref(current.context)
-                output_modes = {item.output_mode for item in responsibilities}
                 projected = [fast_capability_payload(item, include_side_effect_free=True)
                     for item in catalog if item.available and item.interaction_executable
                     and is_planner_step_capability(item.capability_id)
                     and realizable_with_current_target(item, target_ref)]
-                capabilities = qualify_capability_catalog_for_output_mode_values(
-                    projected,
-                    output_modes=output_modes,
-                )
-                # Contracts the Planner requested through need-first search are components
-                # of its HOW (for example the forecast read before a conditional action);
-                # they are not filtered against the Responsibility's own output mode.
-                qualified_ids = {item["capability_id"] for item in capabilities}
-                capabilities += [item for item in projected if item["capability_id"] in loaded_ids
-                                 and item["capability_id"] not in qualified_ids]
+                capabilities = projected
                 if len(capabilities) > self.max_capabilities + len(loaded_ids):
                     raise PlannerDTOContractError("Common capability contracts exceed the configured context budget")
                 loaded_capability_ids = [item["capability_id"] for item in capabilities]
@@ -246,7 +237,9 @@ class PlannerResolver:
                     original_user_text=current.original_user_text,
                     situation_source_refs=list(situation_source_observations(current.context)),
                     trusted_target_ref=target_ref,
-                ), loaded_capability_ids)
+                ), loaded_capability_ids,
+                    retained_need_texts=[item.need for item in first_needs] if invocation else None,
+                )
                 prompt = fast_advance_layered_prompt(current, responsibilities=responsibilities,
                     capabilities=capabilities, response_schema=schema)
                 raw_text = ""
@@ -271,14 +264,11 @@ class PlannerResolver:
                         needs_seen = True
                         first_needs = parse_ability_needs(prefix, loaded_capability_ids=loaded_capability_ids)
                         unmet = [item.need for item in first_needs if item.unmet]
-                        # Search everything the Planner did not see, including a common
-                        # contract the Responsibility's output mode filtered out.
+                        # Search only contracts not already supplied to the Planner.
                         found = search_capability_library(
                             unmet, entries, loaded_ids=set(loaded_capability_ids)) if unmet else []
                         by_id = {item.capability_id: item for item in entries}
-                        # A speech-only turn cannot author a Capability Activity, so nothing loads.
-                        can_work = any(item.output_mode != "speech" for item in responsibilities)
-                        searched = [key for key in found if key in by_id] if can_work else []
+                        searched = [key for key in found if key in by_id]
                         if searched:
                             # Stop reading: no Plan from this pass is used.
                             break
@@ -288,9 +278,16 @@ class PlannerResolver:
                 from jsonschema import Draft202012Validator
                 raw = parse_fast_work_document(raw_text)
                 Draft202012Validator(schema).validate(raw)
-                final_needs = take_ability_needs(raw, loaded_capability_ids=loaded_capability_ids)
+                final_needs = take_ability_needs(
+                    raw, loaded_capability_ids=loaded_capability_ids,
+                    retained_need_texts=[item.need for item in first_needs] if invocation else None,
+                )
                 take_activity_count(raw)
+                decode_need_timings(raw)
                 output = FastPlannerAdvanceModelOutput.model_validate(raw)
+                validate_ability_need_realization(final_needs, [
+                    item.capability_id for item in output.activities if item.role == "capability"
+                ], completes_without_work=output.disposition == "respond")
                 output, repeated_activity_repairs = drop_repeated_identical_activities(output)
                 output, merged_read_repairs = merge_identical_reads_across_responsibilities(
                     output, capabilities=capabilities)
@@ -316,7 +313,6 @@ class PlannerResolver:
                 authored_decisions = {ref: item.model_dump() for ref, item in output.responsibility_decisions.items()}
                 output = project_responsibility_decisions(
                     output, responsibility_refs=[item.local_ref for item in responsibilities],
-                    speech_refs={item.local_ref for item in responsibilities if item.output_mode == "speech"},
                 )
                 output = normalize_fast_capability_activity_purpose(
                     output, capabilities=capabilities
@@ -403,7 +399,10 @@ class PlannerResolver:
         runtime_tracer.attach_fragment(result.metadata, trace_scope)
         return result
 
-    async def _resolve(self, request: CognitiveWorkRequest, loaded_capability_ids: tuple[str, ...] = ()) -> CanonicalPlan:
+    async def _resolve(
+        self, request: CognitiveWorkRequest, loaded_capability_ids: tuple[str, ...] = (), *,
+        retained_need_texts: list[str] | None = None,
+    ) -> CanonicalPlan:
         request, selected_catalog, indexed_catalog = await fast_capability_context(self.catalog, request, loaded_capability_ids)
         plan_id = stable_plan_id(request, "fast")
         context = request.context if isinstance(request.context, dict) else {}
@@ -612,6 +611,7 @@ class PlannerResolver:
             response_schema = readiness_first_response_schema(need_first_response_schema(
                 native_goal_outcome_branches(response_schema),
                 [item["capability_id"] for item in capability_payload],
+                retained_need_texts=retained_need_texts,
             ))
         options = {
             "temperature": 0,
@@ -661,43 +661,55 @@ class PlannerResolver:
                         ),
                     )
                 else:
-                    raw = await self.ollama.generate(
-                        fast_layered_prompt(
-                            request,
-                            capability_payload,
-                            response_schema=response_schema,
-                            goal_context=goal_context,
-                        ),
-                        system=fast_system_prompt(),
-                        options=options,
-                        response_format=response_schema,
-                        prompt_family="fast_planner.primary",
-                        turn_id=request.sid,
-                        attempt=1 + int(bool(loaded_capability_ids)),
-                    )
-                    if not isinstance(raw, dict):
-                        raise ValueError("planner response is not a JSON object")
-                    needs = take_ability_needs(
-                        raw, loaded_capability_ids=[item["capability_id"] for item in capability_payload]
-                    )
-                    unmet = [item.need for item in needs if item.unmet]
-                    found = search_capability_library(
-                        unmet, indexed_catalog,
-                        loaded_ids={item["capability_id"] for item in capability_payload},
-                    ) if unmet and not loaded_capability_ids else []
-                    by_id = {item.capability_id: item for item in indexed_catalog}
-                    usable = [fast_capability_payload(by_id[key]) for key in found
-                              if key in by_id] if found and not response_only else []
+                    raw_text = ""
+                    usable: list[dict[str, Any]] = []
+                    needs: list[PlannerAbilityNeed] = []
+                    unmet: list[str] = []
+                    async with aclosing(self.ollama.generate_stream(
+                        fast_layered_prompt(request, capability_payload,
+                            response_schema=response_schema, goal_context=goal_context),
+                        system=fast_system_prompt(), options=options,
+                        response_format=response_schema, prompt_family="fast_planner.primary",
+                        turn_id=request.sid, attempt=1 + int(bool(loaded_capability_ids)),
+                    )) as deltas:
+                        needs_seen = bool(loaded_capability_ids)
+                        async for delta in deltas:
+                            raw_text += delta
+                            if len(raw_text) > 131072 or (raw_text.lstrip() and not raw_text.lstrip().startswith("{")):
+                                raise PlannerDTOContractError("Planner Work stream is oversized or not a JSON object")
+                            if needs_seen:
+                                continue
+                            prefix = complete_ability_needs(raw_text)
+                            if prefix is None:
+                                continue
+                            needs_seen = True
+                            needs = parse_ability_needs(prefix,
+                                loaded_capability_ids=[item["capability_id"] for item in capability_payload])
+                            unmet = [item.need for item in needs if item.unmet]
+                            found = search_capability_library(unmet, indexed_catalog,
+                                loaded_ids={item["capability_id"] for item in capability_payload}) if unmet else []
+                            by_id = {item.capability_id: item for item in indexed_catalog}
+                            usable = [fast_capability_payload(by_id[key]) for key in found if key in by_id] if not response_only else []
+                            if usable:
+                                break  # No unused Plan is authored before loading contracts.
                     if usable:
-                        # No Plan from this pass is used; plan once with the found contracts.
                         searched = await self._resolve(
-                            request, tuple(item["capability_id"] for item in usable)
+                            request, tuple(item["capability_id"] for item in usable),
+                            retained_need_texts=[item.need for item in needs],
                         )
                         return searched.model_copy(update={"metadata": {
                             **searched.metadata,
                             **ability_need_metadata(needs, unmet, tuple(item["capability_id"] for item in usable)),
                             "semantic_result_call_count": 1,
                         }})
+                    raw = parse_fast_work_document(raw_text)
+                    needs = take_ability_needs(raw,
+                        loaded_capability_ids=[item["capability_id"] for item in capability_payload],
+                        retained_need_texts=retained_need_texts)
+                    validate_ability_need_realization(needs, [
+                        str(step.get("capability_id") or "") for step in raw.get("steps") or []
+                        if isinstance(step, dict)
+                    ], completes_without_work=raw.get("disposition") == "respond" and not raw.get("time_conditions"))
                     need_metadata = ability_need_metadata(needs, [], ())
                 raw, common_repairs = normalize_common_planner_output(
                     raw,

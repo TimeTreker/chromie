@@ -74,7 +74,6 @@
           "confidence": 0.99,
           "local_ref": "r1",
           "outcome": "演唱一句愉快的话。",
-          "output_mode": "singing",
           "schema_version": 1,
           "source_evidence": {
             "source_end_token_ref": "t999",

@@ -98,6 +98,19 @@ def record_session_workflow_stage(
         )
 
 
+def record_stale_planning_submission(
+    host: Any, session_id: str | None, *, evidence: dict[str, Any],
+) -> None:
+    """Retain a proven obsolete proposal without inventing a Work failure."""
+    host.session_log(session_id, "planning_submission_rejected_stale: evidence=%s", evidence)
+    record_session_workflow_stage(
+        host, session_id, stage="planning_submission", status="stale",
+        started_monotonic_ms=now_ms(), finished_monotonic_ms=now_ms(),
+        input_payload=None, output_payload=evidence, errors=[],
+        metadata={"execution_allowed": False},
+    )
+
+
 class SessionEventWriter:
     """Append session events as JSON Lines for acceptance evidence.
 

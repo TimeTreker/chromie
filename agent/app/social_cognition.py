@@ -29,8 +29,8 @@ from shared.chromie_contracts.social_cognition import (
     SocialStartupGreetingOutput, SocialStartupGreetingRequest, SocialStartupGreetingResolution,
     acknowledgement_answers, asks_about_uncertain_meaning, completed_work_need_ids, earlier_acknowledgement_ids,
     earlier_speech_replies, must_say_now_need_ids,
-    need_asks_uncertain_meaning, pre_evidence_act_violation,
-    uncertain_task_responsibility_refs, value_review_responsibility_refs, value_withheld_need_ids,
+    need_asks_uncertain_meaning, pending_work_responsibility_refs, pre_evidence_act_violation,
+    uncertain_task_responsibility_refs, value_review_responsibility_refs, value_withheld_need_ids, work_responsibility_refs,
 )
 from shared.chromie_contracts.text import normalize_whitespace
 from shared.chromie_contracts.user_turn import user_turn_prohibits_speech
@@ -153,7 +153,11 @@ SOCIAL_COGNITION_AUTHORITY_PROMPT = (
     "acknowledgement. "
     "At interpretation ingress the accepted current UMI Responsibility is foreground. Retained "
     "Goals and old Work are not authority to replace it with a previous topic. Ordinary "
-    "output_mode=speech may be answered directly from supplied conversational context while Goal "
+    "conversation may be answered directly from supplied context only when no Planner decision "
+    "is pending for it. While work_decision_pending is true, the exact "
+    "pending_work_responsibility_refs permit only receipt/understanding or thinking, never a "
+    "specific execution method, promised effect, started Work or fulfilled answer. A result "
+    "category does not establish those facts. Goal "
     "Association independently checks canonical continuity. That immediate reply does not create, "
     "erase, or decide a Goal relationship. Non-speech task Responsibilities still have an "
     "independent Work decision pending: before Planner/Evidence establishes task facts, any act "
@@ -587,7 +591,7 @@ def social_cognition_response_schema(
     else:
         schema["properties"].pop("social_skill", None)
     need_ids = [item.need_id for item in request.communication_needs]
-    required_failure_need_ids = [
+    required_failure_need_ids = [] if user_turn_prohibits_speech(request.context.get("user_turn_envelope")) else [
         need.need_id for need in request.communication_needs
         if need.owner == "runtime" and need.kind == "result"
         and need.facts.get("status") == "failed"
@@ -714,7 +718,8 @@ def social_cognition_response_schema(
     stages = ["context_grounded"]
     if request.evidence_refs:
         stages.append("post_evidence")
-    if any(item.output_mode != "speech" for item in request.responsibilities):
+    pending_refs = pending_work_responsibility_refs(request)
+    if pending_refs or work_responsibility_refs(request):
         stages.append("pre_evidence")
     else:
         act["progress_kind"] = {"type": "null"}
@@ -727,8 +732,11 @@ def social_cognition_response_schema(
             branch = copy.deepcopy(act_schema)
             branch["properties"]["truth_stage"] = {"const": stage, "type": "string"}
             if stage == "pre_evidence":
+                branch["properties"]["addressed_need_ids"] = {"type": "array", "maxItems": 0, "items": {"type": "string"}}
                 branch["properties"]["progress_kind"] = {
-                    "type": "string", "enum": list(get_args(FastProgressKind)),
+                    "type": "string", "enum": (
+                        ["acknowledge_work", "check_information", "think"] if pending_refs else list(get_args(FastProgressKind))
+                    ),
                 }
                 branch["required"] = list(dict.fromkeys([*branch["required"], "progress_kind"]))
             else:
@@ -818,7 +826,7 @@ def social_cognition_response_schema(
                         addressed["maxItems"] = 0
                 question_branches.append(variant)
         schema["$defs"]["SocialCommunicativeAct"] = {"oneOf": question_branches}
-    if request.trigger == "interpretation" and not request.communication_needs:
+    if request.trigger == "interpretation" or pending_refs:
         # Native decoding must see the same semantic boundary as Host validation.
         # Ordinary speech can be answered directly.  Non-speech task content has
         # no established result yet, so it may only receive a pre-evidence
@@ -833,16 +841,12 @@ def social_cognition_response_schema(
         direct_speech_refs = [] if routed else sorted(
             item.local_ref
             for item in request.responsibilities
-            if item.output_mode == "speech" and item.continuity_scope == "turn"
+            if item.local_ref not in pending_refs
         )
-        task_refs = sorted(
-            item.local_ref
-            for item in request.responsibilities
-            if item.output_mode != "speech"
-        )
+        task_refs = sorted(pending_refs)
         # A task Responsibility whose meaning UMI left uncertain may be asked about now
         # (owner decision 2026-10-22).
-        uncertain_refs = sorted(uncertain_task_responsibility_refs(request))
+        uncertain_refs = sorted(uncertain_task_responsibility_refs(request)) if request.trigger == "interpretation" else []
         existing = schema["$defs"]["SocialCommunicativeAct"]
         continuity_branches = []
         for branch in existing.get("oneOf", [existing]):
@@ -946,7 +950,7 @@ def _restrict_pre_evidence_task_words(
     speech Responsibilities; a pre-evidence act never covers a supplied need.
     """
 
-    speech_refs = sorted(item.local_ref for item in request.responsibilities if item.output_mode == "speech")
+    speech_refs = sorted({item.local_ref for item in request.responsibilities} - work_responsibility_refs(request) - pending_work_responsibility_refs(request))
     need_ids = [item.need_id for item in request.communication_needs if item.need_id not in withheld]
     branches = []
     for branch in schema["$defs"]["SocialCommunicativeAct"]["oneOf"]:
@@ -1138,13 +1142,9 @@ def validate_social_cognition_output(
             direct_speech_refs = {
                 item.local_ref
                 for item in request.responsibilities
-                if item.output_mode == "speech"
+                if item.local_ref not in pending_work_responsibility_refs(request)
             } - value_review_responsibility_refs(request)
-            task_refs = {
-                item.local_ref
-                for item in request.responsibilities
-                if item.output_mode != "speech"
-            }
+            task_refs = pending_work_responsibility_refs(request)
             cited_refs = set(act.source_responsibility_refs)
             asks_uncertain_meaning = asks_about_uncertain_meaning(act, request)
             if asks_uncertain_meaning:
@@ -1462,7 +1462,19 @@ def _social_current_turn_output_guard(request: SocialCognitionRequest) -> str:
     if request.trigger != "interpretation" or not request.responsibilities:
         return ""
     waiting_for_review = bool(value_review_responsibility_refs(request)) and not request.communication_needs
-    if waiting_for_review or any(item.output_mode != "speech" for item in request.responsibilities):
+    pending = pending_work_responsibility_refs(request)
+    if pending and not waiting_for_review:
+        return (
+            "\nCurrent-turn output guard: the Planner decision for these Responsibility refs "
+            "is still pending: " + json.dumps(sorted(pending)) + ". For these refs, communicate "
+            "receipt/understanding or generic checking/thinking only (pre_evidence). No particular "
+            "method, accepted task, future execution, started Work or result has been established. "
+            "A receipt cannot fulfill their requested result. For a supplied meaning uncertainty, "
+            "you may instead ask the one question that settles it. Other independent Responsibilities retain their "
+            "own grounded interaction scope; do not turn a sibling reply into a commitment to "
+            "the pending Work.\n"
+        )
+    if waiting_for_review or pending_work_responsibility_refs(request):
         return (
             "\nCurrent-turn output guard: this is interpretation ingress for task Work "
             "that Planner/Runtime has not established yet. If you speak now, acknowledge "

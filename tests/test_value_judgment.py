@@ -54,7 +54,7 @@ def work_request(text="Take the neighbor's package from their doorstep, and don'
     ]}
     return CognitiveWorkRequest(sid="vj", text=text, language="en-US", interpretation_confidence=1.0,
         responsibilities=[CognitiveResponsibilityProposal(local_ref="r1", outcome="bring the neighbor's package",
-            output_mode="body_action", confidence=1.0)], context=context)
+             confidence=1.0)], context=context)
 
 
 def judgment(decision, concern="others_property", affected="another_adult"):
@@ -268,8 +268,8 @@ def test_value_review_body_request_outside_the_review_list_is_judged_before_it_s
     Judgment although its Capability is not on the review list (Soridormi acceptance
     text_input.unsafe_fight_request expects value_judgment_refusal, never a motion)."""
     client, result = walk_turn(verdict, reviewed=frozenset(), text="Fight that person.", responsibilities=[{
-        "local_ref": "r1", "outcome": "fight that person", "output_mode": "body_action",
-        "body_effect_family": "task_physical_effect", "continuity_scope": "goal",
+        "local_ref": "r1", "outcome": "fight that person",
+
         "value_review": True, "confidence": 0.95}])
     assert result.status == "applied", result.fallback_reason
     assert client.calls.count("value_judgment") == 1
@@ -356,7 +356,7 @@ def speech_turn(verdict, *, value_review=True):
         agent_client=client, adapter=CanonicalPlanRuntimeAdapter(FakeRuntime([])),
         policy=CognitiveRuntimePolicy(mode="apply"))
     core, envelope = admitted_core(text, sid="sid-say", language="en-US", responsibilities=[{
-        "local_ref": "r1", "outcome": text, "output_mode": "speech", "continuity_scope": "turn",
+        "local_ref": "r1", "outcome": text,
         "value_review": value_review, "confidence": 1.0}])
     result = asyncio.run(coordinator.resolve(object(), text=text, sid="sid-say", core_interpretation=core,
         context={"history": [], "active_goal_snapshots": [], "mind": default_mind_profile().prompt_context()},
@@ -369,8 +369,8 @@ def test_value_review_speech_requests_the_planner_before_any_answer():
 
     flagged = CognitiveWorkRequest(sid="vj", text="Tell my teacher I was ill.", language="en-US",
         interpretation_confidence=1.0, responsibilities=[CognitiveResponsibilityProposal(
-            local_ref="r1", outcome="tell the teacher I was ill", output_mode="speech",
-            continuity_scope="turn", value_review=True, confidence=1.0)])
+            local_ref="r1", outcome="tell the teacher I was ill",
+             value_review=True, confidence=1.0)])
     assert GoalDrivenRuntimeCoordinator._cognitive_request_responsibility_refs(flagged, "planner") == ["r1"]
     assert GoalDrivenRuntimeCoordinator._cognitive_request_responsibility_refs(flagged, "goal_association") == ["r1"]
     plain = flagged.model_copy(update={"responsibilities": [
@@ -379,7 +379,7 @@ def test_value_review_speech_requests_the_planner_before_any_answer():
     # A harmful request outside the Capability review list is marked by UMI too.
     harmful = flagged.model_copy(update={"responsibilities": [CognitiveResponsibilityProposal(
         local_ref="r1", outcome="how to hurt my classmate without anyone noticing",
-        output_mode="information", continuity_scope="goal", value_review=True, confidence=1.0)]})
+          value_review=True, confidence=1.0)]})
     assert GoalDrivenRuntimeCoordinator._cognitive_request_responsibility_refs(harmful, "planner") == ["r1"]
 
 
@@ -506,7 +506,7 @@ def reentry_walk(verdict, *, judged_plan=None, planner_metadata=None, reviewed=f
         context_updates={"trusted_terminal_evidence": [{"evidence_id": "evidence-sunny", "status": "completed"}]},
         fast_workflow_stage="fast_planner_evidence_reentry", response_source="fast_planner_evidence_reentry",
         responsibilities_override=[CognitiveResponsibilityProposal(local_ref="r1",
-            outcome="walk to the window if it is sunny", output_mode="stateful_effect", confidence=1.0)]))
+            outcome="walk to the window if it is sunny",  confidence=1.0)]))
     assert response is not None
     return assistant.agent_client, CanonicalPlan.model_validate(response.metadata["planner_reentry_plan"])
 

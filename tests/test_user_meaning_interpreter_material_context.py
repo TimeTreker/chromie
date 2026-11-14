@@ -18,20 +18,20 @@ PROMPT = (
 def test_user_meaning_interpreter_preserves_same_turn_material_context() -> None:
     prompt = PROMPT.read_text(encoding="utf-8").casefold()
 
-    assert "current-turn material context belongs to the same responsibility" in prompt
-    assert "declarative, descriptive or locative clause" in prompt
-    assert "object/resource" in prompt
-    assert "source/location" in prompt
-    assert "recipient/target" in prompt
-    assert "keep material semantic facts in the complete outcome" in prompt
-    assert "do not author `bindings`" in prompt
+    assert "preserve every material object" in prompt
+    assert "a report, feeling, correction, confirmation" in prompt
+    assert "object, person, place" in prompt
+    assert "quantity, unit" in prompt
+    assert "condition, negation" in prompt
+    assert "write complete human meanings in responsibilities[].outcome" in prompt
+    assert "no output_mode, body_effect_family, continuity_scope, bindings" in prompt
 
 
 def test_user_meaning_interpreter_keeps_material_values_in_complete_meaning() -> None:
     prompt = PROMPT.read_text(encoding="utf-8").casefold()
 
-    assert "units, durations, directions, order and concurrency" in prompt
-    assert "planner extracts and realizes parameters" in prompt
+    assert "ordering or concurrency relation" in prompt
+    assert "planner owns conversion, freshness and answer-source choices" in prompt
 
 
 def test_primitive_binding_type_wrapper_is_representation_only() -> None:
@@ -44,8 +44,8 @@ def test_primitive_binding_type_wrapper_is_representation_only() -> None:
         local_ref="r1",
         outcome="nod your head 6 times",
         bindings={"count": {"value": 6, "type": "integer"}},
-        output_mode="body_action",
-        continuity_scope="goal",
+
+
         confidence=1.0,
         source_evidence={
             "source_start_token_ref": "t0",
@@ -64,10 +64,10 @@ def test_primitive_binding_type_wrapper_is_representation_only() -> None:
 def test_user_meaning_interpreter_source_span_covers_material_clauses_not_only_command() -> None:
     prompt = PROMPT.read_text(encoding="utf-8").casefold()
 
-    assert "source_evidence names the first and last current-turn token" in prompt
-    assert "the span begins right after the previous" in prompt
-    assert "determines what, where, which, whom or under what" in prompt
-    assert "semantic conservation, not a capability rule" in prompt
+    assert "source_evidence cites the first and last authoritative current-turn token" in prompt
+    assert "context-derived meaning stays context-derived" in prompt
+    assert "token on which it depends" in prompt
+    assert "do not fabricate current-turn citations for earlier words" in prompt
 
 
 
@@ -108,9 +108,9 @@ def test_retained_responsibility_binding_descriptors_normalize_to_material_value
                 },
             },
         },
-        output_mode="body_action",
-        body_effect_family="task_physical_effect",
-        continuity_scope="goal",
+
+
+
         confidence=1.0,
     )
 
@@ -124,11 +124,11 @@ def test_retained_responsibility_binding_descriptors_normalize_to_material_value
 def test_user_meaning_interpreter_preserves_contextual_resource_meaning() -> None:
     prompt = PROMPT.read_text(encoding="utf-8").casefold()
 
-    assert "those still-applicable source facts are part of the current what and must be" in prompt
-    assert "present in this responsibility's complete outcome" in prompt
-    assert "cognitive_requests" in prompt and "reason_summary" in prompt
-    assert "source_evidence still cites only the current" in prompt
-    assert "turn and must never be widened or fabricated" in prompt
+    assert "include the resolved subject, need and still-applicable constraints" in prompt
+    assert "in the outcome itself" in prompt
+    assert "cognitive_requests" in prompt and "do not author reasons" in prompt
+    assert "authoritative current-turn token" in prompt
+    assert "do not fabricate current-turn citations for earlier words" in prompt
 
 def test_user_meaning_interpreter_goal_context_is_semantic_without_canonical_identity() -> None:
     from agent.app.cognitive_core.user_meaning_interpreter.model_interpreter import (
@@ -164,7 +164,6 @@ def test_user_meaning_interpreter_goal_context_is_semantic_without_canonical_ide
 
     assert projected == [
         {
-            "status": "open",
             "description": "Check whether Chongqing will be hot tonight.",
             "object": {"bindings": {"location": "重庆"}},
             "constraints": {"time_scope": "今晚"},
@@ -179,11 +178,28 @@ def test_user_meaning_interpreter_goal_context_is_semantic_without_canonical_ide
     assert "terminal-goal" not in serialized
 
 
+def test_task_completion_does_not_reauthor_the_human_meaning_context() -> None:
+    from agent.app.cognitive_core.user_meaning_interpreter.model_interpreter import (
+        _compact_goal_meaning_context,
+    )
+
+    snapshots = [
+        {"goal": {"description": "Help with the person's stated need.",
+                  "constraints": {"recipient": "user"}},
+         "last_user_update": "Please help with that."},
+    ]
+    expected = _compact_goal_meaning_context({"user_meaning_goal_context": snapshots})
+    for status in ("open", "satisfied", "failed", "cancelled"):
+        snapshot = {**snapshots[0], "responsibility_status": status,
+                    "goal": {**snapshots[0]["goal"], "responsibility_status": status}}
+        assert _compact_goal_meaning_context({"user_meaning_goal_context": [snapshot]}) == expected
+
+
 def test_user_meaning_interpreter_memory_is_meaning_scoped_not_world_state_authority() -> None:
     prompt = PROMPT.read_text(encoding="utf-8").casefold()
 
-    assert "umi receives\nonly its meaning-scoped projection" in prompt
-    assert 'what does this expression mean?' in prompt
-    assert "remembered object location" in prompt
-    assert "planner/world evidence" in prompt
-    assert "current explicit user wording outranks conflicting memory" in prompt
+    assert "what the current human expression means" in prompt
+    assert 'current explicit wording overrides older context' in prompt
+    assert "an older goal, memory entry, perception or assistant statement is context" in prompt
+    assert "never a new user command or proof of execution" in prompt
+    assert "do not select an object merely because it is visible" in prompt

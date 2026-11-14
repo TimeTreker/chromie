@@ -124,10 +124,6 @@ def evaluate_episode_contract_precheck(episode: EpisodeRecord) -> EpisodeEvaluat
         text = turn.user_text.lower()
         capabilities = [item.capability_id for item in turn.agent.selected_capabilities]
         skill_set = set(capabilities)
-        requires_activity = any(
-            item.output_mode not in {"speech", "unspecified", "other"}
-            for item in turn.user_meaning_interpretation.responsibilities
-        )
         speech = " ".join(turn.agent.speech).strip()
 
         looks_like_locomotion = any(hint in text for hint in LOCOMOTION_HINTS)
@@ -188,11 +184,10 @@ def evaluate_episode_contract_precheck(episode: EpisodeRecord) -> EpisodeEvaluat
             scores["intent_preservation"] = min(scores["intent_preservation"], 35)
             scores["skill_correctness"] = min(scores["skill_correctness"], 15)
             cap = min(cap, 45)
-            if requires_activity:
-                _add_tag(failure_tags, "activity_request_not_planned")
-                scores["responsibility_advancement"] = min(
-                    scores["responsibility_advancement"], 45
-                )
+            # This existing lexical precheck is an offline review hint, never a
+            # UMI classification, Runtime route or native semantic qualification.
+            _add_tag(failure_tags, "activity_request_not_planned")
+            scores["responsibility_advancement"] = min(scores["responsibility_advancement"], 45)
             if selected_locomotion or selected_social_fallback:
                 _add_tag(failure_tags, "wrong_action_class")
                 cap = min(cap, 40)
@@ -537,11 +532,7 @@ def scenario_candidate_from_episode(
         if "body_skill_for_chat" in evaluation.failure_tags:
             expect["no_capabilities"] = True
         if "missing_eye_skill" in evaluation.failure_tags:
-            if any(
-                item.output_mode not in {"speech", "unspecified", "other"}
-                for item in turn.user_meaning_interpretation.responsibilities
-            ):
-                expect["capabilities"] = ["soridormi.blink_eyes"]
+            expect["capabilities"] = ["soridormi.blink_eyes"]
             expect["forbidden_speech_any"] = [
                 "blinked",
                 "blinking",

@@ -19,24 +19,25 @@ from shared.chromie_contracts.semantic_task import ResponsePlan, ResponseStage
 def initial_social_response_needs(
     work_request: CognitiveWorkRequest, turn_id: str,
 ) -> list[SocialCommunicationNeed]:
-    """Project resolved speech WHAT; SC alone decides whether its reply covers it."""
-    if not (
-        work_request.responsibilities
-        and all(item.output_mode == "speech" and not item.value_review
-                for item in work_request.responsibilities)
-        and any(item.authority in {"goal_association", "planner"}
-                for item in work_request.cognitive_requests)
+    """Register standing interaction scope; pending Planner work cannot be answered early."""
+    if not work_request.responsibilities or not any(
+        item.authority == "goal_association" for item in work_request.cognitive_requests
     ):
         return []
     unresolved_refs = {
         ref for uncertainty in work_request.meaning_uncertainties
         for ref in uncertainty.responsibility_refs
     }
+    planner_refs = {
+        ref for request in work_request.cognitive_requests if request.authority == "planner"
+        for ref in request.responsibility_refs
+    }
     return [SocialCommunicationNeed(
         need_id=communication_need_id(turn_id, item.local_ref),
-        owner="user_meaning_interpretation", kind="answer",
+        owner="runtime", kind="answer",
         reference_id=turn_id, source_responsibility_refs=[item.local_ref],
-    ) for item in work_request.responsibilities if item.local_ref not in unresolved_refs]
+    ) for item in work_request.responsibilities
+      if not item.value_review and item.local_ref not in unresolved_refs | planner_refs]
 
 
 def covered_social_response_refs(interaction: InteractionResponse) -> dict[str, set[str]]:
@@ -53,7 +54,7 @@ def covered_social_response_refs(interaction: InteractionResponse) -> dict[str, 
     needs = {
         need["need_id"]: set(need.get("source_responsibility_refs") or [])
         for need in request.get("communication_needs") or []
-        if need.get("owner") == "user_meaning_interpretation"
+        if need.get("owner") == "runtime"
         and need.get("kind") == "answer"
         and outcomes.get(need.get("need_id")) == "covered"
     }
@@ -63,6 +64,7 @@ def covered_social_response_refs(interaction: InteractionResponse) -> dict[str, 
         & set(speech.metadata.get("source_responsibility_refs") or [])
         for speech in interaction.speech
         if speech.text.strip() and speech.metadata.get("wording_owner") == "social_cognition"
+        and speech.metadata.get("truth_stage") in {"context_grounded", "post_evidence"}
     }
 
 
@@ -79,7 +81,6 @@ def covered_social_response_goals(
                        if coverage[item.id] & set(goal.source_responsibility_refs)]
         for goal in association.new_goals
         if goal.source_responsibility_refs
-        and goal.metadata.get("output_mode") == "speech"
         and set(goal.source_responsibility_refs) <= covered_refs
     }
 
@@ -90,21 +91,7 @@ def social_response_answered_refs(interaction: InteractionResponse) -> set[str]:
         return set()
     request = interaction.metadata.get("social_cognition_request") or {}
     resolution = interaction.metadata.get("social_cognition_resolution") or {}
-    accounted_refs = {
-        ref for need in request.get("communication_needs") or []
-        if need.get("owner") == "user_meaning_interpretation" and need.get("kind") == "answer"
-        for ref in need.get("source_responsibility_refs") or []
-    }
-    reply_refs = {
-        ref for act in resolution.get("activities") or []
-        if act.get("function") not in {"acknowledge", "nonverbal"}
-        for ref in act.get("source_responsibility_refs") or []
-    }
-    # Preserve existing replies/questions outside this primary answer scope;
-    # their act type never overrides an explicit pending answer within it.
-    return (reply_refs - accounted_refs) | set().union(
-        *covered_social_response_refs(interaction).values()
-    )
+    return set().union(*covered_social_response_refs(interaction).values())
 
 
 _PROCESS_COMMITMENTS = {"none", "heard", "evaluating"}
@@ -298,7 +285,8 @@ def build_social_interaction_response(
                 "source": "social_cognition", "wording_owner": "social_cognition",
                 "turn_id": turn_id, "session_id": session_id,
                 "language": request.language, "speech_act": act.function,
-                "truth_stage": act.truth_stage, "evidence_refs": list(act.evidence_refs),
+                "truth_stage": act.truth_stage, "progress_kind": act.progress_kind,
+                "evidence_refs": list(act.evidence_refs),
                 "source_goal_ids": list(act.source_goal_ids),
                 "source_responsibility_refs": list(act.source_responsibility_refs),
                 "addressed_need_ids": list(act.addressed_need_ids),
@@ -337,6 +325,8 @@ def build_social_interaction_response(
             "social_cognition_resolution": result.model_dump(mode="json"),
             "source_refs": list(request.source_refs), "goal_ids": [],
             "goal_completion_authority": False,
+            **({"user_turn_envelope": request.context["user_turn_envelope"]}
+               if isinstance(request.context.get("user_turn_envelope"), dict) else {}),
             **({"memory_updates": memory_updates} if memory_updates else {}),
         },
     )

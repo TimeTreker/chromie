@@ -1278,8 +1278,8 @@ class PlannerResolverTests(unittest.TestCase):
                         UserMeaningUncertainty(
                             local_ref="u1", kind="referent", description=unresolved, responsibility_refs=["r1"])],
                     "responsibilities": [
-                        CognitiveResponsibilityProposal(local_ref="r1", outcome="say the referenced content", output_mode="speech", confidence=1.0),
-                        CognitiveResponsibilityProposal(local_ref="r2", outcome="say goodnight", output_mode="speech", confidence=1.0),
+                        CognitiveResponsibilityProposal(local_ref="r1", outcome="say the referenced content",  confidence=1.0),
+                        CognitiveResponsibilityProposal(local_ref="r2", outcome="say goodnight",  confidence=1.0),
                     ],
                 })
                 raw["goal_outcomes"]["goal-speech"]["rationale"] = "The referenced content is missing."
@@ -1439,7 +1439,7 @@ class PlannerResolverTests(unittest.TestCase):
         self.assertEqual(len(ollama.prompts), 1)
 
 
-    def test_fast_advance_cannot_assign_body_capability_to_singing(self):
+    def test_fast_advance_cannot_invent_body_parameters_for_a_vocal_request(self):
         raw = {
             "disposition": "execute",
             "coverage": "complete",
@@ -1466,7 +1466,7 @@ class PlannerResolverTests(unittest.TestCase):
                     "local_ref": "sing",
                     "outcome": "sing a song",
                     "bindings": {},
-                    "output_mode": "singing",
+
                     "confidence": 0.99,
                 }
             ],
@@ -1483,7 +1483,7 @@ class PlannerResolverTests(unittest.TestCase):
         self.assertEqual(result.activities, [])
         # The native Schema now rejects the substitution before DTO/Host.
         self.assertEqual(result.metadata["error_type"], "ValidationError")
-        with self.assertRaisesRegex(PlannerDTOContractError, "exact qualified vocal provider"):
+        with self.assertRaisesRegex(planner_fast_validation.AuthoritativeGroundingValidationError, "unbound Capability input"):
             planner_fast_validation.validate_fast_advance_output(
                 FastPlannerAdvanceModelOutput.model_validate(raw), request=run_request,
                 responsibilities=run_request.responsibilities,
@@ -1518,14 +1518,14 @@ class PlannerResolverTests(unittest.TestCase):
                     "local_ref": "walk",
                     "outcome": "walk",
                     "bindings": {},
-                    "output_mode": "body_action",
+
                     "confidence": 0.99,
                 },
                 {
                     "local_ref": "sing",
                     "outcome": "sing",
                     "bindings": {},
-                    "output_mode": "singing",
+
                     "confidence": 0.99,
                 },
             ],
@@ -1606,7 +1606,7 @@ class PlannerResolverTests(unittest.TestCase):
                         "direction": "forward",
                         "duration": "10 seconds",
                     },
-                    "output_mode": "body_action",
+
                     "confidence": 0.95,
                 }
             ],
@@ -1676,7 +1676,7 @@ class PlannerResolverTests(unittest.TestCase):
                     sid="numeric-argument-" + name, text="眨一下眼睛。", language="zh-CN",
                     responsibilities=[{
                         "local_ref": "r1", "outcome": "blink eyes",
-                        "bindings": bindings, "output_mode": "body_action",
+                        "bindings": bindings,
                         "confidence": 1.0,
                     }],
                 )
@@ -1709,7 +1709,7 @@ class PlannerResolverTests(unittest.TestCase):
                         request = _work_request(
                             sid="turn-count", text="Turn in place.",
                             responsibilities=[{"local_ref": "r1", "outcome": "turn in place",
-                                "output_mode": "body_action", "bindings": {"count": count},
+                                 "bindings": {"count": count},
                                 "confidence": 1.0}],
                         )
                         output = FastPlannerAdvanceModelOutput.model_validate({
@@ -1741,7 +1741,7 @@ class PlannerResolverTests(unittest.TestCase):
                     request = _work_request(
                         sid="turn-count-contract", text="Turn in place.",
                         responsibilities=[{"local_ref": "r1", "outcome": "turn in place",
-                            "output_mode": "body_action", "bindings": {"count": count},
+                             "bindings": {"count": count},
                             "confidence": 1.0}],
                     )
                     args = {"duration_s": 2.0, "yaw_radps": 0.12}
@@ -1784,7 +1784,7 @@ class PlannerResolverTests(unittest.TestCase):
                     request = _work_request(
                         sid="realization-coverage", text="Perform the bounded action.",
                         responsibilities=[{"local_ref": "r1", "outcome": "bounded action",
-                            "output_mode": "body_action", "bindings": {"duration": value},
+                             "bindings": {"duration": value},
                             "confidence": 1.0}],
                     )
                     output = FastPlannerAdvanceModelOutput.model_validate({
@@ -2110,7 +2110,7 @@ class PlannerResolverTests(unittest.TestCase):
         )
         # UMI typed this as body_action, so the streaming Planner must never
         # receive the unrelated information provider in its executable schema.
-        self.assertEqual(advance.metadata["error_type"], "ValidationError")
+        self.assertEqual(advance.metadata["error_type"], "AuthoritativeGroundingValidationError")
 
 
     def test_execution_input_gap_must_name_real_unbound_required_parameter(self):
@@ -2211,8 +2211,8 @@ class PlannerResolverTests(unittest.TestCase):
 
         self.assertEqual(advance.disposition, "unavailable")
         self.assertEqual(advance.activities, [])
-        self.assertEqual(advance.metadata["error_type"], "PlannerDTOContractError")
-        self.assertIn("already-bound input: location", advance.metadata["error"])
+        self.assertEqual(advance.metadata["error_type"], "ValidationError")
+        self.assertIn("is not valid", advance.metadata["error"])
 
     def test_first_activity_plan_preserves_profile_context_topology(self):
         ollama = FakeOllama(
@@ -2576,6 +2576,7 @@ class PlannerResolverTests(unittest.TestCase):
             activity_refs,
             {
                 "#/$defs/FastPlannerInputNeed",
+                "#/$defs/FastPlannerResponseNeed",
                 "#/$defs/FastPlannerCapabilityActivity",
             },
         )
@@ -2620,18 +2621,19 @@ class PlannerResolverTests(unittest.TestCase):
             activity_refs,
             {
                 "#/$defs/FastPlannerInputNeed",
+                "#/$defs/FastPlannerResponseNeed",
                 "#/$defs/FastPlannerCapabilityActivity",
             },
         )
 
-    def test_capability_schema_excludes_ordinary_speech_responsibility_refs(self):
+    def test_capability_schema_preserves_untyped_responsibility_composition(self):
         responsibilities = [
             CognitiveResponsibilityProposal.model_validate(
                 {
                     "local_ref": "blink",
                     "outcome": "Blink twice",
                     "bindings": {"count": 2},
-                    "output_mode": "body_action",
+
                     "confidence": 0.98,
                 }
             ),
@@ -2640,7 +2642,7 @@ class PlannerResolverTests(unittest.TestCase):
                     "local_ref": "joke",
                     "outcome": "Tell a short joke",
                     "bindings": {"length": "short"},
-                    "output_mode": "speech",
+
                     "confidence": 0.98,
                 }
             ),
@@ -2657,16 +2659,16 @@ class PlannerResolverTests(unittest.TestCase):
         response_refs = schema["$defs"]["FastPlannerResponseNeed"][
             "properties"
         ]["source_responsibility_refs"]["items"]["enum"]
-        self.assertEqual(capability_refs, ["blink"])
-        self.assertEqual(response_refs, ["joke"])
+        self.assertEqual(capability_refs, ["blink", "joke"])
+        self.assertEqual(response_refs, ["blink", "joke"])
 
-    def test_body_action_schema_is_discriminator_first_and_excludes_completion(self):
+    def test_body_action_schema_is_discriminator_first_and_allows_word_free_response_need(self):
         responsibility = CognitiveResponsibilityProposal.model_validate(
             {
                 "local_ref": "walk",
                 "outcome": "Walk forward for ten seconds",
                 "bindings": {"direction": "forward", "duration": "10 seconds"},
-                "output_mode": "body_action",
+
                 "confidence": 0.98,
             }
         )
@@ -2684,6 +2686,7 @@ class PlannerResolverTests(unittest.TestCase):
             activity_refs,
             [
                 "#/$defs/FastPlannerCapabilityActivity",
+                "#/$defs/FastPlannerResponseNeed",
                 "#/$defs/FastPlannerInputNeed",
             ],
         )
@@ -2702,7 +2705,7 @@ class PlannerResolverTests(unittest.TestCase):
                 "local_ref": "walk",
                 "outcome": "Walk forward for ten seconds",
                 "bindings": {"direction": "forward", "duration": 10},
-                "output_mode": "body_action",
+
                 "confidence": 0.98,
             }
         )
@@ -2744,6 +2747,7 @@ class PlannerResolverTests(unittest.TestCase):
 
     def test_complete_response_cannot_terminally_cover_body_action(self):
         invalid = {
+            "ability_needs": [{"need": "perform the requested body motion", "closest_loaded": "none", "closest_loaded_does": "No loaded contract fits", "fits": False}],
             "disposition": "respond",
             "coverage": "complete",
             "covered_responsibility_refs": ["walk"],
@@ -2766,7 +2770,7 @@ class PlannerResolverTests(unittest.TestCase):
                     "local_ref": "walk",
                     "outcome": "Walk forward",
                     "bindings": {"direction": "forward"},
-                    "output_mode": "body_action",
+
                     "confidence": 0.98,
                 }
             ],
@@ -2837,14 +2841,14 @@ class PlannerResolverTests(unittest.TestCase):
                     "local_ref": "r1",
                     "outcome": "Walk forward for 10 seconds",
                     "bindings": {"direction": "forward", "duration_s": 10},
-                    "output_mode": "body_action",
+
                     "confidence": 0.95,
                 },
                 {
                     "local_ref": "r2",
                     "outcome": "Blink once",
                     "bindings": {"count": 1},
-                    "output_mode": "body_action",
+
                     "confidence": 0.95,
                 },
             ],
@@ -2867,7 +2871,7 @@ class PlannerResolverTests(unittest.TestCase):
                 "local_ref": "walk",
                 "outcome": "continue moving forward for 10 seconds",
                 "bindings": {"direction": "forward", "duration": "10 seconds"},
-                "output_mode": "body_action",
+
                 "confidence": 0.96,
             }
         )
@@ -2948,14 +2952,14 @@ class PlannerResolverTests(unittest.TestCase):
                     "local_ref": "walk",
                     "outcome": "walk for one second",
                     "bindings": {"duration_s": 1.0},
-                    "output_mode": "body_action",
+
                     "confidence": 0.95,
                 },
                 {
                     "local_ref": "blink",
                     "outcome": "blink twice",
                     "bindings": {"count": 2},
-                    "output_mode": "body_action",
+
                     "confidence": 0.95,
                 },
             ],
@@ -2985,9 +2989,9 @@ class PlannerResolverTests(unittest.TestCase):
             sid="turn-dependency-sequence", text="Walk for one second, then blink twice.",
             responsibilities=[
                 {"local_ref": "walk", "outcome": "walk for one second", "bindings": {"duration_s": 1.0, "before": "blink"},
-                 "output_mode": "body_action", "confidence": 0.95},
+                  "confidence": 0.95},
                 {"local_ref": "blink", "outcome": "blink twice", "bindings": {"count": 2},
-                 "output_mode": "body_action", "confidence": 0.95},
+                  "confidence": 0.95},
             ],
         )
         advance = asyncio.run(PlannerResolver(ScriptedOllama([plan]), FakeCatalog()).resolve_advance(run_request))
@@ -3031,14 +3035,14 @@ class PlannerResolverTests(unittest.TestCase):
                     "local_ref": "walk",
                     "outcome": "walk for one second",
                     "bindings": {"duration_s": 1.0, "parallel_with": "velocity"},
-                    "output_mode": "body_action",
+
                     "confidence": 0.95,
                 },
                 {
                     "local_ref": "velocity",
                     "outcome": "move at velocity for two seconds",
                     "bindings": {"vx_mps": 0.2, "duration_s": 2.0},
-                    "output_mode": "body_action",
+
                     "confidence": 0.95,
                 },
             ],
@@ -3068,9 +3072,9 @@ class PlannerResolverTests(unittest.TestCase):
             sid="turn-independent-conflict", text="Walk, and use velocity control.",
             responsibilities=[
                 {"local_ref": "walk", "outcome": "walk for one second", "bindings": {"duration_s": 1.0},
-                 "output_mode": "body_action", "confidence": 0.95},
+                  "confidence": 0.95},
                 {"local_ref": "velocity", "outcome": "move at velocity for two seconds",
-                 "bindings": {"vx_mps": 0.2, "duration_s": 2.0}, "output_mode": "body_action", "confidence": 0.95},
+                 "bindings": {"vx_mps": 0.2, "duration_s": 2.0},  "confidence": 0.95},
             ],
         )
         advance = asyncio.run(PlannerResolver(ScriptedOllama([plan]), FakeCatalog()).resolve_advance(run_request))
@@ -3115,14 +3119,14 @@ class PlannerResolverTests(unittest.TestCase):
                     "local_ref": "walk",
                     "outcome": "walk for one second",
                     "bindings": {"duration_s": 1.0, "before": "blink"},
-                    "output_mode": "body_action",
+
                     "confidence": 0.95,
                 },
                 {
                     "local_ref": "blink",
                     "outcome": "blink twice",
                     "bindings": {"count": 2, "after": "walk"},
-                    "output_mode": "body_action",
+
                     "confidence": 0.95,
                 },
             ],
@@ -3330,13 +3334,13 @@ class PlannerResolverTests(unittest.TestCase):
                 {
                     "local_ref": "r1",
                     "outcome": "run forward",
-                    "output_mode": "body_action",
+
                     "confidence": 0.95,
                 },
                 {
                     "local_ref": "r2",
                     "outcome": "sing",
-                    "output_mode": "singing",
+
                     "confidence": 0.95,
                 },
             ],
@@ -3381,14 +3385,14 @@ class PlannerResolverTests(unittest.TestCase):
                     "local_ref": "r1",
                     "outcome": "determine whether it rains heavily in Chongqing tonight",
                     "bindings": {"location": "重庆", "time": "今天晚上"},
-                    "output_mode": "information",
+
                     "confidence": 0.95,
                 },
                 {
                     "local_ref": "r2",
                     "outcome": "determine whether Chongqing is hot tonight",
                     "bindings": {"location": "重庆", "time": "今天晚上"},
-                    "output_mode": "information",
+
                     "confidence": 0.95,
                 },
             ],
@@ -5435,13 +5439,13 @@ class PlannerResolverTests(unittest.TestCase):
                     sid="memory-followup", text="will it rain today?", language="en-US",
                     responsibilities=[{"local_ref": "r1", "outcome": "Determine rain today in Chongqing.",
                                        "bindings": {"location": "beijing" if variant == "wrong_current_location" else "chongqing"},
-                                       "output_mode": "information", "confidence": 1.0}],
+                                        "confidence": 1.0}],
                     context={"verified_tool_memory_index": index},
                 )
                 output = FastPlannerAdvanceModelOutput.model_validate({
                     "responsibility_decisions": {"r1": {"needed_abilities_fit": True, "decision": "work", "missing": []}},
                     "disposition": "execute", "coverage": "complete", "covered_responsibility_refs": ["r1"],
-                    "activities": [{"activity_id": "retrieve", "role": "capability", "capability_id": capability_id,
+                    "activities": [{"activity_id": "retrieve", "role": "capability", "deferred_requirement": "Answer from the exact verified result.", "capability_id": capability_id,
                                     "args": args, "argument_sources": {}, "depends_on": [],
                                     "source_responsibility_refs": ["r1"], "reason_summary": "Retrieve the verified result."}], "confidence": 1.0, "unresolved": [], "reason_summary": "Use prior evidence.",
                 })
@@ -5481,7 +5485,7 @@ class PlannerResolverTests(unittest.TestCase):
         run_request = _work_request(
             sid="location-followup", text="will it rain today?", language="en-US",
             responsibilities=[{"local_ref": "r1", "outcome": "Determine rain in Chongqing.",
-                               "bindings": {"location": "Chongqing"}, "output_mode": "information",
+                               "bindings": {"location": "Chongqing"},
                                "confidence": 1.0}],
         )
         definition = {"capability_id": "chromie.weather.lookup", "input_schema": {
@@ -5861,7 +5865,7 @@ class PlannerResolverTests(unittest.TestCase):
         raw = {"goal_outcomes": {'goal-action': {'disposition': 'execute', 'coverage': 'complete', 'unresolved': [], 'step_ids': ['invented'], 'satisfaction': {'score': 1.0, 'status': 'exact', 'satisfied_goal_ids': ['goal-action'], 'unmet_goal_ids': [], 'unmet_requirements': []}}}, "disposition":"execute","coverage":"complete","confidence":0.95,"goal_ids":["goal-action"],"steps":[{"step_id":"invented","capability_id":"invented.skill","args":{},"depends_on": [],"source_goal_ids":["goal-action"]}]}
         plan = asyncio.run(PlannerResolver(FakeOllama(raw), FakeCatalog()).resolve(request("做点什么。", goal_ids=["goal-action"])))
         self.assertEqual(plan.disposition, "unavailable")
-        self.assertEqual(plan.metadata["reason"], "step_not_in_executable_common_catalog")
+        self.assertEqual(plan.metadata["reason"], "fast_planner_model_contract_failed")
 
     def test_prompt_defines_complete_coverage_not_skill_matching(self):
         ollama = FakeOllama(
@@ -6396,7 +6400,7 @@ class PlannerResolverTests(unittest.TestCase):
         work = _work_request(
             sid="water-confirmation", text="Sure, water is perfect!", language="en-US",
             responsibilities=[{"local_ref": "r1", "outcome": "bring water to the user",
-                               "output_mode": "body_action", "body_effect_family": "task_physical_effect",
+
                                "bindings": {"entity": "water", "recipient": "user"}, "confidence": 1.0}],
         )
         schema = planner_schema.fast_streaming_advance_response_schema(

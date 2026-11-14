@@ -38,7 +38,6 @@
           "confidence": 0.99,
           "local_ref": "r1",
           "outcome": "Cause a message to be sent to the neighbor.",
-          "output_mode": "stateful_effect",
           "schema_version": 1,
           "source_evidence": {
             "source_end_token_ref": "t999",

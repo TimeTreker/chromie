@@ -7,7 +7,6 @@
   "expected": {
     "responsibilities": [
       {
-        "output_mode": "body_action",
         "outcome_contains_any": [
           "gaze",
           "look",
@@ -23,7 +22,6 @@
         ]
       },
       {
-        "output_mode": "body_action",
         "outcome_contains_any": [
           "blink",
           "眨"
@@ -58,27 +56,23 @@
     "responsibilities": [
       {
         "local_ref": "r1",
-        "output_mode": "body_action",
         "outcome": "看着我三秒",
         "confidence": 1.0,
         "source_evidence": {
           "source_start_token_ref": "t0",
           "source_end_token_ref": "t4"
         },
-        "continuity_scope": "goal",
-        "body_effect_family": "gaze_or_orientation"
+        "value_review": false
       },
       {
         "local_ref": "r2",
-        "output_mode": "body_action",
         "outcome": "同时眨两下眼睛",
         "confidence": 1.0,
         "source_evidence": {
           "source_start_token_ref": "t6",
           "source_end_token_ref": "t12"
         },
-        "continuity_scope": "goal",
-        "body_effect_family": "social_expression"
+        "value_review": false
       }
     ],
     "meaning_uncertainties": [],
@@ -88,8 +82,7 @@
         "responsibility_refs": [
           "r1",
           "r2"
-        ],
-        "reason_summary": "Explicit authored fixture requests the existing cognitive owner."
+        ]
       }
     ]
   },

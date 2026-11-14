@@ -16,12 +16,10 @@
       "confidence": 0.84,
       "responsibilities": [
         {
-          "schema_version": 1,
           "local_ref": "r1",
           "outcome": "tell the user whether it will rain today at their intended location",
           "confidence": 0.84,
-          "output_mode": "information",
-          "continuity_scope": "goal"
+          "value_review": false
         }
       ],
       "meaning_uncertainties": [],
@@ -30,8 +28,7 @@
           "authority": "planner",
           "responsibility_refs": [
             "r1"
-          ],
-          "reason_summary": "Explicit authored fixture requests the existing cognitive owner."
+          ]
         }
       ]
     }
@@ -47,8 +44,7 @@
       {
         "local_ref": "r1",
         "outcome": "tell the user whether it will rain today at their intended location",
-        "confidence": 0.84,
-        "output_mode": "information"
+        "confidence": 0.84
       }
     ]
   },

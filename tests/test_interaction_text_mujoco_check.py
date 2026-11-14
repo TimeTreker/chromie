@@ -30,6 +30,7 @@ from scripts.interaction_text_mujoco_check import (
     record_execution_bindings,
     print_result_summary,
     run_check,
+    run_check_sequence,
     required_speech_delivery_errors,
     safe_idle_errors,
     should_require_tts_speech,
@@ -40,6 +41,77 @@ from scripts.interaction_text_mujoco_check import (
 )
 from shared.chromie_contracts.interaction import CapabilityResult, InteractionResponse
 from shared.chromie_contracts.reflex import ReflexFilter
+
+
+@pytest.mark.parametrize("continue_after_failure", [False, True])
+@pytest.mark.parametrize("raises", [False, True])
+def test_episode_retains_failure_and_attempts_later_turn_only_when_requested(
+    tmp_path, continue_after_failure, raises,
+):
+    host = object()
+    failed = {"ok": False, "errors": ["first turn failed"]}
+    passed = {"ok": True, "errors": []}
+    check = AsyncMock(side_effect=[RuntimeError("first turn failed") if raises else failed, passed])
+    shutdown = AsyncMock()
+    args = [argparse.Namespace(text=text, evidence_dir=tmp_path / text) for text in ("first", "second")]
+    with (
+        patch("orchestrator.orchestrator.VoiceAssistant", return_value=host),
+        patch("scripts.interaction_text_mujoco_check._configure_environment"),
+        patch("scripts.interaction_text_mujoco_check.run_check", check),
+        patch("scripts.interaction_text_mujoco_check.shutdown_voice_assistant", shutdown),
+        patch("scripts.interaction_text_mujoco_check.playback_transport_for",
+              return_value=SimpleNamespace(close_output_stream=AsyncMock())),
+    ):
+        run = run_check_sequence(args, evidence_dir=tmp_path, continue_after_failure=continue_after_failure)
+        if raises and not continue_after_failure:
+            with pytest.raises(RuntimeError, match="first turn failed"):
+                asyncio.run(run)
+        else:
+            summaries = asyncio.run(run)
+            assert not summaries[0]["ok"]
+            assert "first turn failed" in summaries[0]["errors"][0]
+            assert summaries[1:] == ([passed] if continue_after_failure else [])
+            if raises:
+                retained = json.loads((tmp_path / "first" / "summary.json").read_text())
+                assert retained == summaries[0]
+                assert retained["harness_failure"]["failure_class"] == "RuntimeError"
+    assert check.await_count == (2 if continue_after_failure else 1)
+    assert all(call.kwargs["assistant"] is host for call in check.await_args_list)
+    shutdown.assert_awaited_once()
+
+
+def test_diagnostic_episode_does_not_swallow_outer_cancellation(tmp_path):
+    check = AsyncMock(side_effect=asyncio.CancelledError)
+    shutdown = AsyncMock()
+    with (
+        patch("orchestrator.orchestrator.VoiceAssistant", return_value=object()),
+        patch("scripts.interaction_text_mujoco_check._configure_environment"),
+        patch("scripts.interaction_text_mujoco_check.run_check", check),
+        patch("scripts.interaction_text_mujoco_check.shutdown_voice_assistant", shutdown),
+        patch("scripts.interaction_text_mujoco_check.playback_transport_for",
+              return_value=SimpleNamespace(close_output_stream=AsyncMock())),
+        pytest.raises(asyncio.CancelledError),
+    ):
+        asyncio.run(run_check_sequence(
+            [argparse.Namespace(), argparse.Namespace()], evidence_dir=tmp_path,
+            continue_after_failure=True,
+        ))
+    assert check.await_count == 1
+    shutdown.assert_awaited_once()
+
+
+def test_abandoned_session_is_a_failure_without_waiting_for_the_normal_completion_deadline():
+    host = SimpleNamespace(sessions=SimpleNamespace(state={"failed": {
+        "interrupted": True, "llm_done": True, "done_logged": False,
+        "scheduled_tts": 7, "played_tts": 5, "pending_social_tasks": 0,
+        "workflow_report": {"termination_state": "abandoned"},
+    }}))
+
+    async def check():
+        await asyncio.wait_for(wait_for_session_done(host, "failed", timeout_s=600), 0.1)
+
+    with pytest.raises(RuntimeError, match="interrupted before completion"):
+        asyncio.run(check())
 
 
 def test_optional_social_decoration_result_requires_complete_trust_tuple() -> None:
@@ -188,7 +260,7 @@ def test_admitted_runtime_rejection_retains_final_status_without_dispatch(tmp_pa
             review_attention=AsyncMock(side_effect=lambda _session, request: gateway.attention_fail_open(request, reason="controlled admission")),
             interpret_turn=AsyncMock(return_value=CoreInterpretationResult(
                 turn_id="admitted", session_id="admitted", confidence=1.0,
-                responsibilities=[CognitiveResponsibilityProposal(local_ref="r-blink", outcome="Blink once.", output_mode="body_action", confidence=1.0)],
+                responsibilities=[CognitiveResponsibilityProposal(local_ref="r-blink", outcome="Blink once.",  confidence=1.0)],
             )),
         ),
         interaction_runtime=SimpleNamespace(soridormi_invoker=object(), confirmation_request_ids=AsyncMock(return_value=[])),
@@ -286,7 +358,7 @@ def test_preview_checks_optional_defaults_from_retained_contract(
             review_attention=AsyncMock(side_effect=lambda _session, request: gateway.attention_fail_open(request, reason="controlled admission")),
             interpret_turn=AsyncMock(return_value=CoreInterpretationResult(
                 turn_id="defaults", session_id="defaults", confidence=1.0,
-                responsibilities=[CognitiveResponsibilityProposal(local_ref="r-blink", outcome="Blink twice.", output_mode="body_action", confidence=1.0)],
+                responsibilities=[CognitiveResponsibilityProposal(local_ref="r-blink", outcome="Blink twice.",  confidence=1.0)],
             )),
         ),
         interaction_runtime=SimpleNamespace(
@@ -365,7 +437,7 @@ async def test_live_check_consumes_social_delivery_without_replaying_it(
             review_attention=AsyncMock(side_effect=lambda _session, request: gateway.attention_fail_open(request, reason="controlled admission")),
             interpret_turn=AsyncMock(return_value=CoreInterpretationResult(
                 turn_id="sid", session_id="sid", confidence=1.0,
-                responsibilities=[{"local_ref": "r1", "outcome": "Return a greeting.", "output_mode": "speech", "confidence": 1.0}],
+                responsibilities=[{"local_ref": "r1", "outcome": "Return a greeting.",  "confidence": 1.0}],
             )),
         ),
         interaction_runtime=runtime, _cognitive_gateway_adapter=Mock(return_value=gateway),
@@ -449,7 +521,7 @@ async def test_admitted_user_precedes_social_delivery_without_duplication(
         return CoreInterpretationResult(
             turn_id="sid", session_id="sid", confidence=1.0,
             responsibilities=[{"local_ref": "r1", "outcome": "Return a greeting.",
-                               "output_mode": "speech", "confidence": 1.0}],
+                                "confidence": 1.0}],
         )
 
     async def resolve(*args, **kwargs):
@@ -838,7 +910,7 @@ class InteractionTextMujocoCheckTests(unittest.TestCase):
                 {
                     "local_ref": "resp-1",
                     "outcome": "Complete the requested outcome.",
-                    "output_mode": "body_action",
+
                 }
             ],
             "unresolved": [],

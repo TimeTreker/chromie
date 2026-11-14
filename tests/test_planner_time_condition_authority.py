@@ -130,7 +130,7 @@ def test_conversation_state_binds_planner_time_condition_to_original_responsibil
                     "local_ref": "r1",
                     "outcome": "Keep monitoring the running work.",
                     "bindings": {},
-                    "output_mode": "information",
+
                     "relationship": "new",
                     "target_goal_ids": [],
                     "confidence": 0.95,

@@ -212,7 +212,6 @@
           "confidence": 0.99,
           "local_ref": "r1",
           "outcome": "根据范围内的可信天气 Evidence 报告是否预计下雨。",
-          "output_mode": "information",
           "schema_version": 1,
           "source_evidence": {
             "source_end_token_ref": "t999",

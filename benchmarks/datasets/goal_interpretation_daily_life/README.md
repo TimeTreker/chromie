@@ -11,26 +11,25 @@ The retained inventory contains 1,496 scenarios: 374 four-case contrast sets,
 one split. Every case remains `training_eligible=false` pending independent review.
 
 This is a frozen reference inventory, not a qualified production-model corpus.
-The 2026-10-04 current-contract reconciliation removes retired initial
-`social_cognition` requests: Runtime already owns that standing invocation. It adds
-the existing body-effect family to 850 body-action references and their semantic
-expectations (730 task physical effects, 120 social expressions). All 1,496
-references now pass the current dynamic Schema and Host validator.
+Under the owner-authorized WHAT-only contract, the current wire migration removes
+`output_mode`, `body_effect_family` and `continuity_scope` from references and their
+obsolete classification expectations. It retains explicit `value_review`, source
+ranges, complete outcomes, every input/context, intent-detail oracle, contrast and
+split. Cognitive activation retains its authority/source refs without advisory HOW.
+The old classification distribution is retained in the migration evidence rather
+than required from UMI. Dynamic Schema/Host validation is rerun after migration.
 
-The retained admitted text, complete meaning, context, source ranges, actors,
-referents, quantities, order, contrast membership and splits are unchanged. Original
-files and per-file before/after digests are retained under
-`.chromie/acceptance/contract-fixture-repair-20261004T084054Z/`; the manifest binds the
-new scenario-tree digest. This is a mechanical reference migration, not candidate
-inference or independent semantic review.
+Before-bytes, per-file SHA256 and invariant checks for all 1,496 scenarios are under
+`.chromie/acceptance/meaning-coverage-repair-20261112/daily-life-wire-migration/`;
+`dataset.json` binds the new tree digest. This is explicit reference maintenance,
+not candidate inference or independent semantic review.
 
-UMI preserves complete contextual WHAT, requested result type, uncertainty and
-exact current-turn source evidence. Planner owns parameter extraction, Capability
-selection and Work; SC owns wording. Live UMI output forbids `bindings`, including
-an empty object; complete natural-language WHAT retains every material detail.
-The former conflict is repaired under principle 30 at the Schema/DTO/Host boundary;
-retained canonical Goal bindings remain read-only context. Native meaning and
-activation coverage still require qualification.
+UMI preserves complete contextual WHAT, uncertainty, Value-review requirement and
+exact current-turn source evidence. Planner owns HOW, parameter extraction,
+Capability selection and Work; SC owns communication. Fresh UMI output forbids
+execution/output/lifetime categories and `bindings`, including an empty object.
+Retained canonical Goal constraints stay read-only context. Native complete meaning
+and activation coverage still require qualification.
 
 ## Validation and migration
 

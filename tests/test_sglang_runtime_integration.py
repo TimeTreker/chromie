@@ -217,8 +217,9 @@ class SGLangProtocolTests(unittest.TestCase):
 
     def test_readiness_and_need_first_preserve_primary_planner_decoder_contract(self) -> None:
         from jsonschema import Draft202012Validator
+        from agent.app.planner_model_contract import need_first_response_schema
         from agent.app.planner_schema import (
-            canonical_plan_response_schema, need_first_response_schema,
+            canonical_plan_response_schema,
             planner_readiness_response_schema,
         )
 
@@ -807,3 +808,142 @@ async def test_actual_sc_overflow_is_rejected_even_when_character_estimate_fits(
             await client.generate('short', system='short', options={'num_ctx': 1024, 'num_predict': 32})
     assert caught.value.failure_class == 'prompt_budget_exceeded'
     assert [c.args[0] for c in transport.post.call_args_list] == ['http://model.invalid/v1/tokenize']
+
+
+def test_existing_definition_source_contracts_are_shared_without_changing_admission():
+    import copy
+    from jsonschema import Draft202012Validator
+    from agent.app.clients.sglang_protocol import share_planner_schema_contracts
+    span = {'type': 'object', 'additionalProperties': False,
+            'required': ['source_start_token_ref', 'source_end_token_ref'], 'properties': {
+                'source_start_token_ref': {'type': 'string', 'enum': ['r1.t0']},
+                'source_end_token_ref': {'type': 'string', 'enum': ['r1.t1']}}}
+    branch = {'type': 'object', 'additionalProperties': False, 'required': ['argument_sources'],
+              'properties': {'argument_sources': {'type': 'object', 'required': ['count'],
+                  'additionalProperties': False, 'properties': {'count': span}}}}
+    schema = {'type': 'object', 'required': ['first', 'second'], 'additionalProperties': False,
+              'properties': {'first': {'$ref': '#/$defs/first'}, 'second': {'$ref': '#/$defs/second'}},
+              '$defs': {'first': copy.deepcopy(branch), 'second': copy.deepcopy(branch)}}
+    shared = copy.deepcopy(schema)
+    share_planner_schema_contracts(shared)
+    def source(name):
+        fields = shared['$defs'][name]['properties']['argument_sources']
+        while '$ref' in fields:
+            fields = shared['$defs'][fields['$ref'].rsplit('/', 1)[-1]]
+        return fields['properties']['count']
+    first, second = source('first'), source('second')
+    assert first == second and '$ref' in first
+    for source, accepted in [({'source_start_token_ref': 'r1.t0', 'source_end_token_ref': 'r1.t1'}, True),
+                             ({'source_start_token_ref': 'r1.t0', 'source_end_token_ref': 'r2.t1'}, False),
+                             ({'source_end_token_ref': 'r1.t1'}, False),
+                             ({'source_start_token_ref': 'r1.t0', 'source_end_token_ref': 'r1.t1', 'foreign': 1}, False)]:
+        value = {'first': {'argument_sources': {'count': source}}, 'second': {'argument_sources': {'count': source}}}
+        assert Draft202012Validator(schema).is_valid(value) is accepted
+        assert Draft202012Validator(shared).is_valid(value) is accepted
+
+
+@pytest.mark.parametrize('location', ['items', 'prefix', 'nested_alternative', 'definition'])
+def test_activity_grammar_shares_repeated_slots_at_every_array_depth(location):
+    import copy
+    from jsonschema import Draft202012Validator
+    from agent.app.clients.sglang_protocol import share_planner_schema_contracts
+
+    slot = {'oneOf': [
+        {'type': 'object', 'additionalProperties': False,
+         'required': ['kind', 'owner'], 'properties': {
+             'kind': {'const': kind}, 'owner': {'enum': ['r1', 'r2']}}}
+        for kind in ['work', 'need']
+    ]}
+    array = {'type': 'array', 'minItems': 2, 'maxItems': 2}
+    if location == 'items':
+        array['items'] = copy.deepcopy(slot)
+    else:
+        array.update(prefixItems=[copy.deepcopy(slot), copy.deepcopy(slot)], items=False)
+    if location == 'nested_alternative':
+        array = {'oneOf': [array, {'type': 'array', 'maxItems': 0}]}
+    owner = {'type': 'object', 'additionalProperties': False, 'required': ['activities'],
+             'properties': {'activities': array}}
+    schema = ({'$ref': '#/$defs/owner', '$defs': {'owner': owner}} if location == 'definition'
+              else {'oneOf': [owner]})
+    shared = copy.deepcopy(schema)
+    share_planner_schema_contracts(shared)
+    Draft202012Validator.check_schema(shared)
+    # The repeated slot union must itself be shared, including nested array shapes.
+    slot_definitions = [node for node in shared['$defs'].values()
+                        if isinstance(node, dict) and len(node.get('oneOf', [])) == 2
+                        and all('$ref' in branch for branch in node['oneOf'])]
+    assert slot_definitions
+    for value, accepted in [
+        ({'activities': [{'kind': 'work', 'owner': 'r1'}, {'kind': 'need', 'owner': 'r2'}]}, True),
+        ({'activities': []}, location == 'nested_alternative'),
+        ({'activities': [{'kind': 'work', 'owner': 'foreign'}, {'kind': 'need', 'owner': 'r2'}]}, False),
+        ({'activities': [{'kind': 'work', 'owner': 'r1'}]}, False),
+        ({'activities': [{'kind': 'work', 'owner': 'r1', 'extra': True}, {'kind': 'need', 'owner': 'r2'}]}, False),
+    ]:
+        assert Draft202012Validator(schema).is_valid(value) is accepted
+        assert Draft202012Validator(shared).is_valid(value) is accepted
+
+
+def test_repeated_schema_projection_has_one_wire_identity_despite_allocator_churn():
+    import copy
+    import json
+    from agent.app.clients.sglang_protocol import _openai_response_format
+    from agent.app.planner_schema import fast_streaming_advance_response_schema
+    from shared.chromie_contracts.core_interpretation import CognitiveResponsibilityProposal
+
+    responsibilities = [CognitiveResponsibilityProposal(
+        local_ref=f"r{i}", outcome=f"Perform requested effect {i}.", confidence=1,
+    ) for i in (1, 2)]
+    capabilities = [{"capability_id": f"test.effect_{i}", "effects": ["physical_motion"],
+                     "input_schema": {"type": "object", "properties": {}, "additionalProperties": False}}
+                    for i in range(3)]
+    schema = fast_streaming_advance_response_schema(
+        [item.local_ref for item in responsibilities], responsibilities=responsibilities,
+        capabilities=capabilities,
+    )
+    original = copy.deepcopy(schema)
+    wires = []
+    for count in (0, 1, 31, 127, 511, 1023) * 3:
+        retained = [{str(index): [index]} for index in range(count)]
+        wire = _openai_response_format(schema)
+        wires.append(json.dumps(wire, ensure_ascii=False, separators=(",", ":")))
+        assert len(retained) == count
+    assert len(set(wires)) == 1
+    assert schema == original
+
+
+@pytest.mark.parametrize('literal_keyword', ['const', 'enum', 'default', 'examples'])
+@pytest.mark.parametrize('stage', ['sharing', 'wire'])
+def test_planner_schema_sharing_keeps_schema_shaped_literal_data_opaque(literal_keyword, stage):
+    import copy
+    from jsonschema import Draft202012Validator
+    from agent.app.clients.sglang_protocol import share_planner_schema_contracts, _openai_response_format
+
+    literal = {'properties': {'argument_sources': {'properties': {'count': {
+        'type': 'object', 'properties': {'source': {'type': 'string'}},
+    }}}}, 'type': 'array', 'uniqueItems': True}
+    value = literal if literal_keyword in {'const', 'default'} else [literal]
+    schema = {'title': 'FastPlannerWorkAdvanceOutput', 'type': 'object', 'required': ['payload'], 'properties': {
+        'payload': {literal_keyword: copy.deepcopy(value)}}}
+    shared = copy.deepcopy(schema)
+    if stage == 'sharing':
+        share_planner_schema_contracts(shared)
+    else:
+        shared = _openai_response_format(shared)['json_schema']['schema']
+    payload = shared['properties']['payload']
+    while '$ref' in payload:
+        payload = shared['$defs'][payload['$ref'].rsplit('/', 1)[-1]]
+    assert payload[literal_keyword] == value
+    packet = {'payload': literal}
+    assert Draft202012Validator(schema).is_valid(packet)
+    assert Draft202012Validator(shared).is_valid(packet)
+
+
+@pytest.mark.parametrize('streaming', [False, True])
+@pytest.mark.parametrize('cause', ['Grammar preprocessing timed out', 'backend unavailable'])
+def test_provider_error_is_not_an_empty_completion_or_delta(streaming, cause):
+    from agent.app.clients.sglang_protocol import sglang_completion_content, sglang_stream_delta
+    read = sglang_stream_delta if streaming else sglang_completion_content
+    with pytest.raises(ValueError, match=cause) as caught:
+        read({'error': {'message': cause + ': req.grammar_key=PRIVATE_SCHEMA', 'code': 400}})
+    assert 'PRIVATE_SCHEMA' not in str(caught.value)

@@ -251,6 +251,7 @@ class InteractionLedger:
                 "addressed_need_ids": _normalized_ids(event.get("addressed_need_ids")),
                 "source_responsibility_refs": _normalized_ids(event.get("source_responsibility_refs")),
                 "wording_owner": _normalized_text(event.get("wording_owner")),
+                **{key: event[key] for key in ("truth_stage", "truth_stages", "progress_kind") if key in event},
                 "delivery_role": _normalized_text(
                     event.get("delivery_role")
                 ),

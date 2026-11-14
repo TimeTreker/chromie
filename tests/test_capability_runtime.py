@@ -3675,6 +3675,157 @@ if __name__ == "__main__":
 
 
 class PlanningCommitTests(unittest.IsolatedAsyncioTestCase):
+    async def test_reservation_cannot_invent_coverage_outside_its_snapshot(self):
+        runtime = CapabilityRuntime(CapabilityDefinitionRegistry())
+        snapshot = await runtime.planning_state_snapshot(["a"], "turn")
+        for coverage in (["b"], ["a", "a"]):
+            with self.subTest(coverage=coverage):
+                with self.assertRaisesRegex(ValueError, "planning_coverage_outside_snapshot"):
+                    await runtime.reserve_planning_submission(snapshot, plan_id="bad", fingerprint="bad",
+                        prepared_activity_ids=[], covered_goal_ids=coverage)
+                current = await runtime.planning_state_snapshot(["a"], "turn")
+                self.assertEqual(current["commit_versions"], snapshot["commit_versions"])
+
+    async def test_only_current_successor_covering_all_plan_goals_allows_normal_skip(self):
+        from orchestrator.runtime.capability_runtime import StalePlanningSubmissionError
+        for coverage, invalidate in ((["a", "b"], False), (["a"], False), (["a", "b"], True)):
+            with self.subTest(coverage=coverage, invalidate=invalidate):
+                runtime = CapabilityRuntime(CapabilityDefinitionRegistry())
+                goals = [{"goal_id": g, "description": g, "responsibility_status": "open"} for g in ("a", "b")]
+                runtime.goal_state_provider = lambda: goals
+                old = await runtime.planning_state_snapshot(["a", "b"], "old")
+                guard = await runtime.reserve_planning_submission(old, plan_id="old", fingerprint="old",
+                    prepared_activity_ids=[], covered_goal_ids=["a", "b"])
+                # A watched Goal is not proof that the new Plan serves it.
+                new = await runtime.planning_state_snapshot(["a", "b"], "new")
+                await runtime.reserve_planning_submission(new, plan_id="new", fingerprint="new",
+                    prepared_activity_ids=[], covered_goal_ids=coverage)
+                if invalidate:
+                    goals[0]["description"] = "newer meaning without a successor"
+                with self.assertRaisesRegex(ValueError, "stale_planning_submission") as rejected:
+                    runtime.require_current_planning_commit(guard)
+                if len(coverage) == 2 and not invalidate:
+                    self.assertIsInstance(rejected.exception, StalePlanningSubmissionError)
+                    self.assertEqual(set(rejected.exception.evidence()["successor_plans"]), {"a", "b"})
+                    self.assertEqual(rejected.exception.evidence()["satisfied_goal_ids"], [])
+                else:
+                    self.assertNotIsInstance(rejected.exception, StalePlanningSubmissionError)
+                self.assertTrue(all(g["responsibility_status"] == "open" for g in goals))
+
+    async def test_satisfaction_is_proof_but_cancellation_refusal_or_absence_is_not(self):
+        from orchestrator.runtime.capability_runtime import StalePlanningSubmissionError
+        for terminal in ("satisfied", "cancelled", "superseded", "refused", "absent"):
+            with self.subTest(terminal=terminal):
+                runtime = CapabilityRuntime(CapabilityDefinitionRegistry())
+                goal = {"goal_id": "a", "responsibility_status": "open"}
+                present = [goal]
+                runtime.goal_state_provider = lambda: present
+                old = await runtime.planning_state_snapshot(["a"], "old")
+                guard = await runtime.reserve_planning_submission(old, plan_id="old", fingerprint="old",
+                    prepared_activity_ids=[], covered_goal_ids=["a"])
+                if terminal == "absent":
+                    present.clear()
+                else:
+                    goal["responsibility_status"] = terminal
+                with self.assertRaisesRegex(ValueError, "stale_planning_submission") as rejected:
+                    runtime.require_current_planning_commit(guard)
+                if terminal == "satisfied":
+                    self.assertIsInstance(rejected.exception, StalePlanningSubmissionError)
+                    self.assertEqual(rejected.exception.evidence()["satisfied_goal_ids"], ["a"])
+                else:
+                    self.assertNotIsInstance(rejected.exception, StalePlanningSubmissionError)
+
+    async def test_successor_consumption_preserves_proof_without_renewing_old_guard(self):
+        from orchestrator.runtime.capability_runtime import StalePlanningSubmissionError
+        runtime = CapabilityRuntime(CapabilityDefinitionRegistry())
+        old = await runtime.planning_state_snapshot(["a"], "old")
+        guard = await runtime.reserve_planning_submission(old, plan_id="old", fingerprint="old",
+            prepared_activity_ids=[], covered_goal_ids=["a"])
+        new = await runtime.planning_state_snapshot(["a"], "new")
+        successor = await runtime.reserve_planning_submission(new, plan_id="new", fingerprint="new",
+            prepared_activity_ids=[], covered_goal_ids=["a"])
+        new_response = InteractionResponse(metadata={"planning_commit": successor,
+            "canonical_plan_id": "new", "canonical_plan_fingerprint": "new"})
+        await runtime.accept_completed_planning_submission(new_response)
+        self.assertEqual(guard["versions"]["goal:a"], 1)
+        self.assertEqual(successor["versions"]["goal:a"], 2)
+        for rejected_guard in (guard, successor):
+            with self.assertRaises(StalePlanningSubmissionError):
+                runtime.require_current_planning_commit(rejected_guard)
+
+    async def test_submitted_successor_remains_the_only_provider_work(self):
+        from orchestrator.runtime.capability_runtime import StalePlanningSubmissionError
+        registry = CapabilityDefinitionRegistry()
+        registry.register(_body_definition())
+        runtime = CapabilityRuntime(registry)
+        provider = MockCapabilityProvider("mock.body")
+        runtime.register_provider(provider)
+        old = await runtime.planning_state_snapshot(["a"], "old")
+        old_guard = await runtime.reserve_planning_submission(old, plan_id="old", fingerprint="old",
+            prepared_activity_ids=[], covered_goal_ids=["a"])
+        new = await runtime.planning_state_snapshot(["a"], "new")
+        new_guard = await runtime.reserve_planning_submission(new, plan_id="new", fingerprint="new",
+            prepared_activity_ids=[], covered_goal_ids=["a"])
+        receipt = await runtime.submit(InteractionResponse(interaction_id="accepted", capabilities=[{
+            "request_id": "accepted", "capability_id": "soridormi.nod_yes",
+            "metadata": {"source_goal_ids": ["a"], "turn_id": "new"},
+        }], metadata={"planning_commit": new_guard, "canonical_plan_id": "new", "canonical_plan_fingerprint": "new"}))
+        with self.assertRaises(StalePlanningSubmissionError) as stale:
+            runtime.require_current_planning_commit(old_guard)
+        self.assertEqual(stale.exception.evidence()["successor_plans"]["a"]["plan_id"], "new")
+        await runtime.wait_terminal(receipt)
+        self.assertEqual([x.request_id for x in provider.calls], ["accepted"])
+        self.assertEqual(new_guard["versions"]["goal:a"], 2)
+
+    async def test_goal_revision_without_successor_cannot_silently_drop_work(self):
+        from orchestrator.runtime.capability_runtime import StalePlanningSubmissionError
+        runtime = CapabilityRuntime(CapabilityDefinitionRegistry())
+        goal = {"goal_id": "goal-a", "responsibility_status": "open", "description": "original need"}
+        runtime.goal_state_provider = lambda: [goal]
+        snapshot = await runtime.planning_state_snapshot(["goal-a"], "old")
+        guard = await runtime.reserve_planning_submission(
+            snapshot, covered_goal_ids=snapshot["goal_ids"], plan_id="old", fingerprint="old", prepared_activity_ids=[],
+        )
+        goal["description"] = "owner revised need; no successor Plan yet"
+        with self.assertRaisesRegex(ValueError, "stale_planning_submission") as failure:
+            await runtime.record_planning_submission(InteractionResponse(metadata={
+                "planning_commit": guard, "canonical_plan_id": "old", "canonical_plan_fingerprint": "old",
+            }), lambda: self.fail("stale Work published"))
+        self.assertNotIsInstance(failure.exception, StalePlanningSubmissionError)
+        self.assertEqual(goal["responsibility_status"], "open")
+
+    async def test_stale_rejection_preserves_prepared_meaning_and_rejects_bad_identity(self):
+        from orchestrator.runtime.capability_runtime import StalePlanningSubmissionError
+        runtime = CapabilityRuntime(CapabilityDefinitionRegistry())
+        await runtime.prepare_planner_work("old", [
+            {"activity_id": "first", "source_responsibility_refs": ["r1"]},
+            {"activity_id": "independent", "source_responsibility_refs": ["r2"]},
+        ])
+        await runtime.bind_prepared_planner_work("old", {"r1": ["shared"], "r2": ["independent"]})
+        snapshot = await runtime.planning_state_snapshot(["shared", "independent"], "old")
+        guard = await runtime.reserve_planning_submission(
+            snapshot, covered_goal_ids=snapshot["goal_ids"], plan_id="old", fingerprint="old", prepared_activity_ids=[],
+        )
+        newer = await runtime.planning_state_snapshot(["shared"], "new")
+        await runtime.reserve_planning_submission(newer, covered_goal_ids=newer["goal_ids"], plan_id="new", fingerprint="new", prepared_activity_ids=[])
+        response = InteractionResponse(metadata={
+            "canonical_plan_id": "old", "canonical_plan_fingerprint": "corrupted", "planning_commit": guard,
+        })
+        recorded = []
+        # Corrupt identity remains a hard error even when the version is stale.
+        with self.assertRaisesRegex(ValueError, "identity_mismatch") as invalid:
+            await runtime.record_planning_submission(response, lambda: recorded.append(True))
+        self.assertNotIsInstance(invalid.exception, StalePlanningSubmissionError)
+        response.metadata["canonical_plan_fingerprint"] = "old"
+        with self.assertRaisesRegex(ValueError, "stale_planning_submission") as stale:
+            await runtime.record_planning_submission(response, lambda: recorded.append(True))
+        # Only the shared Goal has a successor. The independent requirement
+        # remains uncovered, so this is still a hard failure, not silent skip.
+        self.assertNotIsInstance(stale.exception, StalePlanningSubmissionError)
+        self.assertEqual(recorded, [])
+        retained = await runtime.planning_state_snapshot(["shared", "independent"], "old")
+        self.assertEqual({x["activity_id"] for x in retained["prepared"]}, {"first", "independent"})
+
     async def test_execution_snapshot_expires_on_provider_start_and_completion(self) -> None:
         started = {name: asyncio.Event() for name in ("blocker", "work")}
         release = {name: asyncio.Event() for name in started}
@@ -3821,17 +3972,17 @@ class PlanningCommitTests(unittest.IsolatedAsyncioTestCase):
         newer = await runtime.planning_state_snapshot(["goal-a"], "turn-new")
         unrelated = await runtime.planning_state_snapshot(["goal-b"], "turn-b")
         async with runtime.planning_commit_scope(newer):
-            await runtime.reserve_planning_submission(newer, plan_id="new", fingerprint="fp-new", prepared_activity_ids=[])
+            await runtime.reserve_planning_submission(newer, covered_goal_ids=newer["goal_ids"], plan_id="new", fingerprint="fp-new", prepared_activity_ids=[])
         with self.assertRaisesRegex(ValueError, "stale_planning_state"):
             async with runtime.planning_commit_scope(older):
                 self.fail("obsolete Planner must not enter mutation scope")
         async with runtime.planning_commit_scope(unrelated):
-            await runtime.reserve_planning_submission(unrelated, plan_id="b", fingerprint="fp-b", prepared_activity_ids=[])
+            await runtime.reserve_planning_submission(unrelated, covered_goal_ids=unrelated["goal_ids"], plan_id="b", fingerprint="fp-b", prepared_activity_ids=[])
 
     async def test_submission_is_bound_to_exact_plan_and_consumed_once(self) -> None:
         runtime = CapabilityRuntime(CapabilityDefinitionRegistry())
         snapshot = await runtime.planning_state_snapshot(["goal-a"], "turn-a")
-        guard = await runtime.reserve_planning_submission(snapshot, plan_id="plan-a", fingerprint="fp-a", prepared_activity_ids=[])
+        guard = await runtime.reserve_planning_submission(snapshot, covered_goal_ids=snapshot["goal_ids"], plan_id="plan-a", fingerprint="fp-a", prepared_activity_ids=[])
         response = InteractionResponse(interaction_id="response-a", metadata={
             "planning_commit": guard, "canonical_plan_id": "plan-a", "canonical_plan_fingerprint": "other",
         })
@@ -3847,7 +3998,7 @@ class PlanningCommitTests(unittest.IsolatedAsyncioTestCase):
         goal = {"goal_id": "goal-a", "description": "original"}
         runtime.goal_state_provider = lambda: [goal]
         snapshot = await runtime.planning_state_snapshot(["goal-a"], "turn-a")
-        guard = await runtime.reserve_planning_submission(snapshot, plan_id="plan-a", fingerprint="fp-a", prepared_activity_ids=[])
+        guard = await runtime.reserve_planning_submission(snapshot, covered_goal_ids=snapshot["goal_ids"], plan_id="plan-a", fingerprint="fp-a", prepared_activity_ids=[])
         goal["description"] = "changed by authoritative Goal owner"
         with self.assertRaisesRegex(ValueError, "stale_planning_submission"):
             await runtime.accept_completed_planning_submission(InteractionResponse(
@@ -3862,7 +4013,7 @@ class PlanningCommitTests(unittest.IsolatedAsyncioTestCase):
         ])
         await runtime.bind_prepared_planner_work("turn-a", {"r1": ["goal-a"]})
         snapshot = await runtime.planning_state_snapshot(["goal-a"], "turn-a")
-        guard = await runtime.reserve_planning_submission(snapshot, plan_id="plan-a", fingerprint="fp-a", prepared_activity_ids=["adopt", "cancel"])
+        guard = await runtime.reserve_planning_submission(snapshot, covered_goal_ids=snapshot["goal_ids"], plan_id="plan-a", fingerprint="fp-a", prepared_activity_ids=["adopt", "cancel"])
         await runtime.accept_completed_planning_submission(InteractionResponse(
             interaction_id="response-a", metadata={"planning_commit": guard,
                 "canonical_plan_id": "plan-a", "canonical_plan_fingerprint": "fp-a"},
@@ -3902,13 +4053,13 @@ class PlanningCommitTests(unittest.IsolatedAsyncioTestCase):
         goal = {"goal_id": "goal-a", "description": "respond", "responsibility_status": "open"}
         runtime.goal_state_provider = lambda: [goal]
         snapshot = await runtime.planning_state_snapshot(["goal-a"], "turn-a")
-        guard = await runtime.reserve_planning_submission(snapshot, plan_id="plan-a", fingerprint="fp-a", prepared_activity_ids=[])
+        guard = await runtime.reserve_planning_submission(snapshot, covered_goal_ids=snapshot["goal_ids"], plan_id="plan-a", fingerprint="fp-a", prepared_activity_ids=[])
         response = InteractionResponse(interaction_id="response-a", metadata={"planning_commit": guard,
             "canonical_plan_id": "plan-a", "canonical_plan_fingerprint": "fp-a"})
         await runtime.record_planning_submission(response, lambda: goal.update(responsibility_status="refused"))
         await runtime.accept_completed_planning_submission(response)
         snapshot = await runtime.planning_state_snapshot(["goal-a"], "turn-b")
-        response.metadata["planning_commit"] = await runtime.reserve_planning_submission(snapshot, plan_id="plan-a", fingerprint="fp-a", prepared_activity_ids=[])
+        response.metadata["planning_commit"] = await runtime.reserve_planning_submission(snapshot, covered_goal_ids=snapshot["goal_ids"], plan_id="plan-a", fingerprint="fp-a", prepared_activity_ids=[])
         goal["description"] = "new explicit request"
         called = []
         with self.assertRaisesRegex(ValueError, "stale_planning_submission"):

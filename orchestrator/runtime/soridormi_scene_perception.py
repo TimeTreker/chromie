@@ -210,10 +210,13 @@ async def run_soridormi_ambient_perception_loop(
 
     interval = max(0.1, float(poll_interval_s))
     unavailable_logged = False
+    owner_task = asyncio.current_task()
     while True:
         # The long-running social skill's upkeep is the same kind of mechanical safe read: it
         # never invokes cognition (catalog offer, Soridormi status, conversation idle).
         await sync_social_skill(host)
+        if owner_task is not None and owner_task.cancelling():
+            raise asyncio.CancelledError
         try:
             await refresh_soridormi_ambient_scene_once(host)
             unavailable_logged = False
@@ -228,4 +231,8 @@ async def run_soridormi_ambient_perception_loop(
                     str(exc)[:240],
                 )
             unavailable_logged = True
+        # A dependency may catch cancellation while releasing its transport.
+        # The owning Host's cancellation still ends this mechanical poller.
+        if owner_task is not None and owner_task.cancelling():
+            raise asyncio.CancelledError
         await asyncio.sleep(interval)

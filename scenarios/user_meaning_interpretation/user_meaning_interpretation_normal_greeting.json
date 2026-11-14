@@ -16,24 +16,14 @@
       "confidence": 0.82,
       "responsibilities": [
         {
-          "schema_version": 1,
           "local_ref": "r1",
           "outcome": "respond to the user greeting and wellbeing question",
           "confidence": 0.82,
-          "output_mode": "speech",
-          "continuity_scope": "turn"
+          "value_review": false
         }
       ],
       "meaning_uncertainties": [],
-      "cognitive_requests": [
-        {
-          "authority": "social_cognition",
-          "responsibility_refs": [
-            "r1"
-          ],
-          "reason_summary": "Explicit authored fixture requests the existing cognitive owner."
-        }
-      ]
+      "cognitive_requests": []
     }
   },
   "expect": {
@@ -47,8 +37,7 @@
       {
         "local_ref": "r1",
         "outcome": "respond to the user greeting and wellbeing question",
-        "confidence": 0.82,
-        "output_mode": "speech"
+        "confidence": 0.82
       }
     ]
   },

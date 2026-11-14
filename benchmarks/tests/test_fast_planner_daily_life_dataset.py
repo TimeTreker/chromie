@@ -315,3 +315,19 @@ def test_adjudication_rejects_any_failed_candidate_process(tmp_path) -> None:
 
     with pytest.raises(ValueError, match="batch is incomplete"):
         asyncio.run(adjudicate_batch(tmp_path))
+
+
+def test_shared_meta_validation_keeps_invalid_nested_activity_constraints():
+    import copy
+    from jsonschema import Draft202012Validator, SchemaError
+    from agent.app.clients.sglang_protocol import share_planner_schema_contracts
+    invalid = {'title': 'FastPlannerWorkAdvanceOutput', 'type': 'object', 'oneOf': [{
+        'type': 'object', 'properties': {'activities': {'type': 'array', 'items': {'oneOf': [{
+            'type': 'invalid-json-schema-type', 'properties': {'role': {'const': 'capability'}},
+        }]}}},
+    }]}
+    shared = copy.deepcopy(invalid)
+    share_planner_schema_contracts(shared)
+    with pytest.raises(SchemaError):
+        Draft202012Validator.check_schema(shared)
+    assert invalid['oneOf'][0]['properties']['activities']['items']['oneOf'][0]['type'] == 'invalid-json-schema-type'

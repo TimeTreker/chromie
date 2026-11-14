@@ -76,7 +76,7 @@ def _source(output_mode: str = "information", text: str = "What's the weather?")
         "user_turn_envelope": {"turn_id": "turn-weather",
                                "normalized_input": {"text": text, "language": "en-US"}},
         "user_meaning_interpretation": {"responsibilities": [{
-            "local_ref": "r-weather", "outcome": text, "output_mode": output_mode,
+            "local_ref": "r-weather", "outcome": text,
             "confidence": 1.0}]},
         "goal_association": {"associations": [], "new_goals": [{
             "goal_id": GOAL, "source_responsibility_refs": ["r-weather"]}]},
@@ -147,14 +147,15 @@ def test_planner_communication_is_the_only_sc_communication() -> None:
     assert assistant.cognitive_runtime.requests == []
 
 
-def test_terminal_evidence_without_requested_result_keeps_planner_ownership() -> None:
+def test_successful_body_work_reaches_sc_for_optional_communication() -> None:
     plan = _plan("soridormi.blink_eyes")
     assistant = _assistant(None)
 
     response = _run(assistant, plan, _bundle(plan), _source("body_action", "Blink."))
 
-    assert response is None
-    assert assistant.cognitive_runtime.requests == []
+    assert response is not None
+    [request] = assistant.cognitive_runtime.requests
+    assert request.communication_needs[0].facts["result_kind"] == "requested_work"
 
 
 def test_sc_owns_how_the_requested_result_is_said() -> None:

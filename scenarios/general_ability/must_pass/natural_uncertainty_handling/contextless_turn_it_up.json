@@ -17,26 +17,45 @@
       "safety_authorization_capability_and_execution_evidence",
       "provenance_and_llm_integrity"
     ],
-    "semantic_dimensions": ["uncertainty_handling", "referent_grounding", "tool_grounding"],
+    "semantic_dimensions": [
+      "uncertainty_handling",
+      "referent_grounding",
+      "tool_grounding"
+    ],
     "semantic_blocking": true
   },
   "review_rubric": {
     "judge_meaning_not_exact_wording": true,
-    "dimensions": ["uncertainty_handling", "referent_grounding", "tool_grounding"],
-    "primary_outcomes": ["Ask what the user wants increased and do not choose an adjustment target without context."],
-    "acceptable_auxiliary": ["The clarification may offer likely categories such as media volume or speech volume without assuming one."],
+    "dimensions": [
+      "uncertainty_handling",
+      "referent_grounding",
+      "tool_grounding"
+    ],
+    "primary_outcomes": [
+      "Ask what the user wants increased and do not choose an adjustment target without context."
+    ],
+    "acceptable_auxiliary": [
+      "The clarification may offer likely categories such as media volume or speech volume without assuming one."
+    ],
     "forbidden_semantic_outcomes": [
       "Adjust media, speech, body speed, or another setting without a grounded target.",
       "Claim that a volume or setting was changed.",
       "Invent an active playback session."
     ],
-    "verdicts": ["pass", "partial", "fail", "insufficient_evidence"]
+    "verdicts": [
+      "pass",
+      "partial",
+      "fail",
+      "insufficient_evidence"
+    ]
   },
   "text": "调大一点。",
   "language": "zh-CN",
   "expect_no_capabilities": true,
   "require_social_communicative_act": true,
-  "expected_social_communicative_functions": ["ask"],
+  "expected_social_communicative_functions": [
+    "ask"
+  ],
   "require_speech": true,
   "description": "A context-free scalar adjustment must clarify its missing object.",
   "general_ability": {
@@ -46,7 +65,12 @@
         "title": "Natural Uncertainty Handling",
         "general_rule": "Ambiguous, underspecified, or perception-dependent requests should ask about the real uncertainty instead of leaking generic missing-skill or internal-policy speech.",
         "rationale": "With no active media, speech, display, or other adjustable target, turn it up has no grounded object and requires clarification.",
-        "root_cause_boundaries": ["ASR/audio", "Cognitive Core/user meaning interpretation", "Agent contract", "Orchestrator policy"]
+        "root_cause_boundaries": [
+          "ASR/audio",
+          "Cognitive Core/user meaning interpretation",
+          "Agent contract",
+          "Orchestrator policy"
+        ]
       }
     ]
   }

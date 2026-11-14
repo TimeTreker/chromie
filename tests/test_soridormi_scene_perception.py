@@ -313,3 +313,49 @@ def test_text_check_records_unavailable_perception_without_blocking() -> None:
     assert record["enabled"] is True
     assert record["primed"].startswith("unavailable:RuntimeError")
     assert record["interpretation_count"] == 0
+
+
+@pytest.mark.parametrize("phase", ["sync_social_skill", "refresh_soridormi_ambient_scene_once"])
+def test_ambient_loop_honors_owner_cancel_even_if_dependency_absorbs_it(monkeypatch, phase):
+    from orchestrator.runtime import soridormi_scene_perception as module
+
+    async def exercise():
+        entered = asyncio.Event()
+        blocked = asyncio.Event()
+        calls = []
+        swallowed = []
+
+        def dependency(name):
+            async def invoke(_host):
+                calls.append(name)
+                if name == phase:
+                    entered.set()
+                    if calls.count(name) == 1:
+                        try:
+                            await blocked.wait()
+                        except asyncio.CancelledError:
+                            swallowed.append(True)
+                    else:
+                        await blocked.wait()
+            return invoke
+
+        for name in ("sync_social_skill", "refresh_soridormi_ambient_scene_once"):
+            monkeypatch.setattr(module, name, dependency(name))
+        task = asyncio.create_task(module.run_soridormi_ambient_perception_loop(object(), poll_interval_s=0.1))
+        try:
+            await asyncio.wait_for(entered.wait(), 1)
+            task.cancel()
+            await asyncio.wait({task}, timeout=0.25)
+            done_after_first_cancel = task.done()
+        finally:
+            if not task.done():
+                task.cancel()
+            await asyncio.gather(task, return_exceptions=True)
+        assert swallowed == [True]
+        assert done_after_first_cancel
+        assert task.cancelled()
+        assert calls.count(phase) == 1
+        if phase == "sync_social_skill":
+            assert calls == [phase]
+
+    asyncio.run(exercise())

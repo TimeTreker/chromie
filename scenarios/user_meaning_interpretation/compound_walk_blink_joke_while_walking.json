@@ -28,37 +28,31 @@
             {
               "local_ref": "r1",
               "outcome": "Please walk forward for 20 seconds",
-              "output_mode": "body_action",
               "confidence": 0.91,
               "source_evidence": {
                 "source_start_token_ref": "t0",
                 "source_end_token_ref": "t5"
               },
-              "continuity_scope": "goal",
-              "body_effect_family": "task_physical_effect"
+              "value_review": false
             },
             {
               "local_ref": "r2",
               "outcome": "after that blink your little eyes 6 times",
-              "output_mode": "body_action",
               "confidence": 0.86,
               "source_evidence": {
                 "source_start_token_ref": "t10",
                 "source_end_token_ref": "t15"
               },
-              "continuity_scope": "goal",
-              "body_effect_family": "social_expression"
+              "value_review": false
             },
             {
               "local_ref": "r3",
               "outcome": "tell me a joke when you are walking",
-              "output_mode": "speech",
               "confidence": 0.88,
               "source_evidence": {
                 "source_start_token_ref": "t17",
                 "source_end_token_ref": "t24"
               },
-              "continuity_scope": "goal",
               "value_review": false
             }
           ],
@@ -68,16 +62,9 @@
               "authority": "planner",
               "responsibility_refs": [
                 "r1",
-                "r2"
-              ],
-              "reason_summary": "Explicit authored fixture requests the existing cognitive owner."
-            },
-            {
-              "authority": "social_cognition",
-              "responsibility_refs": [
+                "r2",
                 "r3"
-              ],
-              "reason_summary": "Explicit authored fixture requests the existing cognitive owner."
+              ]
             }
           ]
         }
@@ -95,21 +82,16 @@
       {
         "local_ref": "r1",
         "outcome": "Please walk forward for 20 seconds",
-        "output_mode": "body_action",
-        "confidence": 0.91,
-        "body_effect_family": "task_physical_effect"
+        "confidence": 0.91
       },
       {
         "local_ref": "r2",
         "outcome": "after that blink your little eyes 6 times",
-        "output_mode": "body_action",
-        "confidence": 0.86,
-        "body_effect_family": "social_expression"
+        "confidence": 0.86
       },
       {
         "local_ref": "r3",
         "outcome": "tell me a joke when you are walking",
-        "output_mode": "speech",
         "confidence": 0.88
       }
     ]

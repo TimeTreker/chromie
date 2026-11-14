@@ -93,6 +93,12 @@ class SocialCognitionRequest(BaseModel):
         refs = {item.local_ref for item in self.responsibilities}
         if len(refs) != len(self.responsibilities):
             raise ValueError("Social Cognition Responsibility refs must be unique")
+        pending_refs = self.context.get("pending_work_responsibility_refs")
+        if pending_refs is not None and (
+            not isinstance(pending_refs, list)
+            or any(not isinstance(ref, str) or ref not in refs for ref in pending_refs)
+        ):
+            raise ValueError("pending Work widens Responsibility scope")
         for uncertainty in self.meaning_uncertainties:
             if set(uncertainty.responsibility_refs) - refs:
                 raise ValueError(
@@ -373,7 +379,7 @@ def earlier_acknowledgement_ids(context: Any) -> set[str]:
 
 
 def earlier_speech_replies(request: "SocialCognitionRequest") -> dict[str, set[str]]:
-    """Earlier acknowledgements that replied to speech Responsibilities only, with the refs they cited.
+    """Earlier grounded replies to Responsibilities with no pending Work, with the refs they cited.
 
     Replying to what the person said ("辛苦了，快休息一下吧。" for "我今天好累啊。") is the whole
     answer to that speech Responsibility, not a receipt said before an answer existed. Live
@@ -381,7 +387,7 @@ def earlier_speech_replies(request: "SocialCognitionRequest") -> dict[str, set[s
     spoken again as a new act in 19 of 156 turns with speech.
     """
 
-    speech_refs = {item.local_ref for item in request.responsibilities if item.output_mode == "speech"}
+    speech_refs = {item.local_ref for item in request.responsibilities} - pending_work_responsibility_refs(request) - work_responsibility_refs(request)
     acknowledgements = earlier_acknowledgement_ids(request.context)
     interaction = request.context.get("interaction_context")
     replies: dict[str, set[str]] = {}
@@ -391,7 +397,8 @@ def earlier_speech_replies(request: "SocialCognitionRequest") -> dict[str, set[s
             if not isinstance(metadata, dict):
                 continue
             cited = {str(ref) for ref in metadata.get("source_responsibility_refs") or []}
-            if cited and cited <= speech_refs:
+            stages = metadata.get("truth_stages") or [metadata.get("truth_stage")]
+            if cited and cited <= speech_refs and set(stages) <= {"context_grounded", "post_evidence"}:
                 for identity in metadata.get("communicative_activity_ids") or []:
                     if str(identity).strip() in acknowledgements:
                         replies.setdefault(str(identity).strip(), set()).update(cited)
@@ -448,8 +455,30 @@ def value_withheld_need_ids(request: "SocialCognitionRequest") -> set[str]:
     return {need.need_id for need in request.communication_needs if need.facts.get("value_withheld") is True}
 
 
+def pending_work_responsibility_refs(request: "SocialCognitionRequest") -> set[str]:
+    """Actual pending planning cannot be completed by an ingress reply category."""
+    if request.context.get("work_decision_pending") is True:
+        own = {item.local_ref for item in request.responsibilities}
+        refs = request.context.get("pending_work_responsibility_refs")
+        return own & set(refs) if isinstance(refs, list) and refs else own
+    return set()
+
+
+def work_responsibility_refs(request: "SocialCognitionRequest") -> set[str]:
+    """Current canonical Work is a truth boundary, irrespective of UMI wording."""
+    work = request.context.get("work")
+    if isinstance(work, list) and any(isinstance(item, dict) and item.get("id") in request.source_refs for item in work):
+        return {item.local_ref for item in request.responsibilities}
+    plan = request.context.get("canonical_plan_resolution")
+    if not isinstance(plan, dict) or not plan.get("steps"):
+        return set()
+    if plan.get("plan_id") not in request.source_refs and not set(plan.get("goal_ids") or []) & set(request.goal_ids):
+        return set()
+    return {item.local_ref for item in request.responsibilities}
+
+
 def value_review_responsibility_refs(request: "SocialCognitionRequest") -> set[str]:
-    """Speech UMI marked value_review: answered only after Value Judgment.
+    """Responsibilities marked value_review: answered only after Value Judgment.
 
     Live 2026-10-10: a requested pretense was performed at the interpretation trigger
     before any Planner or Value Judgment decision. Unmarked speech stays immediate.
@@ -468,7 +497,8 @@ def uncertain_task_responsibility_refs(request: "SocialCognitionRequest") -> set
 
     if value_review_responsibility_refs(request):
         return set()
-    task_refs = {item.local_ref for item in request.responsibilities if item.output_mode != "speech"}
+    task_refs = {item.local_ref for item in request.responsibilities}
+    task_refs.update(pending_work_responsibility_refs(request))
     named = {ref for item in request.meaning_uncertainties for ref in item.responsibility_refs}
     return task_refs & named
 
@@ -512,13 +542,22 @@ def pre_evidence_act_violation(act: "SocialCommunicativeAct", request: "SocialCo
     read, then repeated it after Evidence said Thursday. Interpretation ingress keeps its own rule.
     """
 
+    pending = pending_work_responsibility_refs(request)
+    if pending and (not act.source_responsibility_refs or pending.intersection(act.source_responsibility_refs)):
+        if request.trigger == "interpretation" and asks_about_uncertain_meaning(act, request):
+            return None
+        if act.function not in {"acknowledge", "nonverbal"} or act.truth_stage != "pre_evidence":
+            return "task result cannot be communicated while a Planner decision is pending; only a pre-evidence receipt is established"
+        if act.progress_kind not in {"acknowledge_work", "check_information", "think"}:
+            return "pending planning establishes neither an execution method nor started Work"
+        return None
     if request.trigger == "interpretation" or act.function in {"nonverbal", "acknowledge"} or act.addressed_need_ids:
         return None
-    if not any(item.output_mode != "speech" for item in request.responsibilities):
+    if not work_responsibility_refs(request):
         return None
     if act.truth_stage in {"pre_evidence", "post_evidence"}:
         return None
-    speech_refs = {item.local_ref for item in request.responsibilities if item.output_mode == "speech"}
+    speech_refs = {item.local_ref for item in request.responsibilities} - pending_work_responsibility_refs(request) - work_responsibility_refs(request)
     cited = set(act.source_responsibility_refs)
     if cited and cited.issubset(speech_refs):
         return None
@@ -550,7 +589,7 @@ class SocialCognitionResolution(SocialCognitionOutput):
         needs = {need.need_id: need for need in request.communication_needs}
         if set(self.need_outcomes) != set(needs):
             raise ValueError("Social Cognition must account for every supplied communication need")
-        required_failure_need_ids = {
+        required_failure_need_ids = set() if user_turn_prohibits_speech(request.context.get("user_turn_envelope")) else {
             need.need_id for need in request.communication_needs
             if need.owner == "runtime" and need.kind == "result"
             and need.facts.get("status") == "failed"
@@ -613,6 +652,8 @@ class SocialCognitionResolution(SocialCognitionOutput):
             if not set(self_candidate.subject_refs).issubset(subjects | {"self:chromie"}):
                 raise ValueError("social self-context widens Situation subjects")
         for act in self.activities:
+            if act.truth_stage == "pre_evidence" and act.addressed_need_ids:
+                raise ValueError("a pre-evidence receipt cannot cover a communication need")
             early = pre_evidence_act_violation(act, request)
             if early:
                 raise ValueError(early)
@@ -620,7 +661,7 @@ class SocialCognitionResolution(SocialCognitionOutput):
                 turn_local_refs = {
                     item.local_ref
                     for item in request.responsibilities
-                    if item.continuity_scope == "turn"
+                    if item.local_ref not in pending_work_responsibility_refs(request)
                 }
                 cited_refs = set(act.source_responsibility_refs)
                 if not asks_about_uncertain_meaning(act, request) and (
@@ -628,7 +669,7 @@ class SocialCognitionResolution(SocialCognitionOutput):
                 ):
                     raise ValueError(
                         "interpretation-triggered respond/ask cannot fulfill an unestablished "
-                        "Work communication need unless it cites only turn-local "
+                        "Work communication need unless it cites only established "
                         "Responsibility provenance"
                     )
             for name, values in scopes.items():

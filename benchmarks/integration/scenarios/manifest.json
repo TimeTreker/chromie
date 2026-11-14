@@ -1,18 +1,18 @@
 {
   "schema_version": 1,
-  "frozen_on": "2026-11-07",
+  "frozen_on": "2026-11-12",
   "author_model": "gpt-6-astra",
   "reference_kind": "assistant-authored and contract-reviewed, not independent ground truth",
   "independent_review": false,
   "model_ability_evaluated": false,
   "case_sha256": {
-    "workflow-cancellation.json": "0aa57205aaae9c2208168ae5daaceca287a7b32a07d751ffe694c4beb25e5139",
-    "workflow-conditional-dry.json": "918ef0c9e0f550b0896128b9f958ac355b57122ae66f8e87aa56791857e63b97",
-    "workflow-conditional-rain.json": "a0f93705ff259e0b426a552bb1d866f9ee33f3ff036dd6946110009503a74a85",
-    "workflow-delayed.json": "2d796fc0bcbe44545b2db9d593f1f46a2b8e4b4cb66540876d2f7c56c69bf25f",
-    "workflow-normal.json": "da62460020661c94abc490f2ae3c3e5d383fd81d95bc6bfeed71843313703380"
+    "workflow-cancellation.json": "950bef44e92950ff59e020ef8f7909048060404a7fa944c8ca22474e73258e85",
+    "workflow-conditional-dry.json": "f82d9ed5cc16339547aeb95adf9ef06f8b1282181f0c4d245090273b3df0e2d2",
+    "workflow-conditional-rain.json": "3c63a834482ec8b8af2923c12a576f7fc9ff86ba5af3df58bb352922f50d4bf9",
+    "workflow-delayed.json": "322960330cf3c25a0b484dc654ed17590f528719555586ac656a794eb0ae6c15",
+    "workflow-normal.json": "286ad1a9e0ba4d4f5e8fd5a71356a2af56d3e09bcd1db8788bad101a6e71048f"
   },
-  "freeze_revision": 49,
-  "freeze_note": "Explicit request-only recapture from actual workflow after Planner ability-needs guidance ordering/clarity and lossless shared-definition change. All 6000 authored replies, inputs, provider outcomes, expectations, splits and reference metadata are unchanged; all reach original expected verdicts. Only reviewed fast-role prompt delta and Schema reference factoring allowed; UMI/GA/transport/options unchanged. Strict replay still requires exact packets. No candidate/native model calls; non-independent implementation review.",
+  "freeze_revision": 53,
+  "freeze_note": "Request-only freeze53 after native greeting/dance baseline: expose the existing no-present-Work respond guard in native Schema; preserve explicit canonical future conditions. Add one generic primary output-format clarification: no ability is [], whereas closest_loaded=none is a real unmet ability. No user-phrase routing, model/budget/transport change, reference-output/input/provider/target/split change or additional semantic call. All 6000 Schema-only authoring captures retained; deterministic guide substitution is checked against exact old messages and then requires a new strict current-source replay. Native two-case probes and pinned XGrammar prove focused output/grammar behavior only, not full native, physical or release qualification. Freeze52 and both failed native cohorts remain retained locally.",
   "migration": "Work-only contracts and separate SC fixtures; unchanged expectations, complete request recapture."
 }

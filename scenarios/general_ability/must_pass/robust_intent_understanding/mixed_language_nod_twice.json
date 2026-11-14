@@ -17,25 +17,46 @@
       "safety_authorization_capability_and_execution_evidence",
       "provenance_and_llm_integrity"
     ],
-    "semantic_dimensions": ["intent_understanding", "language_robustness", "constraint_preservation"],
+    "semantic_dimensions": [
+      "intent_understanding",
+      "language_robustness",
+      "constraint_preservation"
+    ],
     "semantic_blocking": true
   },
   "review_rubric": {
     "judge_meaning_not_exact_wording": true,
-    "dimensions": ["intent_understanding", "language_robustness", "constraint_preservation"],
-    "primary_outcomes": ["Interpret nod as the requested gesture and preserve the count of two."],
-    "acceptable_auxiliary": ["Any acknowledgement should remain natural in the user's mixed-language context."],
+    "dimensions": [
+      "intent_understanding",
+      "language_robustness",
+      "constraint_preservation"
+    ],
+    "primary_outcomes": [
+      "Interpret nod as the requested gesture and preserve the count of two."
+    ],
+    "acceptable_auxiliary": [
+      "Any acknowledgement should remain natural in the user's mixed-language context."
+    ],
     "forbidden_semantic_outcomes": [
       "Ask for clarification solely because one common action word is English.",
       "Select blink, shake, or another nearby gesture.",
       "Drop the requested count."
     ],
-    "verdicts": ["pass", "partial", "fail", "insufficient_evidence"]
+    "verdicts": [
+      "pass",
+      "partial",
+      "fail",
+      "insufficient_evidence"
+    ]
   },
   "text": "请 nod 两下。",
   "language": "zh-CN",
-  "expected_capabilities": ["soridormi.nod_yes"],
-  "expected_args": ["0:count=2"],
+  "expected_capabilities": [
+    "soridormi.nod_yes"
+  ],
+  "expected_args": [
+    "0:count=2"
+  ],
   "require_speech": false,
   "description": "Common code-switching should preserve a well-specified body request.",
   "general_ability": {
@@ -45,7 +66,12 @@
         "title": "Robust Intent Understanding",
         "general_rule": "Chromie should preserve ordinary human meaning across discourse markers, short fragments, ASR-like noise, Chinese and English input, and follow-up context.",
         "rationale": "A simple Chinese-English code-switch should retain the nod action and Chinese count.",
-        "root_cause_boundaries": ["ASR/audio", "Cognitive Core/user meaning interpretation", "Agent contract", "Test evidence"]
+        "root_cause_boundaries": [
+          "ASR/audio",
+          "Cognitive Core/user meaning interpretation",
+          "Agent contract",
+          "Test evidence"
+        ]
       }
     ]
   }

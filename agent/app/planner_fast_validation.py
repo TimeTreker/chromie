@@ -19,7 +19,6 @@ from shared.chromie_contracts.core_interpretation import (
     CognitiveWorkRequest,
     responsibility_binding_material_value,
 )
-from shared.chromie_contracts.interaction import VOCAL_MODES, VOCAL_PERFORMANCE_CAPABILITY_ID
 from shared.chromie_contracts.memory import project_active_memory_for_role
 from shared.chromie_contracts.user_turn import (
     canonical_literal_user_turn_source_span, resolve_user_turn_source_span,
@@ -118,20 +117,13 @@ def project_responsibility_decisions(
     output: FastPlannerAdvanceModelOutput,
     *,
     responsibility_refs: list[str],
-    speech_refs: set[str] | frozenset[str] = frozenset(),
 ) -> FastPlannerAdvanceModelOutput:
     """Bind each Responsibility decision to its Activities; nothing is rewritten.
 
-    The Planner decides every Responsibility first (live 2026-10-11: an impossible
-    sibling was left only in ``unresolved``). An unavailable decision carries its
-    missing facts and becomes the Host-side unavailable Activity the model no longer
-    authors. An answer decision is realized by a response need that names only the
-    Responsibility, so a missing one is projected the same way (live 2026-10-13:
-    "Wave to my little brother, then tell us a joke." decided answer for the joke,
-    omitted its response, and lost both). Work and clarification carry content only
-    the model can author, so they must be its own Activities. The authored
-    aggregate disposition must equal the one these decisions imply; a contradiction
-    fails closed instead of being replaced.
+    Each Work/clarification and each answer beside executable Work must have its
+    primary authored Activity. Host cannot reconstruct an answer's position or
+    timing from its decision. Speech-only answers and unavailable/perceived facts
+    retain their deterministic projections; aggregate contradictions fail closed.
     """
 
     decisions = output.responsibility_decisions
@@ -139,6 +131,10 @@ def project_responsibility_decisions(
         return output
     if set(decisions) != set(responsibility_refs):
         raise PlannerDTOContractError("Planner must decide every Responsibility exactly once")
+    has_work = any(item.decision == "work" for item in decisions.values())
+    if has_work and any(item.role == "complete_response" and "timing" not in item.model_fields_set
+                        for item in output.activities):
+        raise PlannerDTOContractError("An answer beside Work requires explicit timing")
     roles: dict[str, set[str]] = {}
     for activity in output.activities:
         for ref in activity.source_responsibility_refs:
@@ -148,8 +144,6 @@ def project_responsibility_decisions(
         item = decisions[ref]
         own = roles.get(ref, set())
         if item.decision == "unavailable":
-            if ref in speech_refs:
-                raise PlannerDTOContractError(f"ordinary speech is answered, not declared unavailable: {ref}")
             if own - {"unavailable"}:
                 raise PlannerDTOContractError(
                     f"an unavailable Responsibility cannot also carry Work or a response: {ref}")
@@ -158,14 +152,28 @@ def project_responsibility_decisions(
                     role="unavailable", activity_id=f"unavailable-{ref}",
                     source_responsibility_refs=[ref], missing=list(item.missing)))
         elif item.decision == "answer_from_perception":
-            if own:
+            if own - {"complete_response"}:
                 raise PlannerDTOContractError(
-                    f"an answer from perception is Host's response, never authored Activities: {ref}")
-            activities.append(FastPlannerResponseNeed(
-                role="complete_response", activity_id=f"response-{ref}",
-                source_responsibility_refs=[ref], situation_interpretation_refs=list(item.observed_refs),
-                rationale="Answered from the cited current perception."))
+                    f"an answer from perception cannot carry executable Work or clarification: {ref}")
+            if "complete_response" in own:
+                # The Planner owns position and timing; only the already-authored
+                # observation citations are mechanically carried into its Need.
+                activities = [activity.model_copy(update={
+                    "situation_interpretation_refs": list(dict.fromkeys([
+                        *activity.situation_interpretation_refs, *item.observed_refs]))})
+                    if activity.role == "complete_response" and ref in activity.source_responsibility_refs
+                    else activity for activity in activities]
+            elif has_work:
+                raise PlannerDTOContractError(
+                    f"Responsibility {ref} requires its primary authored response beside Work")
+            else:
+                activities.append(FastPlannerResponseNeed(
+                    role="complete_response", activity_id=f"response-{ref}",
+                    source_responsibility_refs=[ref], situation_interpretation_refs=list(item.observed_refs),
+                    rationale="Answered from the cited current perception."))
         elif item.decision == "answer" and "complete_response" not in own:
+            if has_work:
+                raise PlannerDTOContractError(f"Responsibility {ref} requires its primary authored response beside Work")
             activities.append(FastPlannerResponseNeed(
                 role="complete_response", activity_id=f"response-{ref}",
                 source_responsibility_refs=[ref],
@@ -666,6 +674,23 @@ def validate_fast_advance_output(
     }
     clarification_activities = [item for item in output.activities if item.role == "clarification"]
     capability_activities = [item for item in output.activities if item.role == "capability"]
+    if any(item.role in {"complete_response", "clarification"} and item.timing == "parallel"
+           for item in output.activities):
+        incompatible = [item.activity_id for item in capability_activities if not item.deferred and (
+            allowed.get(item.capability_id, {}).get("can_run_parallel") is not True
+            or allowed.get(item.capability_id, {}).get("parallel_metadata_declared") is not True
+            or item.depends_on)]
+        if incompatible:
+            raise FastAdvanceMechanicalSchedulingError(
+                "Concurrent communication requires independent provider-qualified Work: " + ", ".join(incompatible))
+    if any(fast_capability_acquires_information(allowed.get(item.capability_id, {}))
+           and not item.deferred_requirement for item in capability_activities):
+        raise PlannerDTOContractError("Information acquisition must retain its remaining requested outcome")
+    over_budget = [ref for ref in responsibility_refs
+                   if sum(ref in item.source_responsibility_refs for item in capability_activities) > 4]
+    if over_budget:
+        raise PlannerDTOContractError(
+            "Fast Work permits at most four executable Activities per Responsibility: " + ", ".join(over_budget))
     terminal_activities = [
         item for item in output.activities if item.role in {"capability", "complete_response"}
     ]
@@ -756,20 +781,6 @@ def validate_fast_advance_output(
                 "complete_response may cite only current established perception: "
                 + ", ".join(sorted(cited - set(situation_observations)))
             )
-        for source_ref in activity.source_responsibility_refs:
-            source = by_ref.get(source_ref)
-            mixed_work = source is not None and source.output_mode == "other" and any(
-                source_ref in item.source_responsibility_refs for item in capability_activities
-            )
-            perceived_answer = source is not None and source.output_mode == "information" and bool(cited)
-            if source is not None and source.output_mode != "speech" and not mixed_work and not perceived_answer:
-                raise PlannerDTOContractError(
-                    "complete_response Activity may satisfy only an ordinary "
-                    "speech Responsibility; observable, informational, vocal, "
-                    "media, and stateful outcomes require their own terminal "
-                    f"Activity; source_ref={source_ref} "
-                    f"output_mode={source.output_mode}"
-                )
     numeric_args_by_ref: dict[str, set[Decimal]] = {ref: set() for ref in responsibility_refs}
     for activity in capability_activities:
         activity_numbers = semantic_numeric_values(activity.args)
@@ -905,31 +916,6 @@ def validate_fast_advance_output(
             raise PlannerDTOContractError(
                 f"unknown or unavailable Capability {activity.capability_id!r}"
             )
-        for source_ref in activity.source_responsibility_refs:
-            source = by_ref[source_ref]
-            if source.output_mode == "speech":
-                raise PlannerDTOContractError(
-                    "ordinary speech Responsibility requires a Planner-authored "
-                    "complete_response Activity, not a Capability Activity; "
-                    f"source_ref={source_ref} actual_capability="
-                    f"{activity.capability_id}"
-                )
-            if source.output_mode not in set(VOCAL_MODES) - {"speech"}:
-                continue
-            if (
-                activity.capability_id != VOCAL_PERFORMANCE_CAPABILITY_ID
-                or activity.args.get("mode") != source.output_mode
-            ):
-                raise PlannerDTOContractError(
-                    "Planner must preserve a mode-specific vocal "
-                    "Responsibility through the exact qualified vocal provider; "
-                    f"source_ref={source_ref} expected_capability="
-                    f"{VOCAL_PERFORMANCE_CAPABILITY_ID} expected_mode="
-                    f"{source.output_mode} actual_capability="
-                    f"{activity.capability_id} actual_mode="
-                    f"{activity.args.get('mode')!r}. Ordinary speech, media, and "
-                    "body Activities are not completion evidence for that mode."
-                )
         schema_errors = validate_args_for_schema(
             activity.args,
             definition.get("input_schema") or {},

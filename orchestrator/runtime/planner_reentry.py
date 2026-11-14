@@ -400,6 +400,46 @@ def meaningful_provider_state(
             projected["member_status"] = meaningful_members
     return projected
 
+def project_retained_responsibility(
+    record: Mapping[str, Any], *, goals: Sequence[Mapping[str, Any]],
+) -> CognitiveResponsibilityProposal:
+    """Read an exact retained source without rewriting its canonical Goal.
+
+    Historical classification fields may leave the re-entry view only when the
+    bound typed Goal still owns those constraints and its immutable source record
+    exactly matches. Fresh UMI admission never uses this projection.
+    """
+    retired = {"output_mode", "body_effect_family", "continuity_scope"}
+    if not retired.intersection(record):
+        return CognitiveResponsibilityProposal.model_validate(record)
+    for goal in goals:
+        metadata = goal.get("metadata") or {}
+        if (not isinstance(metadata, dict)
+                or record.get("local_ref") not in (goal.get("source_responsibility_refs") or [])
+                or metadata.get("goal_materialization_owner") != "trusted_runtime_from_umi"
+                or record.get("output_mode") != metadata.get("output_mode")
+                or record.get("body_effect_family") is not None
+                and record["body_effect_family"] not in (metadata.get("body_effect_families") or [])
+                or not isinstance(record.get("value_review"), bool)):
+            continue
+        if any(source.get("origin") == "umi" and source.get("responsibility") == record
+               for source in metadata.get("requirement_sources") or [] if isinstance(source, dict)):
+            return CognitiveResponsibilityProposal.model_validate({
+                key: value for key, value in record.items() if key not in retired})
+    raise ValueError("Historical Responsibility requires its exact retained typed Goal provenance")
+
+
+def retained_responsibility_records(records: Any, *, goal: Mapping[str, Any]) -> list[dict[str, Any]]:
+    """Project valid retained sources; leave invalid ones for caller rejection/logging."""
+    rows = [dict(item) for item in records if isinstance(item, dict)] if isinstance(records, list) else []
+    try:
+        return [project_retained_responsibility(item, goals=[goal]).model_dump(mode="json")
+                if {"output_mode", "body_effect_family", "continuity_scope"}.intersection(item)
+                else item for item in rows]
+    except (TypeError, ValueError):
+        return rows
+
+
 def planner_reentry_responsibilities(
     *,
     source_response: InteractionResponse,
@@ -422,12 +462,18 @@ def planner_reentry_responsibilities(
         if isinstance(raw_interpretation, dict)
         else []
     )
+    normalized_goal_ids = {str(goal_id).strip() for goal_id in goal_ids if str(goal_id).strip()}
+    association = metadata.get("goal_association") or {}
+    if not isinstance(association, dict):
+        association = {}
+    retained_goals = [goal for goal in association.get("new_goals") or []
+                      if isinstance(goal, dict) and goal.get("goal_id") in normalized_goal_ids]
     parsed: dict[str, CognitiveResponsibilityProposal] = {}
     for item in responsibilities if isinstance(responsibilities, list) else []:
         if not isinstance(item, dict):
             continue
         try:
-            responsibility = CognitiveResponsibilityProposal.model_validate(item)
+            responsibility = project_retained_responsibility(item, goals=retained_goals)
         except (TypeError, ValueError):
             continue
         parsed[responsibility.local_ref] = responsibility

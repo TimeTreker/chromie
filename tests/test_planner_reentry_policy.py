@@ -72,13 +72,13 @@ def _response(*, include_interpretation: bool = True) -> InteractionResponse:
                 {
                     "local_ref": "responsibility-a",
                     "outcome": "Obtain the first requested result.",
-                    "output_mode": "information",
+
                     "confidence": 1.0,
                 },
                 {
                     "local_ref": "responsibility-b",
                     "outcome": "Obtain the second requested result.",
-                    "output_mode": "information",
+
                     "confidence": 1.0,
                 },
             ]
@@ -301,7 +301,7 @@ def test_fast_fail_safe_cannot_widen_typed_reentry_scope() -> None:
             {
                 "local_ref": "blink",
                 "outcome": "blink once",
-                "output_mode": "body_action",
+
                 "confidence": 1.0,
             }
         ],
@@ -375,7 +375,7 @@ def test_one_unbound_responsibility_does_not_cover_multiple_goals() -> None:
             {
                 "local_ref": "responsibility-a",
                 "outcome": "Obtain one requested result.",
-                "output_mode": "information",
+
                 "relationship": "new",
                 "confidence": 1.0,
             }
@@ -483,7 +483,7 @@ def test_work_request_rejects_unverified_source_projection() -> None:
             {
                 "local_ref": "r1",
                 "outcome": "scoped responsibility",
-                "output_mode": "information",
+
                 "confidence": 1.0,
             }
         ],
@@ -635,8 +635,8 @@ def test_planner_reentry_prompt_does_not_expose_old_plan_envelope_as_template() 
         responsibilities=[{
             "local_ref": "r1",
             "outcome": "the weather today in chongqing",
-            "output_mode": "information",
-            "continuity_scope": "goal",
+
+
             "confidence": 1.0,
         }],
         interpretation_confidence=1.0,
@@ -912,8 +912,8 @@ def test_fast_evidence_reentry_prompt_is_bounded_and_has_no_old_output_template(
         responsibilities=[{
             "local_ref": "r1",
             "outcome": "the weather today in Chongqing",
-            "output_mode": "information",
-            "continuity_scope": "goal",
+
+
             "confidence": 1.0,
         }],
         interpretation_confidence=1.0,

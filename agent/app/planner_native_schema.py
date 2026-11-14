@@ -10,6 +10,19 @@ import json
 from itertools import product
 from typing import Any, Callable
 
+from .planner_model_contract import NEED_TIMING_WIRE_VALUES
+
+
+def native_need_timing_schema(schema: dict[str, Any]) -> dict[str, Any]:
+    """Encode the same two canonical timing choices with explicit Work scope."""
+    result = dict(schema, enum=list(NEED_TIMING_WIRE_VALUES))
+    if "default" in schema:
+        encoded = {value: wire for wire, value in NEED_TIMING_WIRE_VALUES.items()}
+        if schema["default"] not in encoded:
+            raise ValueError("Need timing schema default must be canonical")
+        result["default"] = encoded[schema["default"]]
+    return result
+
 
 def native_goal_outcome_branches(schema: dict[str, Any]) -> dict[str, Any]:
     """Final decoder pass: each Goal outcome becomes per-disposition native branches.
@@ -321,3 +334,123 @@ def _responsibility_refs_first(node: Any, *, _seen: set[int] | None = None) -> N
     elif isinstance(node, list):
         for value in node:
             _responsibility_refs_first(value, _seen=seen)
+
+
+def native_communication_parallel_contract(schema: dict[str, Any], capabilities: list[dict[str, Any]]) -> None:
+    """Expose provider eligibility for a Need concurrent with Work in native array shapes.
+
+    Serial Needs preserve every capability choice. Parallel alternatives are disjoint
+    by the first parallel Need, so array order and compound cardinality stay free.
+    Shared definitions avoid copying provider argument grammars for every position.
+    """
+    safe = {item["capability_id"] for item in capabilities
+            if item.get("can_run_parallel") is True and item.get("parallel_metadata_declared") is True}
+    definitions = schema.setdefault("$defs", {})
+    shared: dict[str, str] = {}
+
+    def share(value: dict[str, Any]) -> dict[str, Any]:
+        identity = json.dumps(value, sort_keys=True, separators=(",", ":"))
+        if identity not in shared:
+            name = f"NativeCommunicationTiming{len(shared)}"
+            definitions[name] = value
+            shared[identity] = name
+        return {"$ref": f"#/$defs/{shared[identity]}"}
+
+    def select(slot: dict[str, Any], *, parallel: bool, need_timing: str | None, need_only: bool = False) -> dict[str, Any] | None:
+        choices = []
+        for branch in slot.get("oneOf", [slot]):
+            props = branch.get("properties", {})
+            roles = props.get("role", {}).get("enum", [])
+            if roles == ["capability"]:
+                if need_only:
+                    continue
+                ids = props.get("capability_id", {}).get("enum", [])
+                if parallel:
+                    deferred = props.get("deferred")
+                    if isinstance(deferred, dict) and deferred.get("const") is not False:
+                        held = copy.deepcopy(branch)
+                        held["properties"]["deferred"] = {"type": "boolean", "enum": [True]}
+                        held["required"] = list(dict.fromkeys([*held.get("required", []), "deferred"]))
+                        choices.append(share(held))  # Held effects do not start with this Need.
+                    if not ids or not set(ids) <= safe:
+                        continue
+                variant = branch
+                if parallel:
+                    variant = copy.deepcopy(branch)
+                    variant["properties"]["depends_on"] = {"type": "array", "maxItems": 0, "items": {"type": "string"}}
+                    if "deferred" in props:
+                        variant["properties"]["deferred"] = {"type": "boolean", "enum": [False]}
+            elif roles and roles[0] in {"complete_response", "clarification"}:
+                variant = copy.deepcopy(branch)
+                if need_timing is not None:
+                    offered = props.get("timing", {}).get("enum", list(NEED_TIMING_WIRE_VALUES))
+                    if need_timing not in offered:
+                        continue
+                    variant["properties"]["timing"] = {"type": "string", "enum": [need_timing]}
+                    variant["required"] = list(dict.fromkeys([*variant.get("required", []), "timing"]))
+            else:
+                if need_only:
+                    continue
+                variant = branch
+            choices.append(share(variant))
+        return ({"oneOf": choices} if len(choices) > 1 else choices[0]) if choices else None
+
+    for state in schema.get("oneOf", []):
+        activities = state.get("properties", {}).get("activities", {})
+        count = activities.get("maxItems", 0)
+        if not count:
+            continue
+        prefix = activities.get("prefixItems", [])
+        items = activities.get("items", {})
+        slots = [prefix[i] if i < len(prefix) else items for i in range(count)]
+        branches = [branch for slot in slots for branch in slot.get("oneOf", [slot])]
+        roles = {role for branch in branches for role in branch.get("properties", {}).get("role", {}).get("enum", [])}
+        if "capability" not in roles or not roles.intersection({"complete_response", "clarification"}):
+            continue
+        variants = []
+        serial = [select(slot, parallel=False, need_timing="ordered_with_work") for slot in slots]
+        if all(serial):
+            variants.append({"type": "array", "minItems": count, "maxItems": count, "prefixItems": serial, "items": False})
+        for first in range(count):
+            parallel = [select(slot, parallel=True,
+                               need_timing="ordered_with_work" if i < first else "concurrent_with_work" if i == first else None,
+                               need_only=i == first) for i, slot in enumerate(slots)]
+            if all(parallel):
+                variants.append({"type": "array", "minItems": count, "maxItems": count, "prefixItems": parallel, "items": False})
+        if variants:
+            state["properties"]["activities"] = {**activities, "oneOf": variants}
+
+
+def share_planner_source_contracts(schema: dict[str, Any]) -> None:
+    """Keep identical provenance grammars shared across Capability/state branches."""
+    definitions = schema.setdefault("$defs", {})
+    known: dict[str, str] = {}
+
+    def visit(node: Any) -> None:
+        if isinstance(node, dict):
+            sources = node.get("properties", {}).get("argument_sources", {})
+            for name, contract in list(sources.get("properties", {}).items()):
+                if not isinstance(contract, dict) or "$ref" in contract:
+                    continue
+                encoded = json.dumps(contract, ensure_ascii=False, separators=(",", ":"))
+                if encoded not in known:
+                    key = f"FastArgumentSourceSpan{len(known)}"
+                    while key in definitions:
+                        key += "_"
+                    definitions[key] = contract
+                    known[encoded] = key
+                sources["properties"][name] = {"$ref": f"#/$defs/{known[encoded]}"}
+            for key, value in node.items():
+                if key not in {"$defs", "const", "enum", "default", "examples"}:
+                    visit(value)
+        elif isinstance(node, list):
+            for value in node:
+                visit(value)
+
+    # Planner's native parallel pass already places Capability branches in
+    # $defs. They contain the same provenance grammars as inline branches.
+    # Snapshot before adding shared spans so the new definitions cannot visit
+    # themselves or create recursive references.
+    for definition in tuple(definitions.values()):
+        visit(definition)
+    visit(schema)

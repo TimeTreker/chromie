@@ -94,6 +94,10 @@ CAPABILITY_NEED_PROMPT = (
     "that need (unavailable, or clarify when the person can resolve it) instead of substituting "
     "Work. Never guess missing schemas. Restricted entries remain restricted. Catalog search "
     "authorizes no execution. "
+    "Representation: when no executable Capability ability is needed, write ability_needs as [] "
+    "(zero entries). Never encode absence as an ability object. closest_loaded=\"none\" means "
+    "no loaded Capability was selected for a real requested ability, so fits must be false; "
+    "it does not mean no ability is needed. "
 )
 
 EXPLICIT_NUMERIC_ARGUMENT_GROUNDING_PROMPT = (
@@ -170,8 +174,11 @@ UNRESOLVED_MEANING_PROMPT = (
 FAST_PERCEIVED_ANSWER_PROMPT = (
     "When a current situation.interpretations entry already observes what an information "
     "Responsibility asks (for example whether something is here, or where it is), that observation "
-    "is its Evidence: list it in that Responsibility's observed_refs and decide answer_from_perception, "
-    "with no Activity to check, fetch or confirm it. Otherwise leave observed_refs empty: perception "
+    "is its Evidence: list it in that Responsibility's observed_refs and decide answer_from_perception. "
+    "No Capability is needed to check, fetch or confirm an already observed fact. Beside executable "
+    "Work, still author that Responsibility's complete_response Need with its position and explicit "
+    "timing relative to Work; Host carries the cited observations, never chooses that order. "
+    "Otherwise leave observed_refs empty: perception "
     "shows things and people around Chromie, never the time, the weather or other facts. Offering "
     "further help with what was found is Social Cognition's; plan that help only when the person "
     "asked for it. "
@@ -598,7 +605,7 @@ def _canonical_work_prompt(
             if request.turn_envelope is not None
             else (context.get("user_turn_envelope") or {}).get("received_at")
         ) +
-        "Read output_mode as provider-neutral WHAT, not permission or an execution lane. "
+        "Retained typed Goal constraints stay authoritative; fresh UMI supplies complete natural-language WHAT. "
         "Ordinary language generation, creative/social responses and answers grounded in "
         "supplied context use respond with no Capability: SC will compose the actual words. "
         "This does not require prewritten response content or a speech Capability. Never "
@@ -841,8 +848,6 @@ def fast_evidence_reentry_prompt(
             {
                 "local_ref": item.local_ref,
                 "outcome": item.outcome,
-                "output_mode": item.output_mode,
-                "body_effect_family": item.body_effect_family,
                 "bindings": copy.deepcopy(item.bindings),
             }
             for item in request.responsibilities
@@ -895,9 +900,7 @@ def fast_advance_layered_prompt(
     # provider-owned source; the Situation part only when something is observed now.
     provider_sources = any(provider_resolves_required_source(item, "source") for item in capabilities)
     observed_sources = provider_sources and bool(situation_source_observations(context))
-    perceived_answers = bool(situation_source_observations(context)) and any(
-        item.output_mode == "information" for item in responsibilities
-    )
+    perceived_answers = bool(situation_source_observations(context))
     contract = PLANNER_WORK_AUTHORITY_PROMPT + (
         "UMI owns WHAT. This Fast invocation decides Work over exact Responsibility refs while "
         "GA independently binds canonical Goals. The responsibilities array below is the complete "
@@ -947,7 +950,7 @@ def fast_advance_layered_prompt(
         "complete_response establishes a context-grounded speech obligation, never delivered speech; "
         "include its rationale: which Responsibility it answers and from which facts, never the words to say or "
         "what Chromie is. clarification supplies typed information_gaps, never wording. "
-        "Ordinary requested speech admits complete_response; a mixed-mode other Responsibility may include it alongside Capability Work only when the source Responsibility itself explicitly contains a communicative result. Never add complete_response just to acknowledge, confirm, narrate or announce a physical Work sequence; SC decides that interaction independently. Information acquisition, "
+        "Every information-acquisition Activity must state deferred_requirement: the remaining requested result, including any answer or dependent effect, to be established from its Evidence. Reading alone never silently completes that result. Ordinary requested speech admits complete_response; a compound Responsibility may include it alongside Capability Work only when the source Responsibility itself explicitly contains a communicative result. Never drop a requested communicative result or replace it with a bodily gesture. Never add complete_response just to acknowledge, confirm, narrate or announce a physical Work sequence; SC decides that interaction independently. Information acquisition, "
         "physical/durable effects, vocal performance and media need their qualified providers. "
         "Do not confuse the person's intended activity with an action of Chromie's. "
         "Match each whole requested outcome against Capability semantic_scope, effects and "
@@ -998,7 +1001,7 @@ def fast_advance_layered_prompt(
         "dependency; requested simultaneity (while, at the same time, parallel_with) means no "
         "dependency between those Activities. Runtime starts independent Activities together when "
         "their resources allow and otherwise in list order. Communication Needs use "
-        "timing=sequential for their order relative to Work. Preserve requested speech "
+        "timing=ordered_with_work for their order relative to Work, or concurrent_with_work for overlap. Preserve requested speech "
         "order even though SC realizes it later. Execute only direct, fully grounded Work within "
         "four-step budget; when no loaded or library Capability can realize a Responsibility, "
         "decide it unavailable with what is missing and keep it unmet. No same-decision reviewer. "
@@ -1066,14 +1069,8 @@ def fast_responsibility_decision_projection(
             **{
                 "ref": item.local_ref,
                 "outcome": item.outcome,
-                "output_mode": item.output_mode,
                 "source_evidence": item.source_evidence.model_dump() if item.source_evidence else None,
             },
-            **(
-                {"body_effect_family": item.body_effect_family}
-                if item.body_effect_family is not None
-                else {}
-            ),
         }
         for item in responsibilities
     ]
@@ -1239,7 +1236,17 @@ def fast_streaming_advance_system_prompt() -> str:
         "that object: after emitting a later property, the constrained decoder cannot return "
         "to an earlier property. This is only serialization order; retain every supplied "
         "material binding. Before activities write activity_count: how many Activities you are "
-        "about to write, counting each needed Activity once; then write exactly that many."
+        "about to write, counting each needed Activity once, including the authored complete_response "
+        "Need beside executable Work. Decide that Need's position and explicit timing before counting: "
+        "Host cannot supply an omitted answer's ordering. Capability depends_on cites only earlier "
+        "Capability Activity IDs, never response/input Need IDs. Put an ordered_with_work response Need before "
+        "the Work it must precede or after the Work it must follow; its timing and position carry that "
+        "ordering without a Capability-to-Need dependency. Use timing=concurrent_with_work for requested overlap "
+        "between speech and Work; do not turn their concurrency into a before/after relation. "
+        "In the response rationale, name only the requested communicative effect and its relation "
+        "to Work. Never supply actual speech text there; SC alone authors it. "
+        "Count only the requested effects and necessary "
+        "prerequisites, never catalog entries or optional social decoration; then write exactly that many."
     )
 
 

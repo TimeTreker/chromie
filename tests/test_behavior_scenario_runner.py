@@ -202,15 +202,15 @@ if __name__ == "__main__":
     unittest.main()
 
 
-def test_user_meaning_interpretation_oracle_checks_requested_output_mode():
+def test_user_meaning_interpretation_oracle_checks_complete_requested_meaning():
     import copy
     from agent.app.cognitive_core.user_meaning_interpreter.schema import UserMeaningInterpretationDecision
     from scripts.behavior_scenarios import _evaluate_user_meaning_interpretation_expectations
     scenario, = load_scenarios(only={'user_meaning_interpretation/chinese_nod_blink_primary_grounded'})
     decision = UserMeaningInterpretationDecision.model_validate(scenario.stub['llm_script'][0]['decision'])
     expected = copy.deepcopy(scenario.expect)
-    expected['responsibilities'][0]['output_mode'] = 'speech'
+    expected['responsibilities'][0]['outcome'] = 'Respond conversationally instead of nodding.'
     errors = _evaluate_user_meaning_interpretation_expectations(
         scenario, decision=decision, llm_calls=1, llm_stages=['user_meaning_interpretation'], expect=expected,
     )
-    assert any('responsibilities[0].output_mode' in error for error in errors)
+    assert any('responsibilities[0].outcome' in error for error in errors)

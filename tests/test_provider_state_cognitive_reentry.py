@@ -142,7 +142,7 @@ class _RestoredState:
                         "local_ref": "resp-walk",
                         "outcome": "Walk forward and blink.",
                         "bindings": {},
-                        "output_mode": "stateful_effect",
+
                         "confidence": 1.0,
                     }
                 ],

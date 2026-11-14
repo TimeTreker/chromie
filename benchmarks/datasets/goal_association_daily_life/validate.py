@@ -165,7 +165,7 @@ def _responsibility_map(reference: dict[str, Any], request: CognitiveWorkRequest
                 "operation": "new_goal",
                 "relationship": "new",
                 "target_goal_ids": [],
-                "output_mode": next(item.output_mode for item in request.responsibilities if item.local_ref == source_ref),
+                "outcome": next(item.outcome for item in request.responsibilities if item.local_ref == source_ref),
                 "related_goal_ids": goal["related_goal_ids"],
                 "supersedes_goal_ids": goal["supersedes_goal_ids"],
             })
@@ -189,7 +189,7 @@ def _resolution_map(resolution: GoalAssociationResolution) -> list[dict[str, Any
                 "operation": "new_goal",
                 "relationship": "new",
                 "target_goal_ids": [],
-                "output_mode": goal.metadata.get("output_mode", "unspecified"),
+                "outcome": goal.description,
                 "related_goal_ids": goal.related_goal_ids,
                 "supersedes_goal_ids": goal.supersedes_goal_ids,
             })
@@ -222,13 +222,6 @@ async def _validate_cases(cases: list[dict[str, Any]]) -> tuple[list[str], dict[
             request = CognitiveWorkRequest.model_validate(case["input"]["request"])
             if request.language != case["input"]["language"]:
                 raise ValueError("request language drift")
-            if case["category"] == "reference_terminal" and any(
-                item.output_mode != "speech" for item in request.responsibilities
-            ):
-                # This authored contrast asks for a description of completed
-                # work, not repetition of its effects. Check the corpus input;
-                # production GA must preserve, never repair, accepted UMI WHAT.
-                raise ValueError("historical restatement requires a speech Responsibility")
             request_key = json.dumps(request.model_dump(mode="json"), ensure_ascii=False, sort_keys=True)
             if request_key in seen_requests:
                 raise ValueError("duplicate complete GA request")
@@ -259,20 +252,22 @@ async def _validate_cases(cases: list[dict[str, Any]]) -> tuple[list[str], dict[
                 raise ValueError("candidate Goal projection drift")
             schema_errors = list(Draft202012Validator(schema).iter_errors(reference))
             expectation = target["schema_expectation"]
-            if expectation in {"accept", "accept_host_reject"}:
+            if expectation in {"accept", "reject"}:
                 if expectation == "accept" and target["contract_gap"] is not None:
                     raise ValueError("accepted reference must not declare a contract gap")
-                if expectation == "accept_host_reject" and not target["contract_gap"]:
+                if expectation == "reject" and not target["contract_gap"]:
                     raise ValueError("retained-state negative requires its explicit contract limitation")
-                if schema_errors:
+                if expectation == "accept" and schema_errors:
                     raise ValueError(f"reference schema failure: {schema_errors[0].message}")
+                if expectation == "reject" and not schema_errors:
+                    raise ValueError("retained typed-state negative must be rejected by the production Schema")
                 output_type.model_validate(reference)
-                required_status = "fail_closed" if expectation == "accept_host_reject" else "resolved"
+                required_status = "fail_closed" if expectation == "reject" else "resolved"
                 if resolution.resolution_status != required_status or model.calls != 1:
                     raise ValueError(
                         f"production resolver reference failed: status={resolution.resolution_status} calls={model.calls}"
                     )
-                if expectation == "accept_host_reject":
+                if expectation == "reject":
                     if resolution.new_goals or resolution.associations:
                         raise ValueError("rejected legacy update leaked a state transition")
                     counts["known_contract_gaps"] += 1

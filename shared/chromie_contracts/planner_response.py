@@ -112,9 +112,6 @@ class PlannerResponseProjection(BaseModel):
         if social is not None:
             acts = {act.activity_id: act for act in social.activities if act.text.strip()}
             needs = {need.need_id: need for need in plan.communication_needs}
-            responding_goals = {
-                item.goal_id for item in plan.goal_outcomes if item.disposition == "respond"
-            }
             projected_ids: list[str] = []
             for stage in stages:
                 ids = stage.metadata.get("communicative_activity_ids", [])
@@ -128,7 +125,8 @@ class PlannerResponseProjection(BaseModel):
                 completion_goals = sorted({
                     goal_id for need in addressed
                     if need.kind == "answer" and social.need_outcomes[need.need_id] == "covered"
-                    for goal_id in need.source_goal_ids if goal_id in responding_goals
+                    for goal_id in need.source_goal_ids
+                    if act.truth_stage in {"context_grounded", "post_evidence"}
                 })
                 confirmation = any(need.kind == "confirmation" for need in addressed)
                 waiting = confirmation or any(need.kind == "input" for need in addressed)
@@ -265,7 +263,7 @@ class PlannerResponseProjection(BaseModel):
                 )
 
         if plan.disposition == "execute":
-            if any(phase == "final" for phase, _ in phased_stages):
+            if social is None and any(phase == "final" for phase, _ in phased_stages):
                 raise ValueError(
                     "pre-execution planner response projection must not include a final stage"
                 )

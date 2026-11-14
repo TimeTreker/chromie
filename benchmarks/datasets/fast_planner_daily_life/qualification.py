@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import copy
 from collections import Counter, defaultdict
 import hashlib
 import json
@@ -276,7 +277,10 @@ def _ability_need_capability_ids(schema: Any) -> list[str] | None:
         if isinstance(needs, dict):
             if "$ref" in needs:
                 needs = schema["$defs"][needs["$ref"].removeprefix("#/$defs/")]
-            ids = needs["items"]["properties"]["closest_loaded"]["enum"]
+            item = (needs.get("prefixItems") or [needs.get("items")])[0]
+            if not isinstance(item, dict):
+                return []
+            ids = item["properties"]["closest_loaded"]["enum"]
             return [item for item in ids if item != "none"]
     return None
 
@@ -292,14 +296,14 @@ def _responsibility_decision_refs(schema: Any) -> list[str] | None:
     return None
 
 
-def _effect_capability_ids(schema: Any) -> set[str]:
+def _effect_capability_ids(schema: Any, property_name: str = "deferred") -> set[str]:
     """Capabilities whose streamed Activity states ``deferred`` (effects, owner choice B)."""
     found: set[str] = set()
 
     def visit(node: Any) -> None:
         if isinstance(node, dict):
             properties = node.get("properties")
-            if (isinstance(properties, dict) and "deferred" in properties
+            if (isinstance(properties, dict) and property_name in properties
                     and (properties.get("role") or {}).get("enum") == ["capability"]):
                 found.update((properties.get("capability_id") or {}).get("enum") or [])
             for value in node.values():
@@ -319,15 +323,18 @@ def declared_deferred_effects(reply: Any, response_format: Any) -> Any:
     fixture's effect Activity without the field declares ``deferred: false``.
     """
     effects = _effect_capability_ids(response_format)
-    if not effects or not isinstance(reply, dict) or not isinstance(reply.get("activities"), list):
+    reads = _effect_capability_ids(response_format, "deferred_requirement")
+    if not isinstance(reply, dict) or not isinstance(reply.get("activities"), list):
         return reply
-    activities = [
-        {**activity, "deferred": False}
-        if isinstance(activity, dict) and activity.get("role") == "capability"
-        and activity.get("capability_id") in effects and "deferred" not in activity
-        else activity
-        for activity in reply["activities"]
-    ]
+    activities = []
+    for activity in reply["activities"]:
+        if isinstance(activity, dict) and activity.get("role") == "capability":
+            activity = dict(activity)
+            if activity.get("capability_id") in effects:
+                activity.setdefault("deferred", False)
+            if activity.get("capability_id") in reads:
+                activity.setdefault("deferred_requirement", "Complete the accepted source outcome from the acquired Evidence.")
+        activities.append(activity)
     return {**reply, "activities": activities}
 
 
@@ -342,10 +349,20 @@ def declared_activity_count(reply: Any, response_format: Any) -> Any:
     """Adapt a streamed fixture authored before the declared Activity count (2026-10-14).
 
     The decoder now asks how many Activities follow before writing them; a fixture without
-    the count declares the number of Activities it already wrote.
+    the count declares the number of Activities it already wrote. Explicit canonical
+    Need timings are serialized one-to-one into the native Work-relative wire labels.
     """
     if (not _requires_activity_count(response_format) or not isinstance(reply, dict)
-            or "activity_count" in reply or not isinstance(reply.get("activities"), list)):
+            or not isinstance(reply.get("activities"), list)):
+        return reply
+    from agent.app.planner_model_contract import NEED_TIMING_WIRE_VALUES
+    encoding = {canonical: wire for wire, canonical in NEED_TIMING_WIRE_VALUES.items()}
+    reply = {**reply, "activities": [
+        {**item, "timing": encoding[item["timing"]]}
+        if isinstance(item, dict) and item.get("role") in {"complete_response", "clarification"}
+        and isinstance(item.get("timing"), str) and item["timing"] in encoding else item
+        for item in reply["activities"]]}
+    if "activity_count" in reply:
         return reply
     ordered: dict[str, Any] = {}
     for key, value in reply.items():
@@ -355,7 +372,7 @@ def declared_activity_count(reply: Any, response_format: Any) -> Any:
     return ordered
 
 
-def _fit_decision_refs(schema: Any) -> set[str]:
+def _fit_decision_refs(schema: Any, field: str = "needed_abilities_fit") -> set[str]:
     """Responsibilities whose decoder states needed_abilities_fit before their decision."""
     found: set[str] = set()
 
@@ -364,7 +381,7 @@ def _fit_decision_refs(schema: Any) -> set[str]:
             decisions = (node.get("properties") or {}).get("responsibility_decisions")
             if isinstance(decisions, dict) and isinstance(decisions.get("properties"), dict):
                 found.update(ref for ref, choice in decisions["properties"].items()
-                             if "needed_abilities_fit" in json.dumps(choice))
+                             if field in json.dumps(choice))
             for value in node.values():
                 visit(value)
         elif isinstance(node, list):
@@ -383,11 +400,17 @@ def declared_needed_abilities_fit(reply: Any, response_format: Any) -> Any:
     An answer from perception states no fit.
     """
     refs = _fit_decision_refs(response_format)
+    source_refs = _fit_decision_refs(response_format, "answer_source")
     decisions = reply.get("responsibility_decisions") if isinstance(reply, dict) else None
     if not refs or not isinstance(decisions, dict):
         return reply
     declared = {}
     for ref, item in decisions.items():
+        if (ref in source_refs and isinstance(item, dict)
+                and item.get("decision") in {"work", "clarify", "unavailable"}
+                and "answer_source" not in item):
+            from shared.chromie_contracts.plan import OTHER_ANSWER_SOURCE
+            item = {"answer_source": OTHER_ANSWER_SOURCE, "observed_refs": [], **item}
         if (ref in refs and isinstance(item, dict) and "needed_abilities_fit" not in item
                 and item.get("decision") != "answer_from_perception"):
             head = {key: value for key, value in item.items() if key in {"answer_source", "observed_refs"}}
@@ -450,6 +473,15 @@ def declared_ability_needs(reply: Any, response_format: Any) -> Any:
     needs = [{"need": f"realize {capability_id}", "closest_loaded": capability_id,
               "closest_loaded_does": f"declared contract of {capability_id}"[:80], "fits": True}
              for capability_id in dict.fromkeys(used) if capability_id in loaded][:4]
+    # Old second-pass fixtures did not repeat need identity. Preserve the exact
+    # accepted primary wording when adapting that explicitly fixed wire shape.
+    contract = (response_format.get("$defs") or {}).get("PlannerAbilityNeeds", {})
+    fixed = contract.get("prefixItems")
+    if isinstance(fixed, list):
+        if len(fixed) != len(needs):
+            return {"ability_needs": needs, **reply}  # Host rejects the mismatch.
+        needs = [{**item, "need": shape["properties"]["need"]["const"]}
+                 for item, shape in zip(needs, fixed)]
     return {"ability_needs": needs, **reply}
 
 
@@ -505,7 +537,12 @@ async def build_transaction(case: dict[str, Any]) -> dict[str, Any]:
     response_schema = call["response_format"]
     if not isinstance(response_schema, dict):
         raise ValueError(f"{case['id']}: missing dynamic response Schema")
-    Draft202012Validator.check_schema(response_schema)
+    validation_schema = response_schema
+    if response_schema.get("title") == "FastPlannerWorkAdvanceOutput":
+        from agent.app.clients.sglang_protocol import share_planner_schema_contracts
+        validation_schema = copy.deepcopy(response_schema)
+        share_planner_schema_contracts(validation_schema)
+    Draft202012Validator.check_schema(validation_schema)
     system_prompt = str(call.get("system") or "")
     user_prompt = str(call["prompt"])
     prompt_identity = {

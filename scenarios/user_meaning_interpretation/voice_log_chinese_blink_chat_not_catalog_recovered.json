@@ -20,12 +20,10 @@
       "confidence": 0.9,
       "responsibilities": [
         {
-          "schema_version": 1,
           "local_ref": "r1",
           "outcome": "眨眼两次",
           "confidence": 0.9,
-          "output_mode": "body_action",
-          "continuity_scope": "goal"
+          "value_review": false
         }
       ],
       "meaning_uncertainties": [],
@@ -34,8 +32,7 @@
           "authority": "planner",
           "responsibility_refs": [
             "r1"
-          ],
-          "reason_summary": "Explicit authored fixture requests the existing cognitive owner."
+          ]
         }
       ]
     }
@@ -51,8 +48,7 @@
       {
         "local_ref": "r1",
         "outcome": "眨眼两次",
-        "confidence": 0.9,
-        "output_mode": "body_action"
+        "confidence": 0.9
       }
     ]
   },

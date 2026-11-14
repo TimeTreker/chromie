@@ -16,12 +16,10 @@
       "confidence": 0.96,
       "responsibilities": [
         {
-          "schema_version": 1,
           "local_ref": "r1",
           "outcome": "remember within the session that the user favorite color is blue",
           "confidence": 0.96,
-          "output_mode": "stateful_effect",
-          "continuity_scope": "goal"
+          "value_review": false
         }
       ],
       "meaning_uncertainties": [],
@@ -30,8 +28,7 @@
           "authority": "planner",
           "responsibility_refs": [
             "r1"
-          ],
-          "reason_summary": "Explicit authored fixture requests the existing cognitive owner."
+          ]
         }
       ]
     }
@@ -47,8 +44,7 @@
       {
         "local_ref": "r1",
         "outcome": "remember within the session that the user favorite color is blue",
-        "confidence": 0.96,
-        "output_mode": "stateful_effect"
+        "confidence": 0.96
       }
     ]
   },

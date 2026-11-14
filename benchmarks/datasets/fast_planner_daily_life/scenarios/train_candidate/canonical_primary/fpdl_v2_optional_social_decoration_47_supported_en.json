@@ -104,7 +104,6 @@
           "confidence": 0.99,
           "local_ref": "r1",
           "outcome": "Warmly acknowledge the user's stated plan while respecting the current social-attention boundary.",
-          "output_mode": "speech",
           "schema_version": 1,
           "source_evidence": {
             "source_end_token_ref": "t999",

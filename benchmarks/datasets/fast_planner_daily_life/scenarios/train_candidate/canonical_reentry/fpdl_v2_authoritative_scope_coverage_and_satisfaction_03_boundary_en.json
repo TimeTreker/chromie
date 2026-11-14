@@ -172,7 +172,6 @@
           "confidence": 0.99,
           "local_ref": "r1",
           "outcome": "Give one encouraging sentence.",
-          "output_mode": "speech",
           "schema_version": 1,
           "source_evidence": {
             "source_end_token_ref": "t999",
@@ -186,7 +185,6 @@
           "confidence": 0.99,
           "local_ref": "r2",
           "outcome": "Blink exactly twice.",
-          "output_mode": "body_action",
           "schema_version": 1,
           "source_evidence": {
             "source_end_token_ref": "t999",
@@ -200,7 +198,6 @@
           "confidence": 0.99,
           "local_ref": "r3",
           "outcome": "Walk forward for five seconds.",
-          "output_mode": "body_action",
           "schema_version": 1,
           "source_evidence": {
             "source_end_token_ref": "t999",

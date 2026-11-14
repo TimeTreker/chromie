@@ -140,6 +140,121 @@ class OrchestratorCognitiveRuntimeTests(unittest.TestCase):
         assistant._stage_interaction_confirmation = confirm
         return assistant
 
+    def test_stale_host_publication_preserves_current_and_unrelated_plans(self):
+        async def run():
+            # SC may await after reservation while another same-Goal Plan wins.
+            runtime = _InteractionRuntime().runtime
+            responses = {}
+            for sid, goals in (("old", ["shared"]),
+                               ("new", ["shared"]), ("other", ["independent"])):
+                snapshot = await runtime.planning_state_snapshot(goals, sid)
+                guard = await runtime.reserve_planning_submission(
+                    snapshot, covered_goal_ids=snapshot["goal_ids"], plan_id=sid, fingerprint=sid, prepared_activity_ids=[],
+                )
+                responses[sid] = InteractionResponse(
+                    interaction_id=sid, speech=[{"text": sid}], metadata={
+                        "canonical_plan_id": sid, "canonical_plan_fingerprint": sid,
+                        "planning_commit": guard,
+                    },
+                )
+            for sid in ("old", "new", "other"):
+                resolution = CognitiveRuntimeResolution(
+                    mode="apply", status="applied", interaction_response=responses[sid],
+                )
+                assistant = self._assistant(resolution)
+                assistant.interaction_runtime.runtime = runtime
+                assistant.sessions = SimpleNamespace(state={sid: {"llm_done": False}})
+                done = []
+                assistant.maybe_session_done = done.append
+                confirmations = []
+
+                async def confirm(*args, **kwargs):
+                    confirmations.append(sid)
+                    return sid == "old"
+
+                assistant._stage_interaction_confirmation = confirm
+                core, envelope = _core_and_envelope(sid, sid=sid)
+                self.assertTrue(await assistant._try_apply_cognitive_runtime(
+                    object(), user_text=sid, session_id=sid, context={},
+                    core_interpretation=core, core_interpretation_latency_ms=1,
+                    turn_envelope=envelope,
+                ))
+                if sid == "old":
+                    self.assertEqual(assistant._launch_interaction_calls, [])
+                    self.assertEqual(assistant.conversation_state.agent_results, [])
+                    self.assertTrue(assistant.sessions.state[sid]["llm_done"])
+                    self.assertEqual(done, [sid])
+                    self.assertEqual(confirmations, [])
+                    self.assertEqual(assistant.sessions.state[sid]["planning_submission_status"], "stale")
+                else:
+                    self.assertEqual(len(assistant._launch_interaction_calls), 1)
+                    self.assertEqual(len(assistant.conversation_state.agent_results), 1)
+                    self.assertEqual(done, [])
+                    self.assertEqual(confirmations, [sid])
+            # Dropping the obsolete proposal grants no cancellation,
+            # completion, or version changes to the separate independent Goal.
+            current = await runtime.planning_state_snapshot(["independent"], "probe")
+            self.assertEqual(current["commit_versions"]["goal:independent"], 1)
+
+        asyncio.run(run())
+
+    def test_plan_expiring_during_confirmation_lookup_never_opens_old_token(self):
+        async def run():
+            runtime = _InteractionRuntime().runtime
+            snapshot = await runtime.planning_state_snapshot(["shared"], "old")
+            guard = await runtime.reserve_planning_submission(snapshot, covered_goal_ids=["shared"],
+                plan_id="old", fingerprint="old", prepared_activity_ids=[])
+            response = InteractionResponse(metadata={"planning_commit": guard,
+                "canonical_plan_id": "old", "canonical_plan_fingerprint": "old"})
+            assistant = self._assistant(CognitiveRuntimeResolution(
+                mode="apply", status="applied", interaction_response=response))
+            assistant.interaction_runtime.runtime = runtime
+            assistant.sessions = SimpleNamespace(state={"old": {"llm_done": False}})
+            done = []
+            tokens = []
+            assistant.maybe_session_done = done.append
+            assistant.confirmation_dialogue = SimpleNamespace(begin=lambda *a, **k: tokens.append(True))
+            del assistant._stage_interaction_confirmation
+
+            async def confirmation_ids(_response):
+                newer = await runtime.planning_state_snapshot(["shared"], "new")
+                await runtime.reserve_planning_submission(newer, covered_goal_ids=["shared"],
+                    plan_id="new", fingerprint="new", prepared_activity_ids=[])
+                return {"old-request"}
+
+            assistant.interaction_runtime.confirmation_request_ids = confirmation_ids
+            core, envelope = _core_and_envelope("old", sid="old")
+            self.assertTrue(await assistant._try_apply_cognitive_runtime(
+                object(), user_text="old", session_id="old", context={}, core_interpretation=core,
+                core_interpretation_latency_ms=1, turn_envelope=envelope))
+            self.assertEqual(tokens, [])
+            self.assertEqual(assistant._launch_interaction_calls, [])
+            self.assertEqual(done, ["old"])
+            self.assertTrue(assistant.sessions.state["old"]["llm_done"])
+
+        asyncio.run(run())
+
+    def test_stale_resolution_closes_without_new_failure_speech(self):
+        resolution = CognitiveRuntimeResolution(mode="apply", status="skipped", metadata={
+            "host_commit_status": "rejected_stale", "planning_submission_rejection": {
+                "reason": "stale_planning_submission", "expected_versions": {"goal:g": 1},
+                "current_versions": {"goal:g": 2}, "execution_allowed": False,
+            },
+        })
+        assistant = self._assistant(resolution)
+        assistant.sessions = SimpleNamespace(state={"old": {"llm_done": False}})
+        done = []
+        assistant.maybe_session_done = done.append
+        core, envelope = _core_and_envelope("old request", sid="old")
+        self.assertTrue(asyncio.run(assistant._try_apply_cognitive_runtime(
+            object(), user_text="old request", session_id="old", context={},
+            core_interpretation=core, core_interpretation_latency_ms=1, turn_envelope=envelope,
+        )))
+        self.assertEqual(done, ["old"])
+        self.assertEqual(assistant._launch_interaction_calls, [])
+        self.assertEqual(assistant.conversation_state.agent_results, [])
+        self.assertEqual(assistant.conversation_state.user_turns[0][1]["metadata"]["planning_submission_status"], "stale")
+
     def test_applied_resolution_uses_trusted_prepare_and_launch(self):
         response = InteractionResponse(
             speech=[{"text": "你好。", "timing": "immediate"}],
