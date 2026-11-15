@@ -1796,6 +1796,47 @@ def _ga_decoder_shapes_only(schema):
             for key, value in schema.items() if key not in ignored}
 
 
+@pytest.mark.parametrize("terminal_status", ["satisfied", "refused", "cancelled", "superseded"])
+@pytest.mark.parametrize("has_open_goal", [False, True])
+@pytest.mark.parametrize("reverse_candidates", [False, True])
+@pytest.mark.parametrize("source_count", [1, 2])
+def test_native_goal_link_branches_preserve_distinct_related_and_superseded_scopes(
+    terminal_status, has_open_goal, reverse_candidates, source_count,
+):
+    from agent.app.clients.sglang_protocol import _openai_response_format
+
+    first = active_goal("goal-a", "First retained concern.")
+    second = active_goal("goal-b", "Second retained concern.")
+    for goal, status in ((first, "open" if has_open_goal else "satisfied"),
+                         (second, terminal_status)):
+        goal["responsibility_status"] = status
+        goal["goal"]["responsibility_status"] = status
+    candidates = [second, first] if reverse_candidates else [first, second]
+    refs = [f"r{index + 1}" for index in range(source_count)]
+    source = ga_schema.goal_association_response_schema(
+        GoalAssociationModelOutput, candidates, [], responsibility_refs=refs,
+    )
+    original = copy.deepcopy(source)
+    wire = _openai_response_format(source)["json_schema"]["schema"]
+    # XGrammar follows these complete alternatives rather than the sibling
+    # properties. A valid global enum must therefore survive in each branch.
+    native = Draft202012Validator({"oneOf": wire["$defs"]["GoalAssociationModelGoal"]["oneOf"]})
+    authoritative = Draft202012Validator(source["$defs"]["GoalAssociationModelGoal"])
+    base = {"source_responsibility_refs": ["r1"]}
+    for related, superseded, expected in (
+        (["goal-b"], [], True),
+        ([], ["goal-b"], False),
+        ([], ["goal-a"], has_open_goal),
+        (["goal-b"], ["goal-a"], has_open_goal),
+        (["goal-a"], ["goal-a"], False),
+        ([], ["goal-foreign"], False),
+    ):
+        value = {**base, "related_goal_ids": related, "supersedes_goal_ids": superseded}
+        assert authoritative.is_valid(value) is expected
+        assert native.is_valid(value) is expected
+    assert source == original
+
+
 @pytest.mark.parametrize("candidate_count", [0, 1, 2, 8])
 def test_native_single_source_chooses_exactly_one_continuity_owner(candidate_count):
     from agent.app.clients.sglang_protocol import _openai_response_format

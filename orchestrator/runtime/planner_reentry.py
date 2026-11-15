@@ -28,16 +28,28 @@ def terminal_result_waits_for_batch_closure(
     *,
     source_capability_count: int,
     status: str,
+    evidence: ExecutionEvidence | None = None,
 ) -> bool:
-    """Defer successful results until dispatch closure supplies the complete facts.
+    """Wait only while a successful result still lacks its committed qualification.
 
-    Provider progress and terminal failures still re-enter immediately.  A successful
-    result can still lack required provider postconditions even when it is the only
-    Capability. The existing dispatch-closure path collects those postconditions and
-    owns aggregate completion qualification before Planner can report the outcome.
+    Provider progress and failures retain their existing immediate path. A completed
+    provider event alone proves no outcome: exact closure must validate its observation
+    and establish its committed completion policy. Independent qualified results need
+    not wait for unrelated siblings. Missing provider postconditions still wait for the
+    aggregate closure that collects them, including for a single body Capability.
     """
 
-    return source_capability_count >= 1 and _normalized_text(status) == "completed"
+    if source_capability_count < 1 or _normalized_text(status) != "completed":
+        return False
+    return not (
+        evidence is not None
+        and evidence.status == "completed"
+        and evidence.observation is not None
+        and evidence.observation.status == "available"
+        and evidence.observation.schema_validated
+        and evidence.completion_qualification is not None
+        and evidence.completion_qualification.status == "established"
+    )
 
 
 def execution_outcome_user_text(
@@ -170,6 +182,15 @@ def incremental_execution_outcome_truth(
                     [evidence.step_id] if evidence.status == "completed" else []
                 ),
                 "unresolved_step_ids": unresolved_step_ids,
+                "requires_planner_continuation": any(
+                    step.step_purpose == "acquire_information"
+                    for step in plan.steps if goal_id in step.source_goal_ids
+                ) or any(
+                    item.goal_id == goal_id and item.satisfaction is not None
+                    and (item.satisfaction.unmet_requirements
+                         or goal_id in item.satisfaction.unmet_goal_ids)
+                    for item in plan.goal_outcomes
+                ),
                 "completion_qualification": qualification_summary,
             }
         )

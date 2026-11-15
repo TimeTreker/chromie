@@ -5,6 +5,18 @@ remains available in Git history.
 
 ## Unreleased
 
+### Engineering-first native scope and qualified re-entry repairs
+
+- Preserve GA's authoritative supersedable range in native disjoint branches; permit
+  independent terminal results only with established existing completion qualification.
+- Carry original typed completion proof into scoped Planner guards without inventing an
+  aggregate or relaxing provenance/stage/permission rules. Keep model and budgets fixed.
+- Complete six rounds, original10 and frozen128 live scenarios plus local/Level A/strict
+  gates. Reject all semantic prompt candidates; retain failures and source-bound evidence.
+- Keep target qualification open: raw communication-authority violations, SC readiness,
+  same-Evidence retry, Memory/Goal lifecycle, temporal/provider and delivery defects remain.
+  No new weight-capacity limit, main merge, physical acceptance or release is claimed.
+
 ### WHAT-only UMI and downstream contract repairs (qualification in progress)
 
 - Deliver the owner-authorized WHAT-only migration with fixed model/budgets: UMI owns

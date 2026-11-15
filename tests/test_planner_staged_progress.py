@@ -313,7 +313,7 @@ async def begin_episode(language, rain):
     return request, catalog, plan, runtime, provider, adapter, response, manager, bundle
 
 
-async def reenter(request, catalog, plan, adapter, response, bundle, raw):
+async def reenter(request, catalog, plan, adapter, response, bundle, raw, *, incremental=False):
     class Client(PlannerActivationFixture):
         seen = None
 
@@ -341,9 +341,23 @@ async def reenter(request, catalog, plan, adapter, response, bundle, raw):
         return object()
 
     assistant.get_http_session = get_session
-    result = await assistant._plan_evidence_bound_capability_result_response(
-        source_response=response, bundle=bundle, plan=plan, session_id=request.sid
-    )
+    if incremental:
+        from orchestrator.runtime.planner_reentry_host import plan_incremental_terminal_result_response
+        from shared.chromie_contracts.situation import CognitiveOpportunity
+        evidence = bundle.evidence[0]
+        opportunity = CognitiveOpportunity.create(
+            trigger="execution_outcome", goal_ids=evidence.source_goal_ids,
+            evidence_refs=[evidence.evidence_id], reason_codes=["execution_completed"],
+            recommended_cognition="fast",
+        )
+        result = await plan_incremental_terminal_result_response(
+            assistant, source_response=response, evidence=evidence,
+            opportunity=opportunity, session_id=request.sid,
+        )
+    else:
+        result = await assistant._plan_evidence_bound_capability_result_response(
+            source_response=response, bundle=bundle, plan=plan, session_id=request.sid
+        )
     return result, client.seen
 
 
@@ -859,4 +873,35 @@ def test_frozen_prerequisite_reference_does_not_accept_effect_completion_from_a_
         false_completion.goal_satisfaction.score=1.0
         false_completion.goal_satisfaction.unmet_goal_ids=[]
         assert staged_reference_errors(reference,false_completion)
+    asyncio.run(run())
+
+
+@pytest.mark.parametrize("language", ["en", "zh"])
+@pytest.mark.parametrize("rain", [True, False])
+def test_incremental_result_preserves_completed_work_proof_through_real_host(language, rain):
+    """A terminal acquisition can answer or release conditional Work before a bundle exists.
+
+    Replay fixtures exercise real Host projection, dynamic Schema, DTO, materialization
+    and SC handoff. They prove no live model or robot behavior.
+    """
+    async def run():
+        request, catalog, plan, runtime, provider, adapter, response, _, bundle = await begin_episode(language, rain)
+        followup, seen = await reenter(
+            request, catalog, plan, adapter, response, bundle,
+            next_reply(request, rain), incremental=True,
+        )
+        assert followup is not None
+        assert "execution_outcome_bundle" not in seen.context
+        projected = seen.context["incremental_terminal_evidence"]
+        assert projected["evidence"] == bundle.evidence[0].model_dump(mode="json")
+        assert projected["source_plan_id"] == plan.plan_id
+        assert projected["source_plan_fingerprint"] == seen.planner_reentry_scope.source_plan_fingerprint
+        proved = completed_work_step_evidence(seen.context, reentry_scope=seen.planner_reentry_scope)
+        assert set(proved) == {plan.steps[0].step_id}
+        assert proved[plan.steps[0].step_id]["evidence_id"] == bundle.evidence[0].evidence_id
+        assert completed_acquisition_goal_ids(seen.context, reentry_scope=seen.planner_reentry_scope) == set(plan.goal_ids)
+        assert seen.context["trusted_execution_outcome"]["goal_outcomes"][0]["requires_planner_continuation"] is True
+        assert [call.capability_id for call in provider.calls] == ["chromie.weather.lookup"]
+        assert [item.capability_id for item in followup.capabilities] == (["chromie.reminder.create"] if rain else [])
+        assert followup.requires_confirmation is rain
     asyncio.run(run())

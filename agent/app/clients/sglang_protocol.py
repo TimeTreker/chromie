@@ -245,13 +245,18 @@ def _disjoint_ga_goal_links(schema: dict[str, Any]) -> None:
 
     The schema states the disjointness with ``not``/``contains``, which the decoder ignores
     (live 2026-10-27, "好呀，记住吧。": a new Goal related to and superseded the same Goal and
-    the DTO rejected it). Up to three candidates are offered as one branch per related subset
-    whose superseded subsets come from the remaining candidates.
+    the DTO rejected it). Up to three candidates are offered as one branch per related subset.
+    Superseded subsets must also retain their own authoritative scope: terminal Goals may
+    be related history but cannot be retired again. The native decoder follows the branch,
+    so a sibling items enum cannot contain an overbroad branch (live 2026-11-14).
     """
     goal = schema.get("$defs", {}).get("GoalAssociationModelGoal", {})
     properties = goal.get("properties") or {}
     candidates = ((properties.get("related_goal_ids") or {}).get("items") or {}).get("enum")
+    supersedable = ((properties.get("supersedes_goal_ids") or {}).get("items") or {}).get("enum")
     if not isinstance(candidates, list) or not candidates or len(candidates) > 3:
+        return
+    if not isinstance(supersedable, list):
         return
 
     def subsets(values: list[Any]) -> list[list[Any]]:
@@ -263,7 +268,7 @@ def _disjoint_ga_goal_links(schema: dict[str, Any]) -> None:
                   "properties": copy.deepcopy(properties)}
         branch["properties"]["related_goal_ids"] = {"type": "array", "enum": [related]}
         branch["properties"]["supersedes_goal_ids"] = {
-            "type": "array", "enum": subsets([value for value in candidates if value not in related])}
+            "type": "array", "enum": subsets([value for value in supersedable if value not in related])}
         branches.append(branch)
     goal.pop("anyOf", None)
     goal.pop("allOf", None)

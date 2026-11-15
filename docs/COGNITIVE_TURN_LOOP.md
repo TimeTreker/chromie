@@ -1330,12 +1330,25 @@ stages that have not begun; speech already heard remains delivery evidence.
 
 ### 8.2 Evidence-bound post-execution speech
 
-Successful terminal results are retained as immutable Runtime facts and wait for dispatch
-closure before reactivating Planner. This includes a single Capability: its result can
-still lack the required post-execution provider status until the Host collects it at
-closure. Planner receives the complete result set and its completion qualification
-together. Provider progress and any failure may still re-enter immediately; successful
-siblings do not narrate partial completion while related Work is still finishing.
+Successful terminal results are retained as immutable Runtime facts. A result may
+reactivate Planner for its exact affected Goals once the existing closure validates
+its observation and establishes its committed completion policy. An independently
+qualified information result need not wait for unrelated sibling Work. A completed
+provider event that still lacks required postconditions waits for dispatch closure;
+this includes a single body Capability whose post-execution status is not yet available.
+Provider progress and failures retain their existing immediate re-entry. Aggregate
+closure still collects the complete result set and provider postconditions; a qualified
+sibling cannot claim another Goal's completion or bypass its qualification.
+
+Incremental re-entry carries the original typed `ExecutionEvidence` together with
+its source Plan ID and fingerprint in the existing Host-owned context projection.
+The completed-Work guard checks that provenance, step/Goal/Capability ownership,
+terminal observation and digest against the bounded result and re-entry scope.
+A simplified execution-state summary alone cannot establish completed Work. The
+scoped historical Plan projection is not a complete Plan to fingerprint again.
+No aggregate bundle or sibling terminal state is invented before closure. A Goal's
+acquisition guard releases only when all of its source steps are acquisitions with
+proved completion; any unresolved same-Goal sibling keeps that guard closed.
 
 After terminal results have been joined and every executable Goal reconciled, the Host
 reactivates the one Planner with the immutable Goal/Evidence result bundle. The

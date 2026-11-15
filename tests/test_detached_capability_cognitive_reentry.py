@@ -418,8 +418,31 @@ async def test_submission_staling_after_publication_cannot_start_providers(corru
     assert assistant.conversation_state.goal_status == {"goal-first": "open", "goal-second": "open"}
 
 
+def test_terminal_evidence_failure_keeps_the_result_for_aggregate_closure():
+    from orchestrator.runtime.interaction_dispatch_host import _terminal_result_requires_closure
+
+    def unavailable(**_kwargs):
+        raise RuntimeError("injected evidence boundary failure")
+
+    diagnostics = []
+    host = SimpleNamespace(
+        cognitive_turn_closure=SimpleNamespace(build_terminal_evidence=unavailable),
+        session_log=lambda _sid, message, *args: diagnostics.append((message, args)),
+    )
+    assert _terminal_result_requires_closure(
+        host, response=_response(), session_id="sid-detached",
+        result=CapabilityResult(request_id="request-first", capability_id="chromie.test.first",
+                                status="completed", output={"user_summary": "first"}),
+    )
+    assert any("qualification_unavailable" in message for message, _args in diagnostics)
+    assert any("qualification_pending" in message for message, _args in diagnostics)
+
+
 @pytest.mark.asyncio
-async def test_multi_capability_success_results_wait_for_batch_closure():
+@pytest.mark.parametrize("changed_completion_policy", [False, True])
+async def test_independently_qualified_result_reenters_while_sibling_is_running(
+    changed_completion_policy,
+):
     spoken: list[str] = []
 
     async def schedule_speech(args: dict[str, Any]) -> dict[str, Any]:
@@ -439,7 +462,24 @@ async def test_multi_capability_success_results_wait_for_batch_closure():
         )
     coordinator.runtime.register_provider(provider)
     assistant = _assistant(coordinator)
-    response = _response()
+    response = _response().model_copy(update={"speech": []})
+    reentered: list[tuple[str, list[str]]] = []
+    first_terminal = asyncio.Event()
+
+    def session_log(_sid, message, *_args):
+        if message.startswith("capability_terminal_reentry_event:"):
+            first_terminal.set()
+
+    async def reenter(**kwargs):
+        from orchestrator.runtime.cognitive_outcome_host import cognitive_turn_closure_adapter
+        evidence = cognitive_turn_closure_adapter(assistant).build_terminal_evidence(
+            response=kwargs["response"], result=kwargs["result"], session_id=kwargs["session_id"],
+        )
+        assert evidence.completion_qualification.status == "established"
+        reentered.append((evidence.request_id, list(evidence.source_goal_ids)))
+
+    assistant.session_log = session_log
+    assistant._reenter_cognition_for_terminal_capability = reenter
 
     assistant._launch_interaction(
         response,
@@ -463,12 +503,18 @@ async def test_multi_capability_success_results_wait_for_batch_closure():
     assert not result_task.done()
     assert assistant.sessions.state["sid-detached"]["pending_capability_dispatches"] == 1
 
+    if changed_completion_policy:
+        definition = coordinator.capability_definition("chromie.test.first")
+        coordinator.registry.upsert(definition.model_copy(update={
+            "completion_evidence_policy": definition.completion_evidence_policy.model_copy(
+                update={"claim": "A different, uncommitted completion policy."}),
+        }))
     provider.release_first.set()
-    await asyncio.sleep(0.05)
+    await asyncio.wait_for(first_terminal.wait(), timeout=1)
 
-    # A successful sibling from a multi-Capability dispatch is not yet the whole
-    # immutable fact set.  It therefore waits for dispatch closure instead of
-    # re-entering Planner while another successful sibling is still in flight.
+    # Exact per-result closure qualifies the first Goal independently. A changed
+    # policy digest instead holds that result for final qualification.
+    assert reentered == ([] if changed_completion_policy else [("request-first", ["goal-first"])])
     assert spoken == []
     assert not provider.release_second.is_set()
     assert assistant.agent_client.requests == []
@@ -477,8 +523,12 @@ async def test_multi_capability_success_results_wait_for_batch_closure():
     await asyncio.wait_for(asyncio.shield(result_task), timeout=1.0)
     assert result_task.done()
     assert assistant.sessions.state["sid-detached"]["pending_capability_dispatches"] == 0
-    # This fixture replaces the normal closure owner with a no-op stub, so the
-    # only assertion here is that neither individual success bypassed batching.
+    expected = [("request-second", ["goal-second"])]
+    if not changed_completion_policy:
+        expected.insert(0, ("request-first", ["goal-first"]))
+    assert reentered == expected
+    # The semantic consumer is a spy: this proves eligibility and exact scope,
+    # not model-authored speech or Goal closure.
     assert spoken == []
     assert assistant.agent_client.requests == []
 

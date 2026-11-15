@@ -403,6 +403,19 @@
     },
     {
       "path": "orchestrator/runtime/interaction_dispatch_host.py",
+      "symbol": "_terminal_result_requires_closure",
+      "ordinal": 1,
+      "classification": "fail_closed_boundary",
+      "owner": "orchestrator",
+      "contract": "If exact terminal Evidence cannot be qualified, log the cause and leave it unavailable so the unchanged aggregate closure owns final qualification; never authorize incremental cognition from a provider completed flag alone.",
+      "review_status": "reviewed",
+      "body_sha256": "f819592a73f028af938df4ba99350dbb83846efb583ce0cec00f3d7ceaa8bee9",
+      "failure_signals": [
+        "diagnostic"
+      ]
+    },
+    {
+      "path": "orchestrator/runtime/interaction_dispatch_host.py",
       "symbol": "consume_detached_cognitive_dispatch",
       "ordinal": 1,
       "classification": "fail_closed_boundary",

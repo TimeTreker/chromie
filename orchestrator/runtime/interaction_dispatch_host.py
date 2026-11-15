@@ -25,7 +25,7 @@ from orchestrator.runtime.session import (
 )
 from orchestrator.runtime.capability_runtime import CapabilityRuntimeResult, StalePlanningSubmissionError
 from shared.chromie_contracts.interaction import (
-    InteractionResponse,
+    CapabilityResult, InteractionResponse,
 )
 from shared.chromie_contracts.user_turn import (
     user_turn_prohibits_speech,
@@ -253,6 +253,42 @@ async def consume_detached_non_cognitive_dispatch(
     return execution
 
 
+def _terminal_result_requires_closure(
+    host: Any, *, response: InteractionResponse, result: CapabilityResult,
+    session_id: str | None,
+) -> bool:
+    """Use the existing exact-result closure; never infer qualification from an ID."""
+    evidence = None
+    if result.status == "completed":
+        try:
+            evidence = cognitive_outcome_host.cognitive_turn_closure_adapter(host).build_terminal_evidence(
+                response=response, result=result, session_id=session_id,
+            )
+        except Exception as exc:
+            host.session_log(
+                session_id,
+                "incremental_result_qualification_unavailable: request_id=%s "
+                "error_type=%s error=%s",
+                result.request_id, type(exc).__name__, exc,
+            )
+    waits = terminal_result_waits_for_batch_closure(
+        source_capability_count=len(response.capabilities), status=result.status,
+        evidence=evidence,
+    )
+    if waits:
+        qualification = evidence.completion_qualification if evidence is not None else None
+        host.session_log(
+            session_id,
+            "incremental_result_qualification_pending: request_id=%s "
+            "observation=%s qualification=%s reasons=%s",
+            result.request_id,
+            evidence.observation.status if evidence is not None and evidence.observation is not None else "missing",
+            qualification.status if qualification is not None else "missing",
+            ",".join(qualification.reason_codes) if qualification is not None else "terminal_evidence_not_qualified",
+        )
+    return waits
+
+
 async def consume_detached_cognitive_dispatch(
     host: Any,
     dispatch: Any,
@@ -282,9 +318,8 @@ async def consume_detached_cognitive_dispatch(
     ]
     for result in preexecuted_capability_results:
         terminal_capability_ids.add(result.request_id)
-        if runtime_capability_request_ids and not terminal_result_waits_for_batch_closure(
-            source_capability_count=len(source_capability_request_ids),
-            status=result.status,
+        if runtime_capability_request_ids and not _terminal_result_requires_closure(
+            host, response=response, result=result, session_id=session_id,
         ):
             await host._reenter_cognition_for_terminal_capability(
                 response=response,
@@ -350,9 +385,8 @@ async def consume_detached_cognitive_dispatch(
                     - len(terminal_capability_ids),
                 ),
             )
-            if terminal_result_waits_for_batch_closure(
-                source_capability_count=len(source_capability_request_ids),
-                status=event.result.status,
+            if _terminal_result_requires_closure(
+                host, response=response, result=event.result, session_id=session_id,
             ):
                 host.session_log(
                     session_id,

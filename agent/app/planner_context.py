@@ -15,7 +15,7 @@ from .planner_model_contract import is_planner_step_capability
 
 from shared.chromie_contracts.core_interpretation import CognitiveWorkRequest, PlannerReentryScope
 from shared.chromie_contracts.control import GoalCancellationEvidence
-from shared.chromie_contracts.execution_outcome import ExecutionOutcomeBundle
+from shared.chromie_contracts.execution_outcome import ExecutionEvidence, ExecutionOutcomeBundle
 from shared.chromie_contracts.goal import ActiveGoalSnapshot, GoalAssociationResolution
 from shared.chromie_contracts.interaction import (
     MEDIA_CAPABILITY_IDS,
@@ -611,30 +611,43 @@ def completed_work_step_evidence(
 ) -> dict[str, dict[str, Any]]:
     """Bind already-finished ordering dependencies, never infer Goal success.
 
-    Only exact source-Plan/Goal/step correlations with matching retained terminal
-    observations can discharge an AFTER edge in a later Work result.
+    Exact source-Plan/Goal/step correlations and matching terminal observations
+    discharge an AFTER edge. Incremental closure supplies its original typed
+    Evidence; it must not fabricate a complete bundle or sibling terminal states.
     """
     if reentry_scope is None:
         return {}
     current = context or {}
     try:
-        bundle = ExecutionOutcomeBundle.model_validate(current.get("execution_outcome_bundle"))
+        raw_bundle = current.get("execution_outcome_bundle")
+        if raw_bundle is not None:
+            bundle = ExecutionOutcomeBundle.model_validate(raw_bundle)
+            source_plan_id = bundle.canonical_plan_id
+            source_fingerprint = bundle.canonical_plan_fingerprint
+            evidence = bundle.evidence
+        else:
+            incremental = current.get("incremental_terminal_evidence")
+            if not isinstance(incremental, dict) or reentry_scope.trigger != "capability_result_reentry":
+                return {}
+            source_plan_id = incremental.get("source_plan_id")
+            source_fingerprint = incremental.get("source_plan_fingerprint")
+            evidence = [ExecutionEvidence.model_validate(incremental.get("evidence"))]
         terminal = {item.evidence_id: item for raw in current.get("trusted_terminal_evidence") or []
                     for item in [ToolResultEvidence.model_validate(raw)]}
     except (ValidationError, ValueError, TypeError):
         return {}
     plan = current.get("canonical_plan_resolution") or {}
     if not isinstance(plan, dict) or (
-        bundle.canonical_plan_id != reentry_scope.source_plan_id
-        or bundle.canonical_plan_fingerprint != reentry_scope.source_plan_fingerprint
-        or plan.get("plan_id") != bundle.canonical_plan_id
+        source_plan_id != reentry_scope.source_plan_id
+        or source_fingerprint != reentry_scope.source_plan_fingerprint
+        or plan.get("plan_id") != source_plan_id
     ):
         return {}
     steps = {step["step_id"]: step for step in plan.get("steps") or []
              if isinstance(step, dict) and step.get("step_id")}
     refs, goals = set(reentry_scope.evidence_refs), set(reentry_scope.goal_ids)
     proved = {}
-    for item in bundle.evidence:
+    for item in evidence:
         step, observed = steps.get(item.step_id), terminal.get(item.evidence_id)
         if not step or observed is None or item.observation is None:
             continue
@@ -647,13 +660,16 @@ def completed_work_step_evidence(
             or item.observation.status != "available" or not item.observation.schema_validated
             or observed.data != item.observation.data
             or observed.output_sha256 != item.observation.output_sha256
+            or (raw_bundle is None and item.metadata.get("completion_qualification_required") is True
+                and (item.completion_qualification is None
+                     or item.completion_qualification.status != "established"))
         ):
             continue
         proved[item.step_id] = {
             "step_id": item.step_id, "evidence_id": item.evidence_id,
             "source_goal_ids": list(item.source_goal_ids), "status": item.status,
-            "source_plan_id": bundle.canonical_plan_id,
-            "source_plan_fingerprint": bundle.canonical_plan_fingerprint,
+            "source_plan_id": source_plan_id,
+            "source_plan_fingerprint": source_fingerprint,
         }
     return proved
 
@@ -673,6 +689,16 @@ def completed_acquisition_goal_ids(
     source_goals = acquisition_source_goal_ids(current)
     if not source_goals or reentry_scope is None:
         return set()
+    if current.get("execution_outcome_bundle") is None:
+        proved = completed_work_step_evidence(current, reentry_scope=reentry_scope)
+        plan = current.get("canonical_plan_resolution") or {}
+        return {
+            goal_id for goal_id in source_goals & set(reentry_scope.goal_ids)
+            if (steps := [step for step in plan.get("steps") or []
+                          if goal_id in (step.get("source_goal_ids") or [])])
+            and all(step.get("step_purpose") == "acquire_information"
+                    and step.get("step_id") in proved for step in steps)
+        }
     try:
         bundle = ExecutionOutcomeBundle.model_validate(current.get("execution_outcome_bundle"))
         terminal = {

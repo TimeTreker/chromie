@@ -321,6 +321,12 @@ while each changed handler must demonstrate one explicit outcome:
 - contain expected cleanup without replacing the primary failure, while
   recording a bounded diagnostic.
 
+Incremental terminal-result eligibility is a fail-closed Evidence boundary. If
+its exact closure raises or lacks the committed qualification, the Host logs the
+cause and leaves that result to aggregate closure. A provider's `completed` flag
+alone cannot authorize Planner re-entry; final qualification and failure reporting
+remain owned by the existing aggregate outcome path.
+
 The active structural-simplification work in the
 [Roadmap](../ROADMAP.md#structural-simplification) owns further narrowing. Stable
 enforcement remains centralized in

@@ -316,7 +316,11 @@ async def plan_incremental_terminal_result_response(
     goal_ids = list(evidence.source_goal_ids)
     evidence_refs = [bounded_evidence.evidence_id]
     extra_context = {
-        "incremental_terminal_evidence": True,
+        "incremental_terminal_evidence": {
+            "source_plan_id": canonical_plan.plan_id,
+            "source_plan_fingerprint": canonical_plan_fingerprint(canonical_plan),
+            "evidence": evidence.model_dump(mode="json"),
+        },
         "terminal_request_id": evidence.request_id,
         "terminal_capability_id": evidence.capability_id,
         "terminal_status": evidence.status,

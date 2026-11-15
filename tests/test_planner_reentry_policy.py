@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import copy
+from datetime import datetime, timezone
 
 import pytest
 
@@ -34,7 +35,9 @@ from shared.chromie_contracts.core_interpretation import (
     CognitiveWorkRequest,
     PlannerReentryScope,
 )
-from shared.chromie_contracts.execution_outcome import ExecutionEvidence
+from shared.chromie_contracts.execution_outcome import (
+    ClaimQualification, ExecutionEvidence, ModelObservation,
+)
 from shared.chromie_contracts.interaction import InteractionResponse
 from shared.chromie_contracts.plan import CanonicalPlan
 from shared.chromie_contracts.tool_result import (
@@ -138,6 +141,32 @@ def test_successful_result_waits_for_aggregate_closure_and_postconditions() -> N
         assert not terminal_result_waits_for_batch_closure(
             source_capability_count=1, status=status,
         )
+
+
+@pytest.mark.parametrize("observation_status", [None, "available", "schema_unavailable"])
+@pytest.mark.parametrize("qualification_status", [None, "established", "unknown", "insufficient", "contradicted"])
+def test_only_a_fully_qualified_result_can_reenter_before_unrelated_work(
+    observation_status, qualification_status,
+):
+    evidence = _evidence()
+    observation = None if observation_status is None else ModelObservation(
+        status=observation_status, schema_validated=observation_status == "available",
+        output_sha256="a" * 64, output_size_bytes=0,
+    )
+    qualification = None if qualification_status is None else ClaimQualification(
+        claim="The requested result is established.", status=qualification_status,
+        policy_sha256="b" * 64, evidence_ids=[evidence.evidence_id],
+        evaluated_at=datetime.now(timezone.utc),
+        satisfied_group_index=0 if qualification_status == "established" else None,
+    )
+    evidence = evidence.model_copy(update={
+        "observation": observation, "completion_qualification": qualification,
+        "metadata": {"completion_qualification_required": True},
+    })
+    expected_wait = not (observation_status == "available" and qualification_status == "established")
+    assert terminal_result_waits_for_batch_closure(
+        source_capability_count=2, status="completed", evidence=evidence,
+    ) is expected_wait
 
 
 def test_typed_reentry_scope_bounds_full_association_to_affected_goals() -> None:
