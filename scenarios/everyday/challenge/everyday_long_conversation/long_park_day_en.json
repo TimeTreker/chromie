@@ -9,7 +9,7 @@
     "batch_id": "daily_life_v2_2026_10_15",
     "derived_from_existing_scenario": false
   },
-  "rationale": "Turn 2: Beijing this afternoon from a weather read. Turn 3: umbrella advice that follows from it. Turn 4: wave goodbye.",
+  "rationale": "Turn 2: Beijing tomorrow afternoon from a weather read. Turn 3: umbrella advice that follows from it. Turn 4: wave goodbye.",
   "oracle_policy": {
     "mode": "hybrid",
     "deterministic_sources": [
@@ -30,7 +30,7 @@
       "truthfulness"
     ],
     "primary_outcomes": [
-      "Turn 2: Beijing this afternoon from a weather read. Turn 3: umbrella advice that follows from it. Turn 4: wave goodbye."
+      "Turn 2: Beijing tomorrow afternoon from a weather read. Turn 3: umbrella advice that follows from it. Turn 4: wave goodbye."
     ],
     "acceptable_auxiliary": [
       "A brief acknowledgement in the person's language."
@@ -46,14 +46,14 @@
     ]
   },
   "language": "en-US",
-  "description": "Turn 2: Beijing this afternoon from a weather read. Turn 3: umbrella advice that follows from it. Turn 4: wave goodbye.",
+  "description": "Turn 2: Beijing tomorrow afternoon from a weather read. Turn 3: umbrella advice that follows from it. Turn 4: wave goodbye.",
   "general_ability": {
     "memberships": [
       {
         "id": "everyday_long_conversation",
         "title": "Everyday longer conversations",
         "general_rule": "Over several turns Chromie keeps the topic, the person's earlier words and her own earlier answers coherent, and changes course when the person corrects her.",
-        "rationale": "Turn 2: Beijing this afternoon from a weather read. Turn 3: umbrella advice that follows from it. Turn 4: wave goodbye.",
+        "rationale": "Turn 2: Beijing tomorrow afternoon from a weather read. Turn 3: umbrella advice that follows from it. Turn 4: wave goodbye.",
         "root_cause_boundaries": [
           "User Meaning Interpretation",
           "Goal Association",
@@ -66,14 +66,14 @@
   "turns": [
     {
       "id": "turn-01",
-      "text": "I'm going to the park in Beijing this afternoon.",
+      "text": "I'm going to the park in Beijing tomorrow afternoon.",
       "language": "en-US",
       "expect_no_capabilities": true,
       "require_speech": true
     },
     {
       "id": "turn-02",
-      "text": "Will it rain there this afternoon?",
+      "text": "Will it rain there tomorrow afternoon?",
       "language": "en-US",
       "expected_capabilities": [
         "chromie.weather.lookup"

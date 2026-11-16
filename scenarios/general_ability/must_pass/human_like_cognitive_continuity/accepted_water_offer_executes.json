@@ -4,7 +4,7 @@
   "id": "accepted_water_offer_executes",
   "stage": "must_pass",
   "difficulty": "medium",
-  "rationale": "A short acceptance of Chromie's concrete physical offer must preserve the offered terminal effect and reach planning instead of collapsing into an acknowledgement.",
+  "rationale": "A short acceptance must inherit the actual preceding offer. When that offer is physical water help, preserve its terminal effect and reach planning; when no matching offer was made, clarify rather than inventing one.",
   "oracle_policy": {
     "mode": "hybrid",
     "deterministic_sources": [
@@ -29,14 +29,14 @@
     "primary_outcomes": [
       "Respond naturally to the greeting.",
       "Understand the user's thirst and request for help without claiming completed work.",
-      "Resolve the user's acceptance against Chromie's immediately preceding water offer and request physical water acquisition and delivery to the user."
+      "Resolve sure against Chromie's actual immediately preceding reply. If she offered physical water help, request its acquisition and delivery. If no matching offer or referent exists, ask a genuine clarification without inventing a water task."
     ],
     "acceptable_auxiliary": [
       "Chromie may ask whether the user wants water before the acceptance.",
       "Brief truthful speech may accompany accepted physical work."
     ],
     "forbidden_semantic_outcomes": [
-      "Treat the acceptance as only an acknowledgement or readiness statement.",
+      "Treat acceptance of an actual water-help offer as only an acknowledgement, or invent an ungrounded offer/task when the referent is unclear.",
       "Associate the thirst or water-delivery outcome with the earlier greeting Goal.",
       "Claim water delivery without matching provider completion evidence."
     ],
@@ -65,10 +65,7 @@
       "id": "turn-03",
       "text": "sure",
       "language": "en-US",
-      "require_speech": true,
-      "expected_capabilities": [
-        "soridormi.acquire_and_deliver_resource"
-      ]
+      "require_speech": true
     }
   ],
   "general_ability": {

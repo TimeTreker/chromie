@@ -5,6 +5,17 @@ remains available in Git history.
 
 ## Unreleased
 
+### Preserve functional probes and compare Main fairly
+
+- Keep all prior scenario IDs; classify pure action/control demos as functional Smoke
+  and artificial combinations as Core, separate from plausible daily interactions.
+- Add two retained ordering contrasts; fix false oracle assumptions and elapsed generated
+  time windows before freezing both arms. Opaque IDs keep reviewer labels out of context.
+- Complete Main/branch128 each plus original10 each on fixed models/budgets/services.
+  Functional94/128 vs84/128 confirms observed regression; both remain unqualified.
+- Retain exact workflow, native/context/playback and engineering-versus-inference diagnosis.
+  No new production behavior change, intrinsic model limit, physical proof or Main merge.
+
 ### Engineering-first native scope and qualified re-entry repairs
 
 - Preserve GA's authoritative supersedable range in native disjoint branches; permit

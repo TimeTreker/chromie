@@ -7,120 +7,140 @@ Replace current facts; history remains in Git and [CHANGELOG](CHANGELOG.md).
 ## Current snapshot
 
 - Checkout `/home/chromie/github/chromie`, branch `codex/sc-context-budget-failure-notice`.
-  Pre-delivery HEAD `a0e7524c69d6d555e26bb19ccf390922cd14fdb3`; expected resume revision is
-  the latest commit containing the three delivery owners. Remote was fetched before
-  development and delivery preparation; check again before push. Branch-only diagnostic
-  push is authorized; no main merge without explicit owner approval.
-- Six rounds complete, all final tests ended. WHAT-only UMI, GA identity, Planner
-  HOW/Skills and SC expression remain. Same Gemma4 12B, all budgets/permissions and
-  Planner rules. No prompt candidate, semantic critic or new production flag adopted.
-- Agent `4dbf37d8f3de4709f3487ed6961f3432a60c3b740453cd4b05e30c469f8fd180`,
-  image `sha256:f9138d8641f02a686a57fe1e8ad81f8bfa500db22dbe261c9bd461cd14b5cd4a`;
-  host/container Agent+shared digest
+  Pre-delivery HEAD `0729b3634971194cf7de5f3c63d4f5832050fd86`; expected resume revision
+  is the latest commit containing all three delivery owners. Origin was fetched before
+  source work and delivery preparation; branch upstream0/0. Fetch again before push.
+  Branch-only diagnostic push authorized; no Main merge without explicit owner approval.
+- All requested comparison tests are finished. Main `55f5587d4ca8034fdefb24e53d632df5790b7dba`
+  vs branch `0729b3634971194cf7de5f3c63d4f5832050fd86`:128 cases each plus exact original10
+  each. No application edits during this delivery or cohorts. Source test edits are opaque
+  IDs, purpose/stage preservation and frozen oracle/precondition corrections; no model,
+  budget, permission or Planner-rule changes. Six optimization rounds preceded this
+  frozen comparison; do not silently start another broad optimization round.
+- Detached app checkouts `/tmp/chromie-ab-main-20261116` and
+  `/tmp/chromie-ab-branch-20261116` stay pinned. The same declared observer overlays were
+  applied to both; app directories have no diff. Common128 manifest/source/runtime
+  identities remain under the evidence root. Sequential weather/time is externally
+  confounded; shared compiler backend excludes the historical backport benefit.
+- Original Agent restored as container
+  `3d80fedb83534a60ca8ab670dc8a9febaf0cf5f601034d6e4301600b9419074a`, image
+  `sha256:f9138d8641f02a686a57fe1e8ad81f8bfa500db22dbe261c9bd461cd14b5cd4a`;
+  Agent/shared digest
   `85ac490b3722d8f95efdfdb3ba3d2fee72db0dcf313882d5b1e904608aa79332` matches.
-  Evaluated behavior was dirty HEAD plus12-path patch; later delivery Markdown changes
-  full-tree hash, not behavior. Do not relabel the run clean-delivery-commit proof.
-- LLM `1e5d4ace2318970946739cb6da71037041be395fb958e18fd9194da004ea6857`,
+  Final delivery documentation/harness changes are not a clean-commit app qualification.
+- LLM container `1e5d4ace2318970946739cb6da71037041be395fb958e18fd9194da004ea6857`,
   image `sha256:ab5368ff1306a55fa694d8b88173ddb23dad56c2e615d41d7068675f65c524dd`;
-  Gemma revision `707f0a3b8a3c7ad586ed01e27eafbad8a27dd0f7`, SGLang0.5.19,
-  pinned/backported XGrammar0.2.1, RTX5090. LLM/ASR/TTS stayed unchanged; Agent was
-  rebuilt for round6 before its proofs. Start/end same-cohort container/model/budget
-  comparisons all pass. Services are left running; acceptance Hosts have ended.
-- Context65,536; UMI/GA output2,048/60s; Planner output4,096/Agent60s/Host65s;
-  cognitive300s; SC output1,024 plus2,048 margin; TTS start6s/local speech30s;
-  compiler cache512MiB. Effective identity JSON owns exact values. Never edit generated
-  `.env.runtime`; use `.chromie/voice-runtime/orchestrator.env` as retained.
-- Soridormi `/home/chromie/github/soridormi`, clean main
-  `a49a87f68bb923800c6819b0ea81ab9f4c92c71d`, unedited; `open_duck_forward`, scene
-  `configs/simulation_scenarios/thirst_water_delivery.json`, SHA256
+  Gemma HF `707f0a3b8a3c7ad586ed01e27eafbad8a27dd0f7`, SGLang0.5.19,
+  pinned/backported XGrammar0.2.1, RTX5090. TTS image
+  `sha256:50871c1b589c36616b8940dab1ec5ca067ebb76e76600781ac6b0b130e347f64`.
+  Services are left running; acceptance Hosts have ended. The controller reset the same
+  scene/services only between cohorts, never between cases.
+- Context65,536; UMI/GA output2,048, Planner4,096, SC1,024; Agent60s/Host65s,
+  deep120s/125s, cognitive300s, local speech30s, first TTS6s, weather7s/two attempts,
+  context margin2,048; compiler cache512MiB. Effective identity JSON owns exact settings.
+  Never edit generated `.env.runtime`; retained Host env is
+  `.chromie/voice-runtime/orchestrator.env`.
+- Soridormi `/home/chromie/github/soridormi`, Main
+  `a49a87f68bb923800c6819b0ea81ab9f4c92c71d`, untouched;
+  MCP image `sha256:389cedb814f93c14d28394a2ff0f421de89e66806d07f7984c5cfa37581d924b`.
+  `open_duck_forward`, `configs/simulation_scenarios/thirst_water_delivery.json`, SHA256
   `44454edb6a5ed5bce7f441316acf8c71655ca230cc945e52d37de8fc4afdbfca`.
-  Final safe_idle=true,active_task=null,active_lanes={},standing=true,fallen=false,
-  emergency_stop=false. No source/rebuild/restart/model probes between final cohort cases.
-- Evidence ceiling: fixed real model/services, injected text, discarded TTS,
-  MuJoCo/mock handover. No physical microphone/speaker/robot, owner-human acceptance,
-  target-evidence closure or release. No new model-capacity limit proved; LoRA deferred.
-- Repository surfaces:98 current Markdown files unchanged; no new current document,
-  environment variable, compatibility path or first-class architectural term. New proof
-  lives in ignored evidence, not in Git. Existing exception registry records the new
-  closure fallback handler. Remaining failures are not waived by branch delivery.
+  Final safe_idle=true, active_task=null, active_lanes={}, standing=true, fallen=false,
+  emergency_stop=false. No physical microphone/speaker/robot or release proof.
+- Source libraries207: general99/everyday106/parked2; all205 old IDs retained, plus2
+  retained order contrasts.128 online comparison cases comprise108 daily/10 functional
+  Smoke/10 functional Core; the original79 functional cases are reviewed/retained but
+  not all replayed by128. No new current document, env variable, compatibility path or
+  first-class architecture term;98 current Markdown files remain. Raw private evidence
+  stays ignored, not pushed. No intrinsic weight-capacity limit is established.
 
 ## Retained evidence
 
-Private artifacts stay local/ignored; never push raw prompts/logs or restore old snapshots.
-
 ```bash
 cd /home/chromie/github/chromie
-review_root=.chromie/acceptance/engineering-first-6turns-20261114
+review_root=.chromie/acceptance/fair-main-branch-20261116/qualified-v2
 ```
 
-- `comprehensive-review.md`: all128 final verdicts, six rounds, original10, actual failure
-  reasons and engineering/inference/ability distinction. `round6-workflow-index.md/json`
-  gives source-bound module I/O and raw call refs; reflection/global associations remain
-  explicitly unknown where they cannot bind a case.
-- `round6-qualified-source.patch`, `round6-end-freeze-check.json` and
-  `live-corpus-manifest.json`: evaluated12 paths and128 identical scenario hashes.
-  `round6-full-identity.json` / `round6-final-identity.json`, start/end invariant files and
-  `round6-final-agent-source.json`: exact services, model/budgets and source equality.
-- `round6-full-live/`:128/128;167 admitted main inputs plus1 during-motion stop,
-  automatic112 pass /16 fail; final contract+interaction43 pass /2 partial /83 fail;
-  8 runner integrity records retained. Initial56/2/70 was revised after13 raw body-only
-  Plans added forbidden answer obligations.0 skips; all cases reviewed. Bundle once:
-  `/home/chromie/Downloads/chromie_debug_bundle_20261115_090031.tar.gz`.
-- `round6-full-llm-calls.jsonl`:1016 records,0 log parse loss;1004 complete plus12
-  intentional need-first prefix exits with same-turn final inference. Not12 model
-  failures; raw acceptance is not DTO/Host/semantic acceptance. Streaming parsed_output
-  can be null by design. No current observed grammar compilation timeout.
-  `round6-wire-conformance-audit.json` validates all1,004 complete raw outputs against
-  captured request Schema with0 unknowns; it is not full DTO/Host or native qualification.
-- `round6-original/`, `round6-original-workflow.md`, source-map JSON:10/10 inputs and
-  terminal notifications /54 calls, but duplicates/lifecycle remain.09 food intent kept
-  and milk delivered;10 explicitly cannot check further food. Final10 stored Goal state
-  unknown.03/04 overlap preserved; exact historical interval unknown. Original bundle:
-  `/home/chromie/Downloads/chromie_debug_bundle_20261115_055808.tar.gz`.
-- `round6-focused-live/`:3 auto passes,2 visible passes/1 stale-time-repeat failure;
-  4 bounded results respond, but Goal closure remains unqualified.
-- `round6-local-checks.json`:176 benchmarks /4,414 main /1,042 subtests /20 legacy;
-  5 skips /3 warnings. Policy/docs/45 Level A/strict6,000 pass. Strict first restricted
-  PermissionError attempt and post-run report-helper field error are preserved separately.
-- `native-links-proof.json`:GA41 Schema/811 controls per arm,335→0 mismatches;
-  `incremental-proof-v2-backend-proof.json`:52 Schema/208 controls per arm0 mismatches;
-  `round6-candidate-isolated-proof.json`:96/96 controls;147 isolated and274 focused pass.
-  No claim beyond captured scopes; invalid v1/serializer/prefix attempts remain retained.
-- `round6-bounded-native-audit.json`:25 calls, no completed incremental missing respond;
- 17 completed calls:15 respond,2 same-clock reminder executions rejected.8 failed-result
-  calls separate. Case124 failed incremental decision was repeated at aggregate closure;
-  fix this consumption gap before target qualification.
-- `round6-input-fact-audit.json` and `round6-memory-pipeline-audit.json`:given birthday,
-  Max/blue/piano and bottle observations differ from missing cross-conversation facts.
- 85 has an accepted preference proposal on an unplayed ingress ack, lost before spoken
-  Work reply; request.language en-US then conflicts with the requested preference.
-- `round6-extra-response-raw-proof.json`, `round6-case40-42-workflow.md`:source authority,
-  premature result and mixed-stage contract failures; `round6-full-marker-surface-audit.json`
-  records22 redundant SC proof objects (max3,094 JSON chars, no low-level keys observed).
-- `round6-sc-context-breakdown.json`:peak32,849 prompt tokens /35,921 with reserves,
-  below65,536; inline output Schema60,235 chars dominates, native wire90,086 chars is
-  decoder surface, not another prompt-text token copy. Context still needs engineering.
-- `goal-delivery-registration-proof.json` and `verified-memory-age-proof.json` are zero-LLM
-  mechanical controls, not adopted production fixes. Do not blindly set binding=True or
-  treat storage time as observation time. Earlier invalid control versions are retained.
-- `round1-review.md` and `round5-review.md` retain separate complete128 revisions/rubrics.
-  Round5 bundle `/home/chromie/Downloads/chromie_debug_bundle_20261115_052453.tar.gz`;
-  round1 `/home/chromie/Downloads/chromie_debug_bundle_20261115_005739.tar.gz`.
-  GA/SC/Planner candidates and reference gaps remain; no candidate prompt was adopted.
+- `comprehensive-review.zh.md`: complete scope, results, original episode, failure
+  classification and proposed general repairs. `paired-review.zh.md/json`: all128 paired
+  manual verdicts/reasons. `workflow-index.zh.md/private.json`: actual stage I/O, intervals,
+  model call references and source paths for256 case-arms; global unbound calls stay unknown.
+- `confirmed-boundaries.zh.md`: earliest error tables, actual module handoffs, containment,
+  general repair/verification. `branch-original/original-workflow.zh.md`: the actual09 food
+  WHAT→Planner water substitution→mock handover→SC/console sequence, plus all10 inputs.
+- `main-full/`, `branch-full/`:128/128 each, automatic117/109 pass; functional Main94 pass/
+  12 partial/21 fail/1 insufficient, branch84/11/32/1; interaction complete33/12. Stage22/96/10.
+  Functional Smoke10/10 both; functional Core7/10 vs5/10. No qualified revision.
+- `main-original/`, `branch-original/`:10/10 terminal notices each,47/57 calls; both episode
+  fail. Main09 UMI misgrounds food as water despite supplied food context; Main final TTS
+  exists but history/console omits it. Branch09 UMI/GA preserve food but Planner delivers
+  water;10 gives visible food limitation.03 interrupted by04 in branch; raw meaning and
+  subsequent GA preserve thirst. Exact historical intervals unknown; completion is not pass.
+- Each arm retains `identity.json`, `invariants.json`, source checks, `exits.json`,
+  `post-status.log`, model-input/raw-contract/context audits. Main16 and branch18 identity
+  checks pass;2104 retained model requests have0 reviewer markers/missing/parse losses.
+  `observer-overlay-v2.json`, `common128-manifest.json`, `comparison-protocol.json` bind
+  the frozen test conditions. Earlier parent Main124 is contaminated diagnostic evidence,
+  excluded from this qualified-v2 comparison. Never overwrite completed results.
+- Full raw Schema counts:Main968 valid/1 invalid/17 unadjudicated; branch1005/0/9.
+  Original Main39/4/4; branch56/0/1. Branch9+1 cancellations each have one same-turn final
+  need-first continuation. `cancelled-call-adjudication.private.json` uses turn_id, correcting
+  an initial report-helper null-sid join; that helper error is not an app defect.
+- `native-backend-results.private.json`: post-cohort CPU grammar matching,0 inference/actions,
+  5 actual Schema/16 controls.11 legal accepted/4 illegal rejected/1 JSON-valid property
+  order rejected. Correct tomorrow meaning accepts another ordering; not semantic exclusion.
+- SC full peak51,494 Main/33,009 branch tokens; inline contract101,250/62,692 characters
+  dominates the peak messages. Native format is separate, not extra prompt tokens.
+  No current grammar timeout or SC overflow observed; historical trace gaps remain.
+- `branch-playback-key-collision-proof.json` is a zero-model reproduction in both source
+  revisions. Each full arm's `playback-receipt-audit.json` flags22/50 non-reused early
+  receipts; event counts are not semantic failure counts or physical speaker evidence.
+- `local-validation.json` and parent `repository-gates-v2.json/log`:176 benchmark,
+  4,415 main,1,042 subtests,20 legacy,5 skips/3 warnings; policy/docs pass.160 focused
+  harness is a subset. Initial socket EPERM attempt retained as environmental restriction.
+  Source-purpose review: parent `scenario-curation-review.json/md`,
+  `existing-functional79-review.json`, `curation-source-proof.json`.
+- Earlier six-round evidence remains in
+  `.chromie/acceptance/engineering-first-6turns-20261114/`; its strict6,000/45 Level A,
+  native GA41/811 and typed-proof52/208 controls retain that earlier revision scope.
+
+One bundle was collected after each completed cohort:
+
+```text
+/home/chromie/Downloads/chromie_debug_bundle_20261116_175411.tar.gz  Main128
+/home/chromie/Downloads/chromie_debug_bundle_20261116_180601.tar.gz  Main original10
+/home/chromie/Downloads/chromie_debug_bundle_20261116_221156.tar.gz  Branch128
+/home/chromie/Downloads/chromie_debug_bundle_20261116_223229.tar.gz  Branch original10
+```
 
 ## Resume and verify
 
-Read core owners and the current comprehensive workflow first. The next change follows
-STATUS's ordered blockers; do not silently add another optimization round to this finished
-six-round request. Preserve model/budgets/permissions and complete WHAT. No semantic
-critic, phrase routing, UMI output-mode restoration or Planner rule relaxation.
-
-Use unused evidence paths for an authorized next behavior repair:
+Read the report/workflow first, then STATUS's ordered blockers. Do not reinterpret all
+failures as intrinsic LLM inability. Primary semantic errors, overconstraints, lost input,
+provider/timeouts and Runtime failures have different owners. No output-mode restoration,
+phrase routing, second semantic critic, budget increase or relaxed Planner rules.
+All current jobs have finished. These commands inspect retained evidence without inference:
 
 ```bash
 set -e
 cd /home/chromie/github/chromie
-next_root=.chromie/acceptance/engineering-first-6turns-20261114/resume-next
+review_root=.chromie/acceptance/fair-main-branch-20261116/qualified-v2
+cat "$review_root/progress.json" "$review_root/restored-agent-source.json"
+cat "$review_root/main-full/exits.json" "$review_root/branch-full/exits.json"
+cat "$review_root/main-original/original/episode-summary.json"
+cat "$review_root/branch-original/original/episode-summary.json"
+python "$review_root/build_paired_report.py"
+python scripts/capture_runtime_identity.py --verify-agent-source chromie-agent
+```
+
+For a next authorized repair, choose an unused root. Source changes require new focused
+proof and full qualification; documentation alone does not require redoing model inference:
+
+```bash
+set -e
+cd /home/chromie/github/chromie
+review_root=.chromie/acceptance/fair-main-branch-20261116/qualified-v2
+next_root="$review_root/next-authorized"
 test ! -e "$next_root"
 mkdir "$next_root"
 python scripts/check_repository_policies.py
@@ -130,19 +150,15 @@ python scripts/run_workflow_replay.py --workers 8 --evidence-dir "$next_root/str
 python scripts/general_ability_acceptance.py --mode level-a --evidence-dir "$next_root/level-a"
 ```
 
-When Agent behavior changes, stop the acceptance Host and rebuild only that service;
-verify safe idle and reset the same scene BETWEEN cohorts, never between cases:
+When application behavior changes, end the acceptance Host, rebuild only the changed
+service and verify source/idle. Use the existing `run_comparison.py` reset/status helpers
+as read-only operational references; do not rerun that completed controller or reset during
+an aggregate. After the same scene reset BETWEEN cohorts, run one frozen complete batch:
 
 ```bash
 ./scripts/compose.sh build chromie-agent
 ./scripts/compose.sh up -d --no-deps --force-recreate chromie-agent
 python scripts/capture_runtime_identity.py --verify-agent-source chromie-agent
-```
-
-One frozen directory-discovered aggregate, with diagnostic keep-going retaining all
-failures. Verify effective models/budgets/identities before admission:
-
-```bash
 set -a
 source .chromie/voice-runtime/orchestrator.env
 set +a
@@ -153,35 +169,34 @@ python scripts/capture_runtime_identity.py --allow-dirty \
   --output "$next_root/full-identity.json"
 set +e
 python scripts/general_ability_acceptance.py --mode live-text --keep-going \
-  --scenario-root .chromie/acceptance/engineering-first-6turns-20261114/live-corpus \
+  --assertion-scope user-outcome --scenario-root "$review_root/common128" \
   --execute --runtime-identity "$next_root/full-identity.json" \
   --soridormi-repo /home/chromie/github/soridormi \
   --evidence-dir "$next_root/full-live" > "$next_root/full-live.log" 2>&1
 cohort_result=$?
 ./scripts/collect_debug_bundle.sh > "$next_root/full-bundle.log" 2>&1
 bundle_result=$?
-# Retain both exits, inspect every case, verify final safe idle. A failure stays failed.
+# Retain both exits, judge every case and verify final safe idle; any failure stays failed.
 ```
 
-After safe-idle verification and a same-scene reset between aggregates, copy the retained
-original10 helper to the unused resume root. It preserves03–04 overlap and writes only
-its own new `round6-original` child:
+After another between-cohort safe-idle verification/reset, preserve the original10 input
+bytes and03/04 overlap with the retained helper. It writes only a new `original/` child:
 
 ```bash
-cp "$review_root/replay_round6_console.py" "$next_root/replay_console.py"
+set -e
+cp "$review_root/original-dialogue.json" "$next_root/original-dialogue.json"
+mkdir "$next_root/original-episode"
 python scripts/capture_runtime_identity.py --allow-dirty \
   --orchestrator-env .chromie/voice-runtime/orchestrator.env \
-  --output "$next_root/round6-original-identity.json"
+  --output "$next_root/original-episode/identity.json"
 set +e
-python "$next_root/replay_console.py" > "$next_root/original-replay.log" 2>&1
+python "$review_root/run_original.py" "$next_root/original-episode" \
+  > "$next_root/original-replay.log" 2>&1
 original_result=$?
 ./scripts/collect_debug_bundle.sh > "$next_root/original-bundle.log" 2>&1
 original_bundle_result=$?
-# Retain both exits, inspect all ten source-bound results and final safe idle.
+# Keep exits, raw call windows and actual playback events; inspect all10 and final idle.
 ```
 
-The original source transcript remains under
-`.chromie/acceptance/sc-context-budget-20261102/baseline/original-dialogue.json`.
-Collect one bundle after each complete separate replay. Never overwrite completed runs.
-All requested current tests have finished; source behavior changes require new qualification.
-Documentation-only delivery updates do not create clean-commit live evidence.
+Do not copy live claims from planned responses, discarded audio, the simulator or an older
+revision. Physical evidence remains supervised; Main merge remains owner-controlled.

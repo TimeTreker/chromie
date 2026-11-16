@@ -63,6 +63,23 @@ def test_social_response_timing_reads_the_real_session_tracker_handoff(tmp_path)
     assert evidence["derived"]["sc_decision_ms"] == 400.0
 
 
+def test_episode_conversation_identity_contains_no_reviewer_scenario_labels(tmp_path):
+    args = build_parser().parse_args(["--mode", "live-text", "--no-write"])
+    turns = (TextScenarioCase(case_id="turn-01", text="Which one?"),
+             TextScenarioCase(case_id="turn-02", text="That one."))
+    case = TextScenarioCase(case_id="expected_answer_is_water", text="", turns=turns)
+    capture = AsyncMock(side_effect=RuntimeError("captured before inference"))
+    with patch("scripts.general_ability_acceptance.run_check_sequence", capture):
+        with pytest.raises(RuntimeError, match="captured before inference"):
+            asyncio.run(_run_live_case(args, case, tmp_path))
+    namespaces = capture.call_args.args[0]
+    identity = namespaces[0].conversation_id
+    assert all(item.conversation_id == identity for item in namespaces)
+    assert case.case_id not in identity
+    assert "water" not in identity
+    assert identity == _live_case_namespace(args, case, tmp_path).conversation_id
+
+
 @pytest.fixture(autouse=True)
 def isolate_unit_tests_from_saved_deployment(monkeypatch):
     monkeypatch.setattr("scripts.general_ability_acceptance._live_model_binding", lambda path: {})
@@ -468,13 +485,13 @@ class GeneralAbilityAcceptanceTests(unittest.TestCase):
         )
         self.assertEqual(
             [(stage.stage_id, len(stage.scenario_paths)) for stage in manifest.stages],
-            [("must_pass", 55), ("core", 16), ("challenge", 8)],
+            [("must_pass", 65), ("core", 26), ("challenge", 8)],
         )
-        self.assertEqual(len(live_ids), 79)
+        self.assertEqual(len(live_ids), 99)
         self.assertNotIn("tianxin_ambiguous_tool", live_ids)
         self.assertEqual(
             len({ref.source_path for ability in manifest.ability_classes for ref in ability.live_text_cases}),
-            79,
+            99,
         )
         generated = [
             ref
@@ -1366,9 +1383,15 @@ class GeneralAbilityAcceptanceTests(unittest.TestCase):
 
         self.assertTrue(namespace.cognitive_runtime)
         self.assertEqual(namespace.soridormi_repo, "/tmp/soridormi-checkout")
+        self.assertNotIn(case.case_id, namespace.conversation_id)
         self.assertEqual(
             namespace.conversation_id,
-            "ga-live-multi_goal_look_then_blink",
+            _live_case_namespace(args, case, Path("/tmp/other-evidence")).conversation_id,
+        )
+        self.assertNotEqual(
+            namespace.conversation_id,
+            _live_case_namespace(args, replace(case, case_id="unrelated_case"),
+                                 Path("/tmp/multi-goal")).conversation_id,
         )
         self.assertEqual(args.assertion_scope, "user-outcome")
         self.assertEqual(namespace.expect_capability, [])

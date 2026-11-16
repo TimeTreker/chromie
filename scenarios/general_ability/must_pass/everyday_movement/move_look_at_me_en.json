@@ -1,16 +1,15 @@
 {
   "schema_version": 1,
   "kind": "chromie_general_ability_live_text",
-  "id": "child_spin_en",
-  "stage": "core",
-  "difficulty": "easy",
+  "id": "move_look_at_me_en",
+  "stage": "must_pass",
+  "difficulty": "medium",
   "provenance": {
-    "origin": "agent_authored_common_scene",
-    "batch_id": "daily_life_v3_personas_2026_10_26",
-    "persona": "child",
+    "origin": "codex_generated_common_scene",
+    "batch_id": "daily_life_v2_2026_10_15",
     "derived_from_existing_scenario": false
   },
-  "rationale": "Turn in place as far as she can, or say honestly she can't spin all the way around (turn_in_place covers at most about 230 degrees in one request; a slower partial turn instead is fine).",
+  "rationale": "Look at the person (the observed person) for three seconds.",
   "oracle_policy": {
     "mode": "hybrid",
     "deterministic_sources": [
@@ -31,13 +30,13 @@
       "truthfulness"
     ],
     "primary_outcomes": [
-      "Turn in place as far as she can, or say honestly she can't spin all the way around (turn_in_place covers at most about 230 degrees in one request; a slower partial turn instead is fine)."
+      "Look at the person (the observed person) for three seconds."
     ],
     "acceptable_auxiliary": [
       "A brief acknowledgement in the person's language."
     ],
     "forbidden_semantic_outcomes": [
-      "Walk away; claim to have spun all the way around."
+      "A guessed head angle; walking; another gesture."
     ],
     "verdicts": [
       "pass",
@@ -47,26 +46,28 @@
     ]
   },
   "language": "en-US",
-  "description": "Turn in place as far as she can, or say honestly she can't spin all the way around (turn_in_place covers at most about 230 degrees in one request; a slower partial turn instead is fine).",
+  "description": "Look at the person (the observed person) for three seconds.",
   "general_ability": {
     "memberships": [
       {
         "id": "everyday_movement",
         "title": "Everyday movement and attention",
         "general_rule": "Walking, turning, stepping and looking use the matching body ability with the requested amount, from the person's words or the observed scene, never a guessed value.",
+        "rationale": "Look at the person (the observed person) for three seconds.",
         "root_cause_boundaries": [
           "User Meaning Interpretation",
           "Planner",
           "Soridormi"
-        ],
-        "rationale": "Turn in place as far as she can, or say honestly she can't spin all the way around (turn_in_place covers at most about 230 degrees in one request; a slower partial turn instead is fine)."
+        ]
       }
     ]
   },
-  "text": "Can you spin around?",
-  "require_speech": false,
-  "forbidden_capabilities": [
-    "soridormi.walk_forward",
-    "soridormi.sidestep"
-  ]
+  "text": "Look at me for three seconds.",
+  "expected_capabilities": [
+    "soridormi.look_at_person"
+  ],
+  "expected_args": [
+    "0:duration_s=3.0"
+  ],
+  "require_speech": false
 }

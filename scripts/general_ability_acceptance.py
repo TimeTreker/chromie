@@ -12,6 +12,7 @@ from __future__ import annotations
 import argparse
 import asyncio
 import fcntl
+import hashlib
 import json
 import os
 import sys
@@ -1968,6 +1969,11 @@ def _selected_live_refs(
     return refs
 
 
+def _live_conversation_id(case_id: str) -> str:
+    """Keep reviewer-facing scenario labels out of model-facing correlation IDs."""
+    return "conv_" + hashlib.sha256(case_id.encode("utf-8")).hexdigest()[:24]
+
+
 def _live_case_namespace(
     args: argparse.Namespace,
     case: TextScenarioCase,
@@ -1985,7 +1991,7 @@ def _live_case_namespace(
         language=case.language or args.language,
         evidence_dir=str(evidence_dir),
         runtime_identity=args.runtime_identity,
-        conversation_id=conversation_id or f"ga-live-{case.case_id}",
+        conversation_id=conversation_id or _live_conversation_id(case.case_id),
         speaker=args.speaker,
         preview_only=not args.execute,
         allow_non_sim=args.allow_non_sim,
@@ -2127,7 +2133,7 @@ async def _run_live_case(
             assertion_scope=args.assertion_scope,
         )
 
-    conversation_id = f"ga-live-{case.case_id}"
+    conversation_id = _live_conversation_id(case.case_id)
     namespaces = [
         _live_case_namespace(
             args,

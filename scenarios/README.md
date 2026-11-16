@@ -1,8 +1,10 @@
 # Behavior Scenario Fixtures
 
-This directory stores one frozen behavior scenario per JSON file. The files are
-Level A regression fixtures: they are deterministic, dependency-light, and do
-not prove GPU, microphone, speaker, simulator, or robot behavior.
+This directory stores one behavior scenario per JSON file. Scripted suites are
+deterministic Level A fixtures; `general_ability/`, `everyday/`, and
+`model_limited/` contain live-text scenarios. Evidence depends on the executed
+profile and retained observations. A fixture or metadata check alone does not
+prove GPU, microphone, speaker, simulator, or robot behavior.
 
 Run maintained file-backed scenarios through the Benchmark Suite entrypoint:
 
@@ -11,13 +13,15 @@ python -m benchmarks.scenarios check
 python -m benchmarks.scenarios run --suite cognitive_core_dialogue --no-write
 ```
 
-`scenarios/model_limited/` keeps everyday live cases that fail only because of the local
-model's own judgment (owner decision 2026-10-25: skip them until the model is fine-tuned;
+`scenarios/model_limited/` keeps historically parked everyday live cases
+(owner decision 2026-10-25: skip them until the model is fine-tuned;
 first `multi_that_water_zh`, a conversation-settled "那个"; then `adult_note_shopping_later_zh`, a
 note kept across conversations, parked with the keep Capability because the local Planner model
 planned every reminder as a keep). The everyday cohort does not
-discover them; run them with `--scenario-root scenarios/model_limited`, and move a case back
-to `scenarios/everyday/` once it passes.
+discover them; run them with `--scenario-root scenarios/model_limited`. The folder
+name records that historical decision, not proof of an intrinsic model limit.
+Requalification must inspect context, prompt, Schema, Host, provider and oracle
+before attributing a failure to model ability or restoring a case to the daily set.
 
 Run behavior-quality gates through the discovered general-ability scenario library:
 
@@ -62,8 +66,9 @@ python scripts/scenario_author.py prompt --suite user_meaning_interpretation --c
   --focus "normal social requests, ambiguous movement, and discourse markers"
 ```
 
-The LLM should author candidate files only. The committed JSON expectations are
-the deterministic judge.
+The LLM should author candidate files only. Committed expectations own the
+deterministic checks; hybrid cases also require the declared blocking semantic
+review. Mechanical success alone does not establish semantic completion.
 
 Live `expected_observations` may attach an `overlaps` observation selector to require
 positive overlap between two distinct completed Runtime execution intervals. The oracle
@@ -126,9 +131,6 @@ or Deep DTO fails closed without a same-authority repair stage:
             "local_ref": "r1",
             "outcome": "Can you move over there a little?",
             "confidence": 0.78,
-            "output_mode": "body_action",
-            "body_effect_family": "task_physical_effect",
-            "continuity_scope": "goal",
             "source_evidence": {
               "source_start_token_ref": "t0",
               "source_end_token_ref": "t7"
@@ -172,8 +174,10 @@ not a live-model, microphone, simulator, or robot claim.
 ## Everyday live cohort
 
 `everyday/<must_pass|core|challenge>/<ability-class>/` holds the everyday-utterance live cohort the owner
-uses for live acceptance (owner, 2026-10-15): 15 `must_pass` smoke cases (one or more per ability), 50
-`core` and 5 `challenge` cases over 16 ability classes. Each file carries its declared review rubric. Run
+uses for live acceptance: 106 cases, comprising 12 `must_pass`, 84 `core` and
+10 `challenge` cases. Requests need a plausible daily-life or communication
+purpose. Natural greetings, expressive gestures, entertainment, unsupported
+requests and safety/privacy probes remain eligible. Each file carries its review rubric. Run
 the smoke stage first and let its gate stop later stages (no `--keep-going`):
 
 ```bash
@@ -197,6 +201,21 @@ bundles; it never changes the verdict or creates a central registry.
 Maintained Level-A scenarios in the deterministic suites declare their own
 `general_ability.memberships`, including multi-ability membership where needed.
 Counts and ability-class reports are derived from those files.
+
+The general-ability library contains 99 functional cases: 65 `must_pass`, 26
+`core` and 8 `challenge`. Pure action demonstrations, counts, durations and
+stop/cancel checks belong here, including the action probes moved from the daily
+set into `must_pass` Smoke. Artificial combinations and ordering/overlap contrasts
+remain functional regressions in `core`; moving them does not remove coverage or
+make them evidence of natural daily interaction.
+
+Persona metadata describes the author's scenario perspective. It does not tell
+the candidate a person's observed age or establish supervision. Judge only facts
+actually admitted to that conversation. Multi-turn acceptance must refer to the
+assistant's actual preceding offer; a fixed follow-up must not invent that offer.
+The live runner uses opaque conversation identifiers so reviewer-facing case
+names do not leak into model context. Expectations and rubrics remain outside
+candidate input.
 
 Run the directory and metadata checks with:
 

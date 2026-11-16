@@ -10,7 +10,7 @@
     "derived_from_existing_scenario": false,
     "carried_into": "daily_life_v2_2026_10_15"
   },
-  "rationale": "Turn 1: respond to thirst (an offer to get water is natural). Turn 2 'Yes, please.': fetch the water.",
+  "rationale": "Turn 1: respond naturally and honestly to thirst. Turn 2: ground Yes, please in the actual previous assistant reply. If it offered to get water or a drink, perform the accepted water-help task using available evidence. If no matching offer or referent was established, ask the genuine clarifying question; do not invent an accepted task.",
   "oracle_policy": {
     "mode": "hybrid",
     "deterministic_sources": [
@@ -31,13 +31,15 @@
       "truthfulness"
     ],
     "primary_outcomes": [
-      "Turn 1: respond to thirst (an offer to get water is natural). Turn 2 'Yes, please.': fetch the water."
+      "Turn 1: respond naturally and honestly to thirst. Turn 2: ground Yes, please in the actual previous assistant reply. If it offered to get water or a drink, perform the accepted water-help task using available evidence. If no matching offer or referent was established, ask the genuine clarifying question; do not invent an accepted task."
     ],
     "acceptable_auxiliary": [
       "A brief acknowledgement in the person's language."
     ],
     "forbidden_semantic_outcomes": [
-      "Turn 2 treated as small talk; fetch the milk."
+      "Treat acceptance of an actual water/drink offer as unrelated small talk.",
+      "Invent a prior offer or dispatch an ungrounded task when the acceptance referent is unclear.",
+      "Fetch milk as fulfillment of an accepted water offer."
     ],
     "verdicts": [
       "pass",
@@ -47,14 +49,14 @@
     ]
   },
   "language": "en-US",
-  "description": "Turn 1: respond to thirst (an offer to get water is natural). Turn 2 'Yes, please.': fetch the water.",
+  "description": "Turn 1: respond naturally and honestly to thirst. Turn 2: ground Yes, please in the actual previous assistant reply. If it offered to get water or a drink, perform the accepted water-help task using available evidence. If no matching offer or referent was established, ask the genuine clarifying question; do not invent an accepted task.",
   "general_ability": {
     "memberships": [
       {
         "id": "everyday_continuity",
         "title": "Everyday multi-turn continuity",
         "general_rule": "Follow-ups such as 'yes please', 'what about...' and 'again' continue the previous turn's meaning.",
-        "rationale": "Turn 1: respond to thirst (an offer to get water is natural). Turn 2 'Yes, please.': fetch the water.",
+        "rationale": "Turn 1: respond naturally and honestly to thirst. Turn 2: ground Yes, please in the actual previous assistant reply. If it offered to get water or a drink, perform the accepted water-help task using available evidence. If no matching offer or referent was established, ask the genuine clarifying question; do not invent an accepted task.",
         "root_cause_boundaries": [
           "User Meaning Interpretation",
           "Goal Association",
@@ -74,10 +76,7 @@
       "id": "turn-02",
       "text": "Yes, please.",
       "language": "en-US",
-      "require_speech": true,
-      "expected_capabilities": [
-        "soridormi.acquire_and_deliver_resource"
-      ]
+      "require_speech": true
     }
   ]
 }

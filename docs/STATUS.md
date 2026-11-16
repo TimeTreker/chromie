@@ -10,18 +10,19 @@ The current focus remains Goal-driven single-authority architecture.
 
 | Axis | Current evidence |
 | --- | --- |
-| Implementation | WHAT-only UMI remains: UMI owns intent, GA identity, Planner HOW/Skills, SC communication. This delivery retains the GA supersedable enum through native projection, permits independently qualified terminal Evidence to re-enter without unrelated sibling delay, and carries typed completion proof into the existing completed-Work guard. Model, budgets, Planner rules and permissions remain unchanged. No prompt candidate was adopted. These mechanisms do not close the remaining semantic/Runtime defects below. |
-| Automatic verification | Required gates pass:176 benchmarks /4,414 main /1,042 subtests /20 legacy;5 host skips /3 warnings. Policy/docs pass;98 Markdown /15 core readings. Strict6,000 matches1,500 pass /1,800 expected-state /2,700 expected-rejection;45 Level A pass. Focused274 pass. Native GA41 Schema/811 controls per arm improves335 mismatches to0; typed-proof52 Schema/208 controls per arm has0 mismatches. Proof scopes are bounded, not whole-model qualification. |
-| Target validation | NOT qualified. Final128:17 smoke /100 core /11 challenge, all167 main inputs plus1 during-motion stop attempted,0 skipped. Automatic112 pass /16 fail; final Codex contract+interaction review43 pass /2 partial /83 fail. Initial56/2/70 was revised after13 raw body-only Plans were found to add forbidden answer obligations. Runner retains8 integrity-failure records; failures are not averaged away. Original10 reaches10 terminal notifications /54 calls but still fails interaction/lifecycle qualification. Focusedlive3 has3 automatic passes but1 stale-time/duplicate failure. No owner-human or physical acceptance. |
-| Deployment state | Branch codex/sc-context-budget-failure-notice; pre-delivery HEAD a0e7524c69d6. Expected resume revision is the latest commit containing the three delivery owners. Agent4dbf37d8f3de/imagef9138d8641f0 matches Agent/shared85ac490b3722. LLM1e5d4ace2318/imageab5368ff1306 and ASR/TTS remain unchanged. Entire128 source/scenario hashes and start/end effective models/budgets/container identities match. Final safe_idle=true,active_task=null,active_lanes={},standing=true. Soridormi a49a87f remains unedited. Branch-only diagnostic delivery is authorized; no main merge or release. |
+| Implementation | WHAT-only UMI, GA identity, Planner HOW/Skills and SC communication remain. No production behavior, model, budget or Planner-rule change in this delivery. Preserve all205 prior scenario IDs, move18 artificial probes to functional coverage (10 Smoke/8 Core), add2 retained ordering contrasts, and use opaque live conversation IDs to exclude reviewer labels. Existing engineering repairs remain revision-bound, not qualified behavior. |
+| Automatic verification | Required checks pass:176 benchmarks /4,415 main /1,042 subtests /20 legacy;5 skips /3 warnings; policy/docs pass. Focused harness160 pass is a subset. General/everyday/frozen libraries99/106/128 validate. Post-cohort CPU native proof uses5 actual Schema/16 controls:11 valid encodings accepted,4 invalid rejected,1 JSON-valid property order rejected; the same correct meaning is accepted in another order. Not whole-decoder or semantic qualification. Earlier strict6,000/45 Level A and six-round proofs retain their original revision scope. |
+| Target validation | NOT qualified. Same-condition Main55f5587d4 vs branch0729b3634:128/128 attempted each,22 Smoke/96 Core/10 Challenge. Automatic117/109 pass; manual functional Main94 pass/12 partial/21 fail/1 insufficient, branch84/11/32/1; interaction complete33/12. Functional Smoke10/10 both, Core7/10 vs5/10. Both exact original10-input episodes finish and fail overall; branch preserves food WHAT but Planner substitutes water. No physical or owner-human acceptance. |
+| Deployment state | Branch codex/sc-context-budget-failure-notice, pre-delivery HEAD0729b3634971194cf7de5f3c63d4f5832050fd86. Expected resume revision is the latest commit containing all three delivery owners. Both frozen app checkouts remain pinned, shared model/services/budgets unchanged, Main16/branch18 invariants pass. Original Agent restored: imagef9138d8641f0, Agent/shared digest85ac490b3722 matches. Final safe_idle=true,active_task=null,active_lanes={},standing=true. Branch-only diagnostic push authorized; no Main merge or release. |
 
-Current retained evidence: `.chromie/acceptance/engineering-first-6turns-20261114/`.
-`comprehensive-review.md` owns this run's complete128 table, original replay, six rounds,
-actual failure reasons and engineering/model distinction; `round6-workflow-index.md/json`
-retains actual module I/O and call correlations. Earlier126/parked2 and compiler evidence
-remain in their original directories and revisions. [Handoff](../HANDOFF.md) owns
-exact identities, bundle paths and resume commands. Later delivery Markdown changes
-are not a claim that a clean delivery commit was itself deployed and qualified.
+Current evidence: `.chromie/acceptance/fair-main-branch-20261116/qualified-v2/`.
+`comprehensive-review.zh.md` and `paired-review.zh.md/json` retain scope, all128 paired
+verdicts, original replays and failure attribution; `workflow-index.zh.md/private.json`
+retains actual ordered/asynchronous module I/O and source calls. All four cohorts ended;
+no source/rebuild/substituted-case edits occurred within a cohort.2104 retained model
+requests have0 reviewer-marker hits/missing messages/parse losses. Services/text,
+discarded TTS and MuJoCo/mock handover only. Later bookkeeping is not live proof of the
+new delivery commit. [Handoff](../HANDOFF.md) owns exact identities and resume commands.
 
 ## Social Cognition migration
 
@@ -59,56 +60,63 @@ This describes current intended ownership, not full conformance; see the open wo
 The [Roadmap](../ROADMAP.md#social-cognition-migration) owns delivery order; the
 [checkpoint](../DEVELOPMENT_CHECKPOINT.md) owns the active Issue and owner decisions.
 
-1. Close the reproduced failure-consumption gap: case124 invokes Planner twice for the
-   same completed clock Evidence after the first semantic/Canonical failure. Consume
-   rejected source-bound opportunities without an aggregate semantic retry; only fresh
-   state may open a new decision. Preserve the one mechanical malformed-DTO repair limit.
-2. Reconcile Planner/SC authority, result readiness and actual played coverage. Thirteen
-   initially visible passes have body-only `complete_response` Work;122 prewrites a final
-   result with zero Evidence. An addressed Need is not readiness. Existing native greeting
-   restrictions and model mis-tagging are distinct; retain grounded social replies,
-   genuine clarification and independent results without phrase routing or cross-turn
-   text deduplication. Remove redundant Host completion-proof metadata from SC's broad
-   context projection while preserving its semantic Evidence;22 SC requests carried it,
-   up to3,094 reserialized characters, with no low-level control keys observed.
-3. Align Fast/canonical staged and temporal expression without relaxing isolation or
-   splitting connected UMI intent. Cases40/42 are rejected at the mixed-stage boundary;
-   Fast lacks existing canonical time-condition expression and103/125 create no timer.
-   Planner must use supplied facts/observations and realize complete effects, not substitute
-   bottle delivery for pouring or words for supervision/volume control. Complete existing
-   story/joke method disclosure; all semantic candidates in this run were rejected.
-4. Repair existing Memory/Goal lifecycle boundaries. In85 an accepted SC preference proposal
-   is tied to an unplayed think acknowledgement and is lost before the final spoken promise;
-   preserve same-source proposals through actual delivery and cancellation rules. Separate
-   absent proposals76/79/82 from already supplied Memory/facts80/81/84/86. Register semantic
-   delivery obligations before completion callbacks without replacing executable lineage
-   or closing unfinished siblings. Preserve original observation age; delayed storage must
-   not refresh stale tool facts. Retained zero-model controls prove both mechanical gaps.
-5. Qualify GA identity/update semantics and UMI request/background scope:48 explains a new
-   joke is unrelated yet references weather;118 references an old evening Goal despite a
-   fresh morning request;45 rewrites a nod as agreement;106 mixes a private admission into
-   a requested message. Preserve WHAT-only UMI, exact source identity and single-authority
-   complete results. GA native1–3-candidate proof does not qualify broader native coverage.
-6. Repair existing provider/delivery contracts: weather future date versus today/current
-   summary fields, independent HTTP timeout diagnosis, semantic look-direction measurement,
-   and story delivery within the unchanged30s budget. Case108 has complete text but only4/5
-   played segments;119's shorter story plays fully. Do not infer physical vision, volume,
-   acquisition or speaker proof from discarded audio/MuJoCo/mock outcomes.
-7. After each next authorized repair, freeze the full role transaction, run focused ability
-   proof, required gates, strict6,000/Level A, original10 and the full directory cohort in
-   unused evidence paths. No source edits/rebuilds/probes between cohort cases; collect one
-   bundle afterwards and judge every case. Owner-authorized keep-going is diagnostic only.
-   Then obtain current-revision voice proof and default target-evidence closure; physical
-   evidence remains supervised. No main merge without explicit owner approval. No new
-   model-weight limit is established while these engineering gaps remain; LoRA is deferred.
+1. Repair existing Host playback lifecycle identity and completion semantics. Both
+   revisions reproduce old released-key reuse with a new pending order, without a model.
+   The complete event audits flag22 Main/50 branch non-reused receipts; do not equate
+   flags with semantic-case counts or physical speaker duration. Also consume rejected
+   source-bound Evidence opportunities once: branch45 repeats the same semantic decision
+   after Canonical rejection. Preserve cancellation, ordered playback and legitimate reuse.
+2. Reconcile SC authority, readiness and actual delivered coverage. Cases16/21/62 have
+   grounded replies barred by pending native constraints;8 instead mis-tags a representable
+   question.74 prewrites a date before clock start. Body-only extra answer Work and later
+   formal Needs create duplication. Keep known-context communication, genuine clarification,
+   bounded results and failure notice; no phrase routing or cross-turn text deduplication.
+   Reduce redundant proof projections without deleting required semantic Evidence.
+3. Align complete WHAT with existing Planner staged/partial/temporal contracts.39 cannot
+   represent honest partial availability in the tested atomic form;40/42 mix acquisition
+   and effect stages. Keep stage isolation and Planner decomposition authority.103/125
+   create no future wake;104 latency is not scheduling. A global meaning/cardinality or
+   lifecycle amendment needs explicit approval; do not silently loosen rules or restore
+   UMI speech/body-action labels.
+4. Qualify primary Planner outcome sufficiency and GA continuity. Original09 preserves food
+   WHAT in UMI/GA but Planner substitutes water;30/36 use current_speaker as if it fulfilled
+   singing/reminding;58/126 substitute easier effects.86 already has the color fact,93 has
+   bottle observations, yet Planner claims unavailable abilities.119 new morning WHAT is
+   supplied but the raw Plan selects evening;120 Goodnight links to an unfinished story.
+   Resolve prompt conflicts and capability-method grounding in the primary transaction,
+   without another semantic critic or semantic repair call.
+5. Repair Memory/Goal delivery boundaries.87 proposes a valid Chinese preference on an
+   unplayed ingress ack; it is lost before the spoken promise and next language guard
+   forces en-US.84/81 instead make no personal-fact proposal;119 actually stores workplace.
+   Distinguish missing proposals from Host loss and already-present facts. Earlier controls
+   for Goal delivery registration and observation age remain open at their retained scope.
+6. Repair provider/delivery contracts: future-date weather mixed with today/current fields,
+   independently diagnose7s/two-attempt weather timeouts, and deliver stories within the
+   unchanged30s speech budget.120 has complete text but7/6 then6/4 scheduled/completed chunks.
+   Ground left/right and volume evidence before claims; simulator and discarded streams
+   cannot prove physical vision, loudness, acquisition or supervision.
+7. For each next authorized repair, freeze one earliest-boundary cluster, prove focused
+   contrasts/general ability, then required gates and complete original10/full cohorts in
+   unused evidence paths. Preserve all failures and collect one bundle after each cohort.
+   The original79 functional cases are retained/reviewed, not claimed replayed by this128.
+   Current voice proof/default target closure and supervised physical proof remain open.
+   No intrinsic model limit is established while engineering/prompt gaps remain; no Main
+   merge without owner approval. Six optimization rounds are complete; this delivery is
+   the requested frozen comparison and scenario review, not another behavior-change round.
 
 ## Evidence interpretation
 
-Automatic checks, raw-call acceptance and planned satisfaction are not semantic or
-physical qualification. Final SC prompt peak32,849 tokens plus3,072 reserves is35,921,
-below65,536; inline output Schema60,235 characters is the largest text component.
-All1,004 retained complete raw outputs validate against their captured request Schema;
-this positive-sample audit does not establish DTO/Host correctness or all native constraints.
-Current retained calls show no grammar compilation timeout; this does not locate every
-historical ReadTimeout. Keep engineering, raw inference errors, reference gaps and
-unproven model-capacity limits separate.
+Automatic observations, raw-call acceptance and planned satisfaction are not semantic
+or physical qualification. Functional, interaction and architecture verdicts are separate;
+one hard failure blocks qualification. The branch loses10 functional passes in this one
+paired run; do not hide that regression or attribute every difference to one change.
+Sequential provider failures remain confounded. No case is newly classed as intrinsic
+model inability; wrong primary model choices are recorded, not excused.
+
+SC full-cohort measured prompt peak Main51,494 vs branch33,009 tokens; medians21,113 vs
+20,022. Main peak inline output contract101,250 of152,573 message characters dominates;
+session memory is only1,604 characters. Native-format bytes are a separate decoder
+surface, not another prompt-token copy. No current SC overflow or grammar compilation
+timeout was observed. These data do not locate every historical timeout, prove all native
+constraints or justify relaxing the contract. Raw Schema audits and property-order/native
+controls retain their exact bounded scope in the report.

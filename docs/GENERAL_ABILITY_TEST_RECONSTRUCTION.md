@@ -36,7 +36,7 @@ validation and it does not prove microphone, speaker, simulator execution, or
 physical hardware behavior.
 
 The general-ability live library (the source of the current-revision closure track; the
-owner's everyday target cohort lives in `scenarios/everyday`) contains 79 cases: 55 `must_pass`, 16 `core`, and 8
+owner's everyday target cohort lives in `scenarios/everyday`) contains 99 cases: 65 `must_pass`, 26 `core`, and 8
 `challenge`. The spelling-error probe `tianxin_ambiguous_tool` was removed at
 the owner's request; historical 80-case reports are not rewritten. The first
 stage includes retained regression and owner-reported cases plus 25
@@ -45,6 +45,10 @@ supported body skills, composition, safety controls, uncertainty, evidence, and
 conversation continuity. The generated files declare scenario-local authoring
 provenance so later database extraction can distinguish them from migrated or
 user-reported probes. This count is a reviewed cohort, not a permanent target.
+Eighteen former everyday probes remain as functional coverage: ten action/control
+demonstrations in Smoke and eight artificial or conditional combinations in core.
+Two retained joke/wave ordering contrasts add distinct before/overlap coverage.
+They are not counted as natural daily interactions. No case is removed for a model failure.
 The stage directory is the execution gate; `difficulty=easy|medium|hard` remains
 independent metadata inside each file. A future cluster scheduler can assign
 individual files or case ids to isolated service deployments without changing

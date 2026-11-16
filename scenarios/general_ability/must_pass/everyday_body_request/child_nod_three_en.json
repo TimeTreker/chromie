@@ -1,15 +1,16 @@
 {
   "schema_version": 1,
   "kind": "chromie_general_ability_live_text",
-  "id": "move_look_at_me_en",
-  "stage": "core",
-  "difficulty": "medium",
+  "id": "child_nod_three_en",
+  "stage": "must_pass",
+  "difficulty": "easy",
   "provenance": {
-    "origin": "codex_generated_common_scene",
-    "batch_id": "daily_life_v2_2026_10_15",
+    "origin": "agent_authored_common_scene",
+    "batch_id": "daily_life_v3_personas_2026_10_26",
+    "persona": "child",
     "derived_from_existing_scenario": false
   },
-  "rationale": "Look at the person (the observed person) for three seconds.",
+  "rationale": "Nod three times.",
   "oracle_policy": {
     "mode": "hybrid",
     "deterministic_sources": [
@@ -30,13 +31,13 @@
       "truthfulness"
     ],
     "primary_outcomes": [
-      "Look at the person (the observed person) for three seconds."
+      "Nod three times."
     ],
     "acceptable_auxiliary": [
       "A brief acknowledgement in the person's language."
     ],
     "forbidden_semantic_outcomes": [
-      "A guessed head angle; walking; another gesture."
+      "Nod another number of times; another gesture."
     ],
     "verdicts": [
       "pass",
@@ -46,28 +47,27 @@
     ]
   },
   "language": "en-US",
-  "description": "Look at the person (the observed person) for three seconds.",
+  "description": "Nod three times.",
   "general_ability": {
     "memberships": [
       {
-        "id": "everyday_movement",
-        "title": "Everyday movement and attention",
-        "general_rule": "Walking, turning, stepping and looking use the matching body ability with the requested amount, from the person's words or the observed scene, never a guessed value.",
-        "rationale": "Look at the person (the observed person) for three seconds.",
+        "id": "everyday_body_request",
+        "title": "Everyday body requests",
+        "general_rule": "A requested gesture or movement is performed with the right Capability and nothing unrequested.",
         "root_cause_boundaries": [
-          "User Meaning Interpretation",
           "Planner",
-          "Soridormi"
-        ]
+          "User Meaning Interpretation"
+        ],
+        "rationale": "Nod three times."
       }
     ]
   },
-  "text": "Look at me for three seconds.",
+  "text": "Nod three times for me.",
   "expected_capabilities": [
-    "soridormi.look_at_person"
+    "soridormi.nod_yes"
   ],
   "expected_args": [
-    "0:duration_s=3.0"
+    "0:count=3"
   ],
   "require_speech": false
 }
