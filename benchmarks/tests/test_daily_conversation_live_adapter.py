@@ -72,14 +72,14 @@ def test_daily_conversation_live_adapter_retains_goal_and_plan_semantics() -> No
             },
             "cognitive_runtime": {
                 "goal_association": {"new_goals": [{"description": "walk"}]},
-                "metadata": {"deep_planner_invoked": True},
+                "metadata": {"capability_detail_lookups": 1},
             },
             "errors": [],
         }
     )
 
     assert record["goal_association"]["new_goals"][0]["description"] == "walk"
-    assert record["planner_metadata"]["deep_planner_invoked"] is True
+    assert record["planner_metadata"]["capability_detail_lookups"] == 1
     assert record["proposed_skills"][0]["timing"] == "parallel"
 
 

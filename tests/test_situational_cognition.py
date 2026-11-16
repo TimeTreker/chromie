@@ -295,9 +295,6 @@ def test_voice_assistant_uses_social_cognition_without_goal_work_api() -> None:
             self.planner_calls += 1
             raise AssertionError("Goal-bound Planner API requires Goal provenance")
 
-        async def resolve_deep_plan(self, *_args, **_kwargs):
-            self.planner_calls += 1
-            raise AssertionError("Goal-bound Deep API requires Goal provenance")
 
     assistant = bare_voice_assistant()
     assistant.agent_client = Agent()

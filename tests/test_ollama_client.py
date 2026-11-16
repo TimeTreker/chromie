@@ -551,7 +551,7 @@ class OllamaClientTests(unittest.IsolatedAsyncioTestCase):
                 await OllamaClient(
                     base_url="http://chromie-llm:11434",
                     model="test-model",
-                    purpose="deep_planner",
+                    purpose="fast_planner",
                 ).generate(
                     "x" * 4000,
                     system="y" * 1000,
@@ -624,7 +624,7 @@ class OllamaClientTests(unittest.IsolatedAsyncioTestCase):
                     base_url="http://chromie-llm:11434",
                     model="test-model",
                     timeout_ms=1234,
-                    purpose="deep_planner",
+                    purpose="fast_planner",
                 ).generate("hello", options={"num_ctx": 4096, "num_predict": 512})
 
         metadata = raised.exception.metadata()

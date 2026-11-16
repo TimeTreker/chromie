@@ -5,6 +5,13 @@ remains available in Git history.
 
 ## Unreleased
 
+### Offline Gemma4 fine-tuning scripts
+
+- Add private reviewed transaction export, current Planner/Social Cognition SFT,
+  pinned HF model checks, opt-in PEFT training/merge, isolated SGLang evaluation
+  and non-regression/rollback instructions. Clean retired-role test examples.
+  No real model training, default runtime changes or deployment.
+
 ### Optimization loop turn 2: deliberation while the social skill runs (2026-10-29)
 
 - While the long-running social skill ran, a Social Cognition deliberation (which decides nothing about the skill)

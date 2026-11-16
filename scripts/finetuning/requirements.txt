@@ -1,0 +1,8 @@
+# Install in an isolated Python 3.12 environment; never in the runtime image.
+# Versions resolved from upstream PyPI on 2026-11-14. GPU execution must pass preflight.
+torch==2.15.0
+transformers==5.23.0
+peft==0.21.3
+accelerate==1.15.0
+bitsandbytes==0.50.2
+Jinja2==3.1.6

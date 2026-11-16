@@ -30,186 +30,42 @@ Evidence and per-run judgments: `.chromie/acceptance/loop2-20261029/`, `loop1-20
 `playback-race-20261020/`, `answer-source-20261020/`, `gaze-turn-20261020/`, `said-now-20261020/`, `decided-activity-20261020/`,
 `main-03974435e-20261020/` and `everyday-20261016/` (README.md in each).
 
-## Resume point — 2026-10-25 (owner iteration loop, performance mode)
+## Resume point — offline scripts delivery
 
-- Owner 2026-10-25: up to 8 iterations of complete cohort → earliest-boundary root cause → fix → gate → commit and
-  push; when a cohort passes every case, add everyday scenarios to `scenarios/everyday/`.
-- Iteration 1 (2fd36c9ea) hard-stopped at 32/70 on an invalid GA re-plan DTO (fixed in a3b8e2b82: a link to a
-  finished Goal keeps the running Plan; celebrate is common). Iteration 2 (a3b8e2b82) hard-stopped at 34/70 (smoke
-  15/15, core 17/19 automatic, 16/19 judged): the Planner cited "上海" with outcome tokens one off. This delivery:
-  an outcome citation that misses its value moves to the value's single verbatim run in that outcome (12bfb0e95).
-  Iteration 3 (12bfb0e95) hard-stopped at 16/70: iteration 2 had enforced "an acknowledgement says no answer or
-  result" by splitting every Social Cognition act branch by function, growing the output schema 1.5-1.66x, and a
-  large call overflowed the context. This delivery moves that rule into the reuse variants of delivered
-  acknowledgements; the schema is now smaller than before iteration 2 (3cdf06008). Iteration 4 (3cdf06008)
-  hard-stopped at 32/70 (smoke 15/15, core 15/17): the validators still judged the function label, rejecting a
-  fresh "Here you are!" result labelled acknowledge. This delivery rejects only the reuse of an earlier
-  acknowledgement for an answer or result, and moves `multi_that_water_zh` to `scenarios/model_limited/` (owner
-  2026-10-25: local-model limit, skip until fine-tuning) (e36ada5b9). Iteration 5 (e36ada5b9, 69 cases) is the
-  owner's stop point: no automatic cognition failure before a hard stop at 33/69 caused by a transient
-  weather-provider geocoding timeout (Chromie planned Shanghai tomorrow and said truthfully that the lookup timed
-  out); smoke 15/15 automatic (14/15 judged: a joke came out as "Why did you do that?"), core 17/18 automatic
-  (16/18 judged). Every earlier hard-stop point passed. Iteration 6 (e36ada5b9, 2026-10-26) ran in quiet mode
-  with the performance-mode default timeouts and hard-stopped at 28/69 on a Planner timeout (smoke 15/15, core
-  12/13 automatic). This delivery (owner 2026-10-26): configurable character styles — one choice sets personality
-  and social expression together (`config/mind/character_styles.json`), and the factory Chromie is `lively_cute`
-  with the new `lively` expression preset (Mind 0.10.0) (7e091a536). Iteration 7 (7e091a536, quiet mode with its
-  overrides) got furthest: 47/69, smoke 15/15, core 31/32 automatic (30/32 judged; "那上海呢？" answered Shanghai
-  tomorrow, the language preference held, the quiet nod passed), then Goal Association looped
-  `replace_requirement_indices: [0, 0, ...]` until truncation. This delivery offers those indices to the decoder as
-  exact unique subsets (or a bounded list). The lively style did not raise expression use (2/116 SC calls with an
-  expression vs 3/80 under courteous): open. Iteration 8 (9358ba34c, the SGLang transport carries that bound) is
-  the loop's first complete cohort: 69/69 automatic, no hard stop; judged smoke 15/15, core 47/49, challenge 3/5
-  (65/69 = 94.2 %, previous best complete judged cohort acc1 62/70). Quiet-mode latency: first audio p50 28.2 s.
-- The workstation came up in quiet mode on 2026-10-26: deploy with the quiet-mode timeout overrides (Handoff).
-  After a reboot start the Soridormi scene detached (Handoff).
-- The owner's 8-iteration loop is complete (8 of 8 used). Per the owner, 50 everyday cases written for three buyer personas (a child, a
-  working parent, a grandparent; `provenance.persona`) were added on 2026-10-26 and approved by the owner. Their first
-  cohort (`personas-20261026/`) stopped at 30/119: the streaming Planner read the weather for "明天早上上班要不要带伞？"
-  with an invented place "current_location" (the cross-script citation check cannot test a Latin value against a
-  Chinese span), the provider answered location_not_found and the runner treated it as a Runtime failure. Read-only
-  local tools now declare an unservable request as the owner's honest non-completion (`provider_output`), never a
-  timeout or outage. Owner direction (2026-10-26): ask where the person works the first time and remember it until
-  they say it changed; the case is now that three-turn flow. Owner loop 2 (2026-10-26: up to 6 iterations,
-  my recommendations decide, commit and push each). Iterations 1-3 build that memory the way a person keeps what a friend tells them (owner
-  decision 2026-10-27: no "要我记住吗？" question; the Charter's memory principle is amended): Social Cognition states
-  `personal_fact` at ingress (key + text, `stated` first) only from the person's own Responsibility; Host keeps it as
-  a fact about the speaker (`person_fact_entry`: subject, source and audience are the person, disclosure
-  `shared_with_audience`, visible to UMI, GA and Planner) — as profile Memory when it is on (`.env.common`), replaced
-  by key, otherwise for the conversation. Without speaker identification the speaker is `person:primary`; another
-  speaker's facts are not shown. A kept fact grounds a later information read's value its turn words lack
-  (`turn_citation_reanchored_to_memory`), counted once per key across tiers. A cross-script value stands only where
-  a served outcome or a kept fact states it ("unknown" had been geocoded to Bangladesh); a required free-text read
-  input no source states is asked for (`ungrounded_input_clarified`); the turn that answered a Goal's open input gap
-  owns the value it states; a value the person said in this turn outside UMI's span moves to the outcome citation
-  ("我明天要去广州出差，那边热不热？" had cited only "那边" and asked which district). GA's native decoder shapes: change
-  branches carry their whole shape, a new Goal relates to or supersedes a retained Goal but never both, and an
-  array whose items nothing can satisfy (`{"not": {}}`, no UMI binding to copy) is decoded empty (the shopping-list
-  follow-up had written a free-form binding change and stopped the iteration-2 cohort at 70/119); a requirement
-  keeps its Goal's outcome modality, so a speech answer to an information Goal resolves its gap or takes another
-  relationship instead of replacing the question (only such requests change shape; the frozen corpus has none);
-  modify and clarify are decoded only with a requirement change or a resolved gap (SGLang transport branches). The weather
-  contract no longer carries the worked example "current-local-night realizes as date=today", which pulled a
-  period-scoped "明天早上" to today (replayed live calls: 2.6 → 10.7 nats, and a wrong T4 corrected). A GA continuation or
-  reference that answers a Goal's open input gap now closes it (only modify/clarify did). The silence
-  reflex also takes a hush and a duration ("嘘，安静一会儿，我在打电话。" had been planned as a body action).
-  Iteration 4: SenseVoice's own emotion and notable sound (`voice_cues`, owner decision 2026-10-27) reach Social
-  Cognition with that utterance and shape only its tone, never the person's words. The streaming Planner decoder's mixed
-  state now needs two different dispositions: "I have a headache. Can I take some of grandpa's pills?" decided answer
-  and answer_from_perception (both respond) under mixed and stopped the iteration-3 cohort. The acceptance oracle
-  listed the retired sidestep field `vy_mps`, so a sidestep that did go right failed; the library check now rejects an
-  expected argument the oracle never observes, and `child_spin_en` accepts the truthful limitation (turn_in_place
-  covers at most about 4 rad per request). Iteration 5 (c93bee6c9) added a keep Capability for "帮我记一下…", a
-  result need for a stateful effect the person cannot see, and a merged read that cites the value the person said from
-  the first served outcome holding it once (the iteration-4 stop). Its cohort (`it5-keep-20261027/cohort/`) stopped at
-  67/122: smoke 15/15 automatic and judged, core 48/52 automatic and 42/52 judged, challenge not reached. The keep
-  contract was the one stateful-effect contract in view and the local Planner named every reminder after it
-  ("一会儿提醒我。" was kept with a promise to remind; the umbrella reminder deferred a keep on another
-  Responsibility's read and stopped the cohort). Iteration 6 removes `chromie.memory.keep`: replays of the recorded
-  Planner calls under four contract/prompt variants and a live rare-tier run all still chose it; reminders again get
-  an honest limitation, and the cross-conversation note case waits in `scenarios/model_limited/`. A handover's result
-  need now carries what was handed over (`handed_over`, from schema-validated Evidence): "给我倒杯水。" had been told
-  as poured water. Not qualified and not shipped: a Social Cognition care sentence and UMI "offer the concrete help"
-  wordings (replays in `it6-final-20261028/README.md`). Open judged failures: boredom, a scraped knee and loneliness
-  get a question instead of an offer (UMI's bodily-need outcome says "ask whether they want help"); "Please remember
-  that I'm allergic to peanuts." is answered "I can't remember that" while Social Cognition keeps it (UMI makes it a
-  stateful effect, so the Planner reports a limitation); wave_friend has no greeting; the celebrate reply echoes;
-  `stand_idle` after a hush; "跟我打个招呼吧！" was once announced instead of said; from iteration 3, a drawing or shirt
-  Chromie cannot see is praised and "你都会做些什么呀？" names abilities she lacks. The iteration-6 cohort
-  (`it6-final-20261028/cohort/`, da1b6b353) closes owner loop 2: the whole smoke and core stages ran (smoke 15/15
-  automatic, 14/15 judged; core 93/95 automatic, 80/95 judged; the same 52 cases as iteration 5: 43/52 judged) and it
-  stopped at challenge case 112/121: Goal Association repeated one `requirement_changes` item for "给我讲个很短的睡前故事吧。"
-  until its 2,048-token limit. The decoder schema leaves that array unbounded (the native decoder ignores
-  `uniqueItems`, so the DTO's distinct-target rule is invisible while decoding). The reminder cases and "给我倒杯水。"
-  now pass. New judged failures: the homework lie request (Value Judgment declined; Social Cognition left the
-  decline unsaid and spoke UMI's "承认我其实还没写完作业" in Chromie's voice), a recall turn whose non-fitting need
-  led the second Planner pass to a `chromie.clock.local` placeholder step, an unseen remote decided `unavailable`, a
-  dizzy elder asked instead of advised, and a resolved workplace answered "我这就去查" with an empty Plan. Fetches
-  take 185-380 s, compound fetch-and-read turns 355-504 s. The GA decoder now allows one requirement change per
-  changeable Goal and none for other relationships (`_bound_ga_requirement_changes` in
-  `agent/app/clients/sglang_protocol.py`); the focused `child_bedtime_zh` rerun passes
-  (`ga-bound-20261028/focus/`, diagnostic). Its cohort (`ga-bound-20261028/cohort/`, 86715d473) stopped at 48/121:
-  after "帮我把老花镜拿过来。" failed (no glasses in the scene), Social Cognition re-cited its earlier ownership
-  question "这是谁的老花镜呀？" for the Planner's "where are they?" need and the contract rejected it; the decoder
-  offered that reuse. The reuse branches now exclude later input and confirmation needs, as the contract does
-  (smoke 15/15 judged; core 27/33 judged; "那上海呢？" read today in two cohorts running). Still open: Value Judgment
-  asked whose glasses an elder's unnamed glasses are, and the harness's silent confirmation grant leaves that
-  question unanswered in the ledger, so a replay asked it again in a new act. Latency, measured on the iteration-6 cohort (136 turns, quiet mode):
-  medians UMI 12.1 s, ingress Social Cognition 14.1 s, first audio 28.7 s, Planner 24.4 s (concurrent), turn 60.4 s.
-  SGLang reused about 1.5% of prompt tokens: an identical request is reused whole (Social Cognition 8.8 s -> 5.4 s
-  on an idle GPU), but a request sharing only its opening (UMI shares about 84% with the previous call) reuses
-  almost nothing on this hybrid sliding-window model. Decoding dominates the critical path: UMI writes indented
-  JSON (median 906 characters, 255 of them whitespace), and 30 of 76 speech-only turns ran a post-Planner Social
-  Cognition call that added nothing. UMI and ingress Social Cognition stay serial (Social Cognition answers UMI's
-  Responsibilities); one combined generation for all modules was discussed with the owner and set aside (Host
-  gates between stages, deliberate per-module views, lost concurrency). The owner approved the long-running
-  social skill on 2026-10-28 (contract: Social Attention; order: Roadmap item 2): its name, its ends (5 s after
-  the person is lost, conversation idle, 10 minutes), Social Cognition alone starting it and switching people,
-  and as the first step the current speaker marked by Soridormi's mock perception and copied by the Host into
-  trusted target evidence. Since the legacy runtime's removal (27ff14e72, 2026-08-17) nothing had produced that
-  evidence: 293 of 297 Social Cognition calls in the iteration-6 cohort read `target_evidence: {"available":
-  false}` and 3 used a gesture. That first step is done: Soridormi `178f5ec` marks the scenario's speaking person
-  `current_speaker: true` in `observe_scene`; the Host turns exactly one mark into a Situation interpretation
-  (`scene.current_speaker`) and `trusted_target_evidence` gives `requester` with that interpretation as evidence
-  (two marks or none: unavailable). The fixture-injected target in the acceptance harness is removed; about 30
-  recorded benchmark fixtures still carry their recorded target keys. Its cohort (26f15b95d,
-  `speaker-20261028/README.md`): 121/121 attempted, 119 automatic; judged smoke 15/15, core 79/95, challenge 6/11
-  (f99c1c1fd: 81/95 core); no outcome moved with the mark, and two memory/grounding cases failed that had passed
-  ("我今天早上吃过药了吗？" claimed a check; a Chinese-answer preference was not followed). The whole skill is now
-  built (owner 2026-10-28: before the 18-turn optimization loop). Soridormi `a49a87f` adds `attend_to_person`
-  (`soridormi.attention.start|status|stop`, listed with `lifecycle: long_running`, never a Planner step or a
-  catalog Capability): a per-frame loop under the locomotion and head locks that follows the person, glances away
-  one-sidedly at least 7 s apart (never a nod or shake), blinks only when the eyes are free, turns the body toward a
-  person beyond ±0.55 rad after 2 s, gives way to any body task at the next step and returns, and ends 5 s after the
-  person is lost, after 600 s, on a motion or emergency stop or a simulator reset. Social Cognition decides
-  `social_skill` (null, attend the perceived person in a listening or thinking posture, keep, or stop); the
-  decoder offers only what the Host's offer and trusted perception allow, and while the skill runs offers `keep`
-  instead of `null` or the run as it already is. The Host
-  owner `LongRunningSocialSkill` carries the decision out after the response, ends the run on any reflex scope, a
-  new conversation or 180 s of conversation idle, and records `social_skill_*` ledger events. Live compile of
-  1,200 Social Cognition schema shapes (skill idle or running × the 600 earlier shapes), and of the 600 running
-  shapes after each decoder change: 0 failed. Focused live runs (`skill-20261028/README.md`, diagnostic, dirty tree): the
-  three new `everyday_attention` cases pass; the looks suspend and resume the skill; `adult_be_quiet_zh` still
-  fails on `stand_idle`. Restating the unchanged attend added about 23 generated tokens to every Social Cognition
-  call (ingress median 16.4 s vs 13.9 s in the cohort). Removing only that branch made the model alternate
-  postures (decoder coercion); with `keep` offered instead of `null` while it runs, six focused cases pass with
-  no alternation (10 of 20 calls `keep`). Ingress stayed 16.2 s on those mostly first turns, where the start
-  (about 30 tokens) is decided; the full cohort measures the cost per conversation. The acceptance harness
-  matched played speech to the response by whitespace-sensitive text, so a reply re-cited without a space
-  ("！ 你呢？") was listed twice though played once; matching now ignores whitespace. The speech-to-gaze time
-  on the robot and the rate of voices not addressed to Chromie need a supervised voice session; the onset-glance
-  reflex waits for them. Delivery-constraint exception (owner-approved): one new architecture term,
-  "long-running social skill", defined once in `docs/SOCIAL_ATTENTION_BEHAVIOR_DOMAIN.md`; no new document or
-  environment variable. Next: the owner's 18-turn optimization loop on the complete 124-case cohort; then
-  latency (fewer generated tokens, no unneeded wake-ups, partial-prefix reuse) and voiceprint speaker
-  identification (owner decisions 2026-10-27).
-  Measure the schema size of any Social Cognition schema change before deploying it.
-  Owner loop 3 (2026-10-28: up to 18 turns; my recommendations decide; commit and push each turn), turn 1
-  (`loop1-20261029/README.md`). Its baseline cohort on 1f7954402 completed 124/124 (119 automatic): judged smoke
-  15/15, core 84/98, challenge 6/11; replies played twice, merged in the user-outcome view and so missed by every
-  earlier judgement, were found in 19 of 156 sessions with speech (13/15, 74/98, 4/11 counting them). Earliest
-  boundaries and repairs: UMI's `stateful_effect` covered Chromie's own memory, so "Please remember…" and
-  "帮我记一下…" were planned unavailable while `personal_fact` kept the fact (now speech; a reminder stays a future
-  effect; freeze 48 recaptures 6,500 UMI requests); UMI never saw the applied output stop and planned
-  `stand_idle` for "嘘，安静一会儿，我在打电话。" (now a trusted fact in its turn message); a Work-state Social
-  Cognition decision dropped as stale by a 2.5 s celebrate left the turn silent (one more decision when the turn has
-  no reply); the decoder barred an earlier acknowledgement from covering the answer need of the speech
-  Responsibility it had already answered, so the model wrote the same words under an extended ID (now allowed for
-  speech Responsibilities only, and fresh IDs never extend a retained one; replay of the 19 recorded calls 19/19
-  re-cited); a decoration target with evidence but no source failed a turn with 422 (the target states its source
-  first); two greeting gestures that could not start together lost their decoration provenance (kept now). The
-  harness lets the running skill's own body turn finish (bounded 30 s) before the safe-idle check. Focused live
-  runs (diagnostic): `focus2/` 10/11, `focus4/` 14/15 with no repeated reply. Turn 2 (`loop2-20261029/README.md`):
-  the turn-1 cohort (68d97c9e7) judged smoke 15/15 with no repeated reply in 48 sessions with speech, core 24/25
-  before it stopped at 41/124: a `deliberate` ingress decision while the skill ran carried the `null` its branch
-  requires, but the running state's top-level `social_skill` offered no `null`, so the raw Schema rejected it (422;
-  a gap of the skill delivery). The top-level field now always offers `null` and the deciding branches drop it
-  while the skill runs. A projection of cited Situation subjects into the answer need was replayed and reverted
-  (no gain on the water question, a lost memory answer).
+Owner request: finish the LoRA/QLoRA-related scripts, do not fine-tune the model now,
+and commit/push only a new feature branch. This is the explicit offline tooling
+scope; the everyday live-cohort Issue above remains active and its target-evidence
+closure is not displaced.
 
-Verification: canonical gate on this delivery's source (2026-10-29, clean worktree): pytest 4,113 passed + 5 skipped (`xgrammar` not installed), benchmarks 172, legacy Agent tests 20; policies, docs, test ownership, ruff, mypy and runtime-structure ratchets pass. Live compile of the
-600 running-state Social Cognition schema shapes: 600/600. Strict replay 6,000/6,000 on freeze 48 (2026-10-29,
-turn-1 source; this delivery changes no UMI, GA or Planner request).
+- Baseline: latest main `55f5587d4ca8034fdefb24e53d632df5790b7dba`.
+  Expected resume revision: the latest `codex/offline-gemma4-finetuning` commit
+  containing all three delivery owners. No merge or push to main is authorized.
+- Implemented: private reviewed receipt/trace export, exact production DTO/prompt/
+  ordered-Schema replay, split isolation, model/base identity checks, opt-in
+  Transformers/PEFT QLoRA or LoRA, completion-only loss, safe merge, native paired
+  evaluation and non-regression checks, isolated SGLang command generation and
+  explicit launch. See [component instructions](scripts/finetuning/README.md).
+- Current authorities are Planner (Work HOW) and Social Cognition (communication).
+  Deep Planner and independent Response Composer are already retired; obsolete
+  test examples are cleaned. Current wire identifiers remain unchanged.
+- Locked identity: `google/gemma-4-12B-it`, revision
+  `707f0a3b8a3c7ad586ed01e27eafbad8a27dd0f7`, Gemma4 Unified dense
+  `Gemma4UnifiedForConditionalGeneration`, Apache-2.0. Existing runtime uses
+  SGLang; neither Ollama adapter compatibility nor generic Gemma loaders are
+  assumed. File hashes and official references live in the component model lock.
+- Retained 2026-11-14 evidence: canonical gate 4,141 passed / 6 skipped /
+  1,002 subtests, 172 benchmarks, 20 legacy tests; focused suite 29 passed;
+  Level A 45/45; frozen workflow 6,000 cases with no candidate inference.
+  Random tiny CPU same-architecture checks prove loss/backward/save/safe-merge
+  mechanics only. Exact locations and current delivery checks: [Handoff](HANDOFF.md).
+- No real 12B weights trained, native candidate benchmark, GPU NF4 proof, live
+  voice/robot evidence, deployment or promotion. Retained evidence is scoped to
+  its tested source, not a fresh full gate on the delivery documents. Scripts
+  fail closed on missing original transactions, reviews, identities or coverage.
+- Runtime source/prompts/profiles/Compose are unchanged. No new runtime flag or
+  semantic authority is introduced. One component README is added; the core
+  reading path is unchanged. Four offline third-party internal settings are
+  inventoried, not new operator/runtime choices.
 
 ## Repairs in force from this Issue
 

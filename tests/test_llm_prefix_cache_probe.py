@@ -200,8 +200,8 @@ class PrefixCacheTrackerTests(unittest.TestCase):
 
     def test_completion_metrics_are_converted_from_nanoseconds(self) -> None:
         start = self.tracker.begin(
-            purpose="deep_planner",
-            prompt_family="deep_planner.primary",
+            purpose="fast_planner",
+            prompt_family="fast_planner.primary",
             model="gemma4:e2b",
             system="system",
             prompt="prompt",

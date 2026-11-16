@@ -3066,7 +3066,7 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
             metadata={
                 "authority": "advisory",
                 "status": "clarify",
-                "reason": "deep_planner_primary_semantic_validation_failed",
+                "reason": "fast_planner_semantic_validation_failed",
                 "execution_allowed": False,
             },
         )

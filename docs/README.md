@@ -146,6 +146,7 @@ specialized document needs a real component, operator, or mechanical-contract ow
 - [Chromie Mind, Principles, and Experience](CHROMIE_MIND.md)
 - [Experience Evaluation and Scenario Mining](EXPERIENCE_EVALUATION_AND_SCENARIO_MINING.md)
 - [Experience-To-Ability Learning](EXPERIENCE_TO_ABILITY_LEARNING.md)
+- [Offline Gemma Fine-Tuning Tools](../scripts/finetuning/README.md)
 - [Memory Extraction and Prompt Context](MEMORY_EXTRACTION.md)
 - [Adding Agent and Tool Capabilities](ADDING_AGENT_CAPABILITIES.md)
 - [WorkDAG and DAGEngine](WORK_DAG.md)

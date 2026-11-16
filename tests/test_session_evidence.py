@@ -621,11 +621,11 @@ class SessionEvidenceTests(unittest.TestCase):
                 stage="fast_planner",
                 started_monotonic_ms=started + 422.0,
                 finished_monotonic_ms=started + 1922.0,
-                status="escalate",
+                status="complete",
             )
             tracker.record_cognitive_stage(
                 sid,
-                stage="deep_planner",
+                stage="social_cognition",
                 started_monotonic_ms=started + 1923.0,
                 finished_monotonic_ms=started + 2523.0,
                 status="complete",
@@ -645,8 +645,8 @@ class SessionEvidenceTests(unittest.TestCase):
             self.assertIn("vad[accepted]", message)
             self.assertIn("asr[accepted,120.0ms]", message)
             self.assertIn("user_meaning_interpretation[accepted,300.0ms]", message)
-            self.assertIn("fast_planner[escalate,1.50s]", message)
-            self.assertIn("deep_planner[complete,600.0ms]", message)
+            self.assertIn("fast_planner[complete,1.50s]", message)
+            self.assertIn("social_cognition[complete,600.0ms]", message)
             self.assertIn("tts_playback[played=1/1,failed=0,skipped=0]", message)
             self.assertIn("state=complete", message)
             self.assertIn("slowest=fast_planner:1.50s", message)
