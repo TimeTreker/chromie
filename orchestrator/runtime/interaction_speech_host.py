@@ -279,6 +279,9 @@ async def schedule_interaction_speech(
                         "fallback_for_undelivered_speech_event_id"
                     ] = event_id
                     return fallback
+        voice_released = voice_release_required and current_status() == "playback_completed"
+        if not voice_released:
+            voice_released = await wait_for_voice_release(generation, orders, playback_started)
         return {
             "scheduled": True,
             "reused": True,
@@ -289,9 +292,7 @@ async def schedule_interaction_speech(
             "chunks": len(orders),
             "playback_started": playback_started,
             "voice_release_required": voice_release_required,
-            "voice_released": await wait_for_voice_release(
-                generation, orders, playback_started
-            ),
+            "voice_released": voice_released,
             "status": current_status() or status or "scheduled",
         }
 

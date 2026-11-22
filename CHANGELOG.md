@@ -5,6 +5,24 @@ remains available in Git history.
 
 ## Unreleased
 
+### Scope weather evidence to the requested forecast
+
+- Separate next-day and part-day forecasts from present conditions. Report a
+  missing next-day date explicitly and render the forecast date and range.
+- Complete eight fixed-model experiments, two original replays and two paired
+  128-case runs. Replay the additional 79 functional probes on the retained
+  patch. The Planner and SC experiments remain outside runtime code.
+
+### Playback and terminal Evidence delivery
+
+- Preserve pending playback orders and reject stale generation releases. Reuse
+  speech only after its actual completion.
+- Defer same-Goal read answers to terminal Evidence. Consume an incremental rejection
+  once while allowing independent pending Evidence and the existing failure notice.
+- Complete three frozen full reruns and all three original episodes. The third
+  replay gives a terminal food limitation, with Planner outcome adequacy and target
+  qualification still open.
+
 ### Preserve functional probes and compare Main fairly
 
 - Keep all prior scenario IDs; classify pure action/control demos as functional Smoke

@@ -106,8 +106,11 @@ when plan ID/fingerprint, step, capability, arguments, timing, goal ownership, a
 output-schema identity match. Terminal `CapabilityResult` and `CapabilityTrace` records
 then produce an immutable `ExecutionOutcomeBundle`; missing results become
 `not_run`, and trusted terminal truth is projected as Evidence for the same Planner.
-Any result speech must therefore be SC-authored and Evidence-bound. Barge-in may invalidate stale audible output, but an
-ordinary newer turn does not cancel the earlier routed turn or discard its Goal
+Any result speech must therefore be SC-authored and Evidence-bound. A pre-authored
+answer held behind an information-acquisition step for the same Goal is deferred
+to terminal Evidence re-entry. An independent conversational response can still
+retain its explicit order relative to Work. Barge-in may invalidate stale audible
+output, but an ordinary newer turn does not cancel the earlier routed turn or discard its Goal
 and outcome evidence. Explicit deterministic control or a Core-authorized
 foreground interruption may cancel only its bound scope. A recoverable
 Soridormi failure remains trusted terminal Evidence. Provider-declared
@@ -115,7 +118,9 @@ recoverable/retryable/failure-class facts are projected without interpretation;
 Goal/Work/Situation then re-enter the same Planner, which may author retry, an
 alternative, clarification, waiting, or no new Work. Runtime and Soridormi still
 own physical validation, confirmation enforcement, preflight, and execution. Host
-does not synthesize a retry plan or recovery prompt.
+does not synthesize a retry plan or recovery prompt. When an incremental Planner
+decision is rejected, its terminal Evidence is consumed. Aggregate closure keeps
+the operational failure notice and still handles any independently pending results.
 
 The common safe base enables this single path with local capabilities limited to
 explicitly registered safe providers. The Soridormi launcher adds the trusted body
@@ -173,7 +178,10 @@ response, or execute Work. Missing Responsibility provenance retains the Evidenc
 suppresses that cognitive re-entry rather than inventing a synthetic callback request.
 
 Playback delivery owns atomic Activity lookup/scheduling, immutable wording per identity,
-and ordered playback facts. Same words under a new Activity are allowed. Completed
+and ordered playback facts. Dispatch in the current session preserves allocated orders
+and queued audio. Retiring a previous session's output advances the playback generation
+before reusing order numbers, so a delayed completion can only settle its original order.
+Same words under a new Activity are allowed. Completed
 conversation history and Fast speech-Goal completion require every audio chunk to finish;
 started, interrupted, failed or merely released playback cannot supply that proof.
 The existing playback-start barrier still controls action startup independently.

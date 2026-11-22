@@ -613,12 +613,13 @@
       "ordinal": 2,
       "classification": "fail_closed_boundary",
       "owner": "orchestrator",
-      "contract": "Reject failed incremental Planner Evidence re-entry, retain diagnostics, and emit no ungrounded speech; final aggregate closure remains available.",
+      "contract": "Close a rejected incremental Planner opportunity once for its exact Evidence. Retain diagnostics and an operational notice for ordinary aggregate delivery without repeating the semantic decision.",
       "review_status": "reviewed",
-      "body_sha256": "bddf1caa10bb96bf16485f5f20745501b36d60a9686d284f2f01f7dd642dde04",
+      "body_sha256": "bdf70e197b657d413ae8c5fded9b2e2d811a64f1c3098ab409cb187056c54322",
       "failure_signals": [
         "diagnostic",
-        "return"
+        "return",
+        "state_update"
       ]
     },
     {

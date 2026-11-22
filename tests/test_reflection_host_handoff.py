@@ -151,3 +151,72 @@ def test_an_error_planning_the_result_is_told_not_silent():
         assert [item.text for item in notice.speech] == ["I ran into a problem and couldn't complete that."]
         assert notice.metadata['semantic_failure_stage'] == 'cognitive_outcome_response'
     asyncio.run(run())
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("sibling_pending", [False, True])
+@pytest.mark.parametrize("overlapping_turn", [False, True])
+async def test_rejected_terminal_decision_not_replayed_by_closure(sibling_pending, overlapping_turn):
+    plan = _plan()
+    response = _response(plan)
+    execution = CapabilityRuntimeResult(
+        interaction_id=response.interaction_id, status="completed",
+        results=[
+            CapabilityResult(
+                request_id=f"request-{name}", capability_id=f"chromie.test.{name}",
+                provider_id="test.provider", status="completed",
+                output={"user_summary": f"{name} completed."},
+            )
+            for name in ("first", "second")
+        ],
+    )
+    host, sid, recorder = CognitiveTurnLoopClosureTests()._assistant(_Runtime(execution), response)
+    closure = cognitive_outcome_host.cognitive_turn_closure_adapter(host)
+    reported, succeeded = execution.results
+    failed_evidence = closure.build_terminal_evidence(response=response, result=reported, session_id=sid)
+    sibling_evidence = closure.build_terminal_evidence(response=response, result=succeeded, session_id=sid)
+    assert failed_evidence is not None and sibling_evidence is not None
+    if not sibling_pending:
+        response.metadata["incremental_planner_reentry_evidence_ids"] = [sibling_evidence.evidence_id]
+    planner_calls = []
+    deliveries = []
+
+    async def reenter(**kwargs):
+        refs = kwargs["evidence_refs"]
+        planner_calls.append(refs)
+        if failed_evidence.evidence_id in refs:
+            raise ValueError("Rejected decision")
+        assert refs == [sibling_evidence.evidence_id]
+        return host._host_speech_response("The second result is ready.", style="brief")
+
+    async def deliver(final_response, *, session_id):
+        assert session_id == sid
+        deliveries.append(final_response)
+        return "speech_runtime_completed"
+
+    host._planner_state_reentry_response = reenter
+    host._apply_planner_reentry_response = deliver
+    await host._reenter_cognition_for_terminal_capability(
+        response=response, result=reported, session_id=sid, generation=4,
+    )
+    if overlapping_turn:
+        new_sid = host.sessions.create()
+        host.sessions.state[new_sid]["done_logged"] = True
+        host.playback_delivery.playback_generation += 1
+    result = await host._close_cognitive_execution(
+        response=response, execution=execution, session_id=sid, generation=4,
+        provider_status=None,
+    )
+    assert result == "speech_runtime_completed"
+    assert planner_calls == [[failed_evidence.evidence_id]] + (
+        [[sibling_evidence.evidence_id]] if sibling_pending else []
+    )
+    assert len(deliveries) == 1 + int(sibling_pending)
+    notice = deliveries[0]
+    assert notice.metadata["semantic_failure_stage"] == "fast_planner_evidence_reentry"
+    assert notice.metadata["semantic_failure_class"] == "ValueError"
+    assert not notice.capabilities
+    assert [item.text for item in notice.speech] == ["I ran into a problem and couldn't complete that."]
+    assert len(recorder.outcomes) == 1
+    if overlapping_turn:
+        assert all(item.metadata["deferred_outcome_delivery"]["origin_session_id"] == sid for item in deliveries)

@@ -40,6 +40,7 @@ class PlaybackDeliveryLifecycle:
     next_playback_order: int = 0
     synthesis_order: int = 0
     playback_generation: int = 0
+    order_session_id: str | None = None
     pending_audio: dict[int, PendingAudio] = field(default_factory=dict)
     tts_text_by_generation: dict[int, list[str]] = field(default_factory=dict)
     playback_start_waiters: dict[PlaybackKey, asyncio.Future[bool]] = field(
@@ -412,6 +413,7 @@ class PlaybackDeliveryLifecycle:
         self._update_speech_order(
             generation=generation, order=order, session_id=session_id,
             state="playback_completed" if completed else "not_delivered", reason=reason,
+            retain_fact=generation >= self.playback_generation,
         )
         self.execution_starts.pop((generation, order, session_id), None)
         self.resolve_playback_release_waiter(generation=generation, order=order,
@@ -592,7 +594,8 @@ class PlaybackDeliveryLifecycle:
         reason: str,
     ) -> bool:
         key = self.key(generation, order, session_id)
-        self.playback_released_keys.add(key)
+        if generation >= self.playback_generation:
+            self.playback_released_keys.add(key)
         waiter = self.playback_release_waiters.pop(key, None)
         if waiter is None or waiter.done():
             return False
@@ -656,6 +659,7 @@ class PlaybackDeliveryLifecycle:
         self.speech_order_facts.clear()
         self.synthesis_order = 0
         self.next_playback_order = 0
+        self.order_session_id = None
         self.pending_audio.clear()
         self.execution_starts.clear()
         self.cancelled_playback_orders.clear()

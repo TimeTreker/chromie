@@ -106,6 +106,11 @@ async def reenter_cognition_for_terminal_capability(
         return
     if evidence is None:
         return
+    handled = response.metadata.setdefault(
+        "incremental_planner_reentry_evidence_ids", [],
+    )
+    if evidence.evidence_id in handled:
+        return
 
     reason_codes = [
         value
@@ -207,6 +212,20 @@ async def reenter_cognition_for_terminal_capability(
             type(exc).__name__,
             exc,
         )
+        # Rejection closes this semantic opportunity. Deliver its operational
+        # notice at aggregate closure, where the ordinary overlap policy applies.
+        handled.append(evidence.evidence_id)
+        stage_failure = isinstance(exc, CognitiveStageFailure)
+        response.metadata.setdefault("incremental_planner_reentry_failures", {})[
+            evidence.evidence_id
+        ] = {
+            "failure_stage": exc.stage if stage_failure else "fast_planner_evidence_reentry",
+            "failure_class": (
+                str(exc.failure_metadata.get("failure_class") or "")
+                if stage_failure else type(exc).__name__
+            ),
+            "failure_error": str(exc),
+        }
         return
     if result_response is None:
         return
@@ -216,10 +235,6 @@ async def reenter_cognition_for_terminal_capability(
     # plan from the same Evidence again merely because the new Activity is still
     # being accepted or executed asynchronously. Any later Runtime failure is a
     # new state transition with its own Evidence/CognitiveOpportunity.
-    handled = response.metadata.setdefault(
-        "incremental_planner_reentry_evidence_ids",
-        [],
-    )
     if evidence.evidence_id not in handled:
         handled.append(evidence.evidence_id)
 

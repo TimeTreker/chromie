@@ -6,84 +6,51 @@ owns the ordered open-work list; [Handoff](HANDOFF.md) owns volatile identities/
 History belongs in Git and [CHANGELOG](CHANGELOG.md).
 The current focus remains Goal-driven single-authority architecture.
 
+
 ## Active Issue — everyday live-cohort root-cause repairs
 
-Engineering first: inputs/context, Prompt, Schema/native decoding and Host/Runtime precede
-LoRA. Keep Gemma4 12B, budgets, Planner rules, WHAT-only UMI and SC authority fixed.
-Six optimization rounds are complete. The owner then requested same-condition Main/branch
-comparison and plausible daily-case review, retaining pure action probes as functional Smoke.
-This delivery completes that comparison and review; neither revision qualifies. The active
-delivery line remains local gates, current voice proof and default target-evidence closure.
+Recover the functional gap while preserving WHAT-only UMI, GA Goal identity,
+Planner ownership of work, SC wording, the model and the existing budgets.
+Eight optimization iterations are complete. The retained engineering fix is
+in the existing Open-Meteo provider.
 
-## Resume point — frozen comparison complete, functional regression confirmed
+## Resume point — forecast evidence repaired, behavior qualification open
 
-- Pre-delivery HEAD0729b3634971194cf7de5f3c63d4f5832050fd86 on
-  codex/sc-context-budget-failure-notice; remote fetched before source work and delivery
-  preparation, upstream0/0. Expected resume revision is the latest commit containing all
-  three delivery owners. Branch-only push authorized; Main merge needs explicit approval.
-- Evaluated Main55f5587d4 and branch0729b3634 application directories were unchanged.
-  Both detached checkouts used the same declared observer overlays and common128 manifest.
-  No source changes/rebuilds/restarts between cases. Model/services/options/budgets fixed.
-- Source changes here are test-harness opaque identities, scenario purpose/stage moves,
-  frozen oracle/precondition corrections and current documentation. Preserve all205 old
-  scenario IDs plus2 retained order contrasts. General99/everyday106/parked2=207 reviewed;
-  only common128 per arm and the separate original10 per arm were replayed online.
-- UMI complete WHAT/sources/uncertainty, GA identity, Planner HOW/Skills, SC expression
-  remain. No output-mode restoration, semantic critic, new model, increased budget,
-  rule relaxation or production behavior fix was adopted in this comparison delivery.
+The starting application was verified against the frozen 80/128 working baseline.
+The only additional runtime source file in the final snapshot is
+`agent/app/clients/weather_client.py`. Tomorrow's date and range now stay
+separate from current readings, and missing tomorrow data has a typed failure.
+The previous Host fixes preserve playback order, wait for same-Goal evidence,
+and consume a rejected opportunity once. The discarded Planner source patch
+and all eight iteration outcomes are retained under `.chromie/acceptance/optimize-fixed-model-20261121/`.
 
-## Repairs in force and exact proof limits
+The same common128 scored 76/20/31/1 complete/partial/failed/insufficient,
+against Main 94/12/21/1. An additional disjoint 79 scored 42/17/20/0.
+Both suites finished on stable application and service identities. Full
+assertions applied to the additional suite. The two scores have different
+contracts and only common128 has a paired Main control. Current source,
+identities and reproducible commands are in [Handoff](HANDOFF.md).
 
-| Existing mechanism | Current scope |
-| --- | --- |
-| Earlier WHAT-only/native/context/chronology/history fixes | Still implemented in0729; their historical focused evidence is not a current semantic pass. Same-condition Main can fail UMI food grounding with its labels still present. |
-| GA native supersedable projection | Earlier41 Schema/811 controls per arm:335→0 mismatches; current full accepted shapes improve, but semantic association remains unqualified. |
-| Qualified terminal re-entry and typed completed-Work proof | Earlier independent terminal qualification and exact lineage checks remain. Do not fabricate completed siblings or refresh observation age. Same-Evidence semantic failure consumption still fails. |
-| Test evidence isolation | Opaque IDs in both single/multi-turn namespaces; real model requests audited after inference, no targets/rubrics supplied. No semantic routing changes. |
-| Scenario preservation | Ten action/control probes in functional Smoke, eight artificial/conditional combinations in Core; natural daily motivations separate. Missing age or preceding offer must not be invented by the oracle. |
+## Earliest boundaries on the retained original episode
 
-## Current evidence and claim boundary
+- Turn 09 had hunger in its actual UMI input. Its output only requested help.
+  GA chose to replace the previous food requirement. Planner selected milk
+  delivery without agreement to the substitution. Simulated handover succeeded.
+- Turn 10 preserved the food request at UMI and Planner. Planner nevertheless
+  converted the question to water delivery. SC asked whether water was wanted,
+  and Runtime executed without a new answer. The current food-help behavior fails.
+- On turn 05, GA's reason described an independent compliment but its actual
+  relation split the hydration Goal. Host reported `multi_goal_transaction_not_implemented`.
+  A complete console notification is only evidence that a turn terminated.
+- In case 52 the reverted Planner experiment skipped the Shanghai lookup and
+  reused Beijing observations. The final code obtained distinct forecasts.
+  In case 76 the provider fix yielded only the requested next-day date/range.
+  A separate attempt failed its Planner grounding before reaching the provider.
 
-Root: `.chromie/acceptance/fair-main-branch-20261116/qualified-v2/`.
-
-- All four jobs finished.128/128 per arm, stage22/96/10. Functional Main94 pass/12 partial/
-  21 fail/1 insufficient; branch84/11/32/1. Automatic117/109; interaction complete33/12.
-  Functional Smoke10/10 both; functional Core7/10 vs5/10. All failures retained. Same
-  rubric, manual post-inference review, not owner-human approval or independent grading.
-- Both original10-input episodes reach10 terminal notices and fail overall. Main09 UMI
-  sees food context but infers water; final TTS exists though Host/console hides it.
-  Branch09 UMI/GA preserve hunger, Planner explicitly replaces it with water delivery;
-  simulator/mock water handover completes.10 reports food-search limitation visibly,
-  with2/2 TTS chunks, but no ongoing search.03/04 overlap preserved; historical timing
-  unknown. A done notice or simulator success does not establish requested fulfillment.
-- All2104 request messages retained,0 reviewer-marker hits/missing/parse losses. Full
-  raw Schema Main968 valid/1 invalid/17 unadjudicated; branch1005/0/9. Original raw Main
-  39/4/4; branch56/0/1. Branch9+1 cancellations are need-first prefixes with one same-turn
-  final continuation each. Accepted transport/Schema is not DTO/Host/semantic acceptance.
-- Post-cohort CPU native controls:5 actual Schema/16 encodings;11 valid accepted,4 invalid
-  rejected,1 JSON-valid property ordering rejected. Correct tomorrow meaning accepts in
-  another order; UMI single/empty uncertainty can close, but duplicateu1 also accepts.
-  Known-context answer, lasting-fact proposal and genuine missing-location gap are native
-  representable.0 model calls/Runtime effects; no exhaustive decoder qualification.
-- Required gates:176 benchmarks/4,415 main/1,042 subtests/20 legacy,5 skips/3 warnings;
-  policy/docs pass,160 focused harness pass (subset). Earlier strict6,000/45 Level A
-  and six-round candidate rejections remain at their earlier revision, not rerun here.
-- Reproduced engineering includes playback order-key reuse, overly restrictive pending
-  SC reply/reuse constraints, readiness-before-Evidence, composite/stage representation,
-  lost delivered language preference, repeated rejected-Evidence decision and provider/
-  speech-budget contracts. Raw model semantic errors are also recorded. No new intrinsic
-  weight limit is established; do not explain all failures as engineering or all as LLM.
-- Full SC peak51,494 Main vs33,009 branch tokens; largest input component is the inline
-  output contract, not chat history. No current grammar timeout or SC overflow observed;
-  historical missing traces remain unknown. Planner sparse usage is not all-call usage.
-- Fixed real services/text/discarded TTS/MuJoCo/mock only; no physical microphone,
-  speaker, robot or supervised acceptance. Final idle safe; original Agent restored and
-  source digest matches. Later delivery documentation is not clean-commit live proof.
-
-`comprehensive-review.zh.md`, `paired-review.zh.md/json`,
-`confirmed-boundaries.zh.md` and `workflow-index.zh.md/private.json` own the retained
-actual workflows, first wrong boundaries, proposed general repair/verification and gaps.
-Earlier evidence stays under engineering-first-6turns-20261114; do not overwrite it.
+Canonical local checks, Level A 45/45 and offline replay 6,000/6,000 passed.
+The original ten and all 207 distinct live cases were attempted on the retained
+source. Hard failures, incomplete turns, physical evidence and release remain
+open. No new weight-capacity attribution or Main merge is authorized by this result.
 
 ## Owner decisions in force
 
@@ -94,7 +61,7 @@ Earlier evidence stays under engineering-first-6turns-20261114; do not overwrite
   or communication motivation. Do not remove failed cases to raise reported quality.
 - Current keep-going completes diagnosis but waives no hard gate. Next general repairs
   follow STATUS in existing owners; global cardinality/meaning/lifecycle changes require
-  an explicit concrete amendment. Do not silently begin a seventh optimization round.
+  an explicit concrete amendment. The eight authorized iterations have ended.
 
 - 2026-10-26: personality and social expression are one configurable character style; the factory Chromie is
   lively and cute (`lively_cute`, `lively` preset). SC orchestrates Soridormi skills, never motions (2026-10-25).

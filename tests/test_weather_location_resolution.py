@@ -15,6 +15,42 @@ from agent.app.local_tool_execution import _weather_output
 
 
 class WeatherLocationResolutionTests(unittest.IsolatedAsyncioTestCase):
+    def test_daily_evidence_stays_with_the_requested_date(self) -> None:
+        client = OpenMeteoWeatherClient()
+        payload = {
+            "current": {"time": "2026-11-20T23:45", "temperature_2m": 2,
+                        "apparent_temperature": -3, "wind_speed_10m": 11, "weather_code": 61},
+            "daily": {"time": ["2026-11-20", "2026-11-21"],
+                      "temperature_2m_min": [-2, -1], "temperature_2m_max": [4, 5]},
+        }
+        for language in ("en-US", "zh-CN"):
+            for index in (0, 1):
+                with self.subTest(language=language, index=index):
+                    report = client._report_from_payload(
+                        location_name="Beijing", country="China", requested_location="Beijing",
+                        provider_query="Beijing", provider_admin1=None, forecast=payload,
+                        day_index=index,
+                    )
+                    output = _weather_output(report, units="metric", language=language)
+                    self.assertEqual(output["low_c"], [-2, -1][index])
+                    self.assertEqual(output["high_c"], [4, 5][index])
+                    self.assertEqual(output["weather_code"], 61 if index == 0 else None)
+                    self.assertEqual(output["current_temperature_c"], 2 if index == 0 else None)
+                    self.assertEqual(output["apparent_temperature_c"], -3 if index == 0 else None)
+                    self.assertEqual(output["wind_speed_kmh"], 11 if index == 0 else None)
+                    if index:
+                        self.assertIn("2026-11-21", output["summary"])
+                        self.assertNotIn("今天", output["summary"])
+                        self.assertNotIn("Today", output["summary"])
+
+        payload["daily"]["time"] = ["2026-11-20"]
+        with self.assertRaises(WeatherLookupError) as caught:
+            client._report_from_payload(
+                location_name="Beijing", country="China", requested_location="Beijing",
+                provider_query="Beijing", provider_admin1=None, forecast=payload, day_index=1,
+            )
+        self.assertEqual(caught.exception.reason_code, "forecast_period_unavailable")
+
     async def test_geocoding_identity_is_independent_of_reply_language(self) -> None:
         for location, reply_language, context, names, expected in (
             ("Chongqing", "zh-CN", None,
@@ -179,6 +215,8 @@ class WeatherLocationResolutionTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(output["low_c"], 28.0)
         self.assertEqual(output["precipitation_probability_max"], 70.0)
         self.assertIsNone(output["precipitation_sum_mm"])
+        self.assertIsNone(output["current_temperature_c"])
+        self.assertIsNone(output["apparent_temperature_c"])
         self.assertIn("所请求日期夜间小雨", output["summary"])
         self.assertNotIn("当前", output["summary"])
 

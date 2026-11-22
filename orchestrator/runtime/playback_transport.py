@@ -405,7 +405,7 @@ class PlaybackTransport:
                     session_id=session_id,
                     reason="playback_order_terminal",
                 )
-            if played:
+            if played and generation == host.playback_delivery.playback_generation:
                 host.playback_delivery.next_playback_order += 1
             while host.playback_delivery.next_playback_order in host.playback_delivery.pending_audio:
                 ng, na, nsr, nsid, nreason = host.playback_delivery.pending_audio.pop(host.playback_delivery.next_playback_order)
@@ -438,7 +438,7 @@ class PlaybackTransport:
                         session_id=nsid,
                         reason="playback_order_terminal",
                     )
-                if played:
+                if played and ng == host.playback_delivery.playback_generation:
                     host.playback_delivery.next_playback_order += 1
                 else:
                     break
@@ -648,7 +648,7 @@ class PlaybackTransport:
         if host.is_stale_playback(generation, session_id):
             return
         async with host.playback_delivery.synthesis_semaphore:
-            request_id = f"{session_id}-{order}"
+            request_id = f"{session_id}-{generation}-{order}"
             tts_start_ms = now_ms()
             max_attempts = max(1, host.tts_ws_retries)
             retry_delay = max(0, host.tts_ws_retry_delay_ms) / 1000.0

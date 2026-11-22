@@ -493,6 +493,13 @@ If none match, the tool returns typed
 declare `provider_output: {"completed": false, "no_motion": true}`: the provider
 answered and the request cannot be served. A provider timeout or outage declares
 nothing, so it stays a service failure.
+
+The Open-Meteo result and its brief describe the requested forecast date and
+period. Only a whole-day lookup for today can include current temperature,
+apparent temperature or wind speed. A dated observation from another day is
+excluded. A next-day result uses the provider's forecast date and temperature
+range. A missing next-day date returns `forecast_period_unavailable`.
+
 | `AGENT_DAG_ENGINE_MAX_CONCURRENCY` | Process-local WorkDAG bound; default `4`, range 1–64. |
 | `AGENT_DAG_ENGINE_EXECUTION_TOKEN` | Secret bearer token for WorkDAG cancellation. |
 | `AGENT_DAG_ENGINE_DIAGNOSTICS_TOKEN` | Bearer token for DAGEngine status diagnostics. A blank value falls back to `AGENT_DAG_ENGINE_EXECUTION_TOKEN`; when both are blank, those endpoints return 503. |

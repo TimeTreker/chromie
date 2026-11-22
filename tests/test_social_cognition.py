@@ -3825,29 +3825,58 @@ def test_an_expression_target_decides_its_source_before_it_claims_anything():
 
 
 @pytest.mark.asyncio
-async def test_sc_requested_final_speech_can_wait_after_body_work_without_completing_it():
+@pytest.mark.parametrize("acquires_result", [False, True], ids=["ordered-story", "result-awaiting-evidence"])
+async def test_sc_only_releases_grounded_speech_ordered_after_work(acquires_result):
     from orchestrator.runtime.canonical_plan_adapter import CanonicalPlanRuntimeAdapter
+    from orchestrator.runtime.capability_runtime import CapabilityDefinition
     from shared.chromie_contracts.plan import CanonicalPlan
     from shared.chromie_contracts.core_interpretation import CognitiveResponsibilityProposal
     from shared.chromie_contracts.planner_response import PlannerResponseProjection
     from shared.chromie_contracts.social_cognition import SocialCognitionResolution
     from tests.cognitive_runtime_test_support import FakeRuntime, walk_definition
 
-    plan = CanonicalPlan(plan_id='body-and-story', planner_tier='fast', disposition='execute', coverage='complete',
-        goal_ids=['goal:1'], steps=[{'step_id': 'body', 'capability_id': 'soridormi.walk_forward', 'args': {'duration_s': 1}, 'source_goal_ids': ['goal:1']}],
-        goal_outcomes=[{'goal_id': 'goal:1', 'disposition': 'execute', 'coverage': 'complete', 'step_ids': ['body']}],
-        communication_needs=[{'need_id': 'story', 'owner': 'planner', 'kind': 'answer', 'reference_id': 'body-and-story',
+    definition = walk_definition()
+    step = {"step_id": "work", "capability_id": definition.capability_id,
+            "args": {"duration_s": 1}, "source_goal_ids": ["goal:1"]}
+    outcome = "Tell a story after walking"
+    words = "Once upon a time..."
+    if acquires_result:
+        # A stale, pre-authored answer is invalid even when playback is held
+        # until the exact read has completed. A later act needs its Evidence.
+        definition = CapabilityDefinition(
+            capability_id="chromie.test.read_clock",
+            provider_id="clock",
+            input_schema={"type": "object", "additionalProperties": False},
+            output_schema={
+                "type": "object",
+                "properties": {"weekday": {"type": "string"}},
+                "additionalProperties": False,
+            },
+            metadata={"safety_class": "safe_read"},
+        )
+        step.update(
+            capability_id=definition.capability_id,
+            args={},
+            step_purpose="acquire_information",
+            expected_outcome="An observation of the current local weekday.",
+        )
+        outcome = "Read the clock and tell me today's weekday"
+        words = "It's Wednesday."
+    plan = CanonicalPlan(plan_id='work-and-answer', planner_tier='fast', disposition='execute', coverage='complete',
+        goal_ids=['goal:1'], steps=[step],
+        goal_outcomes=[{'goal_id': 'goal:1', 'disposition': 'execute', 'coverage': 'complete', 'step_ids': ['work']}],
+        communication_needs=[{'need_id': 'answer', 'owner': 'planner', 'kind': 'answer', 'reference_id': 'work-and-answer',
                               'source_goal_ids': ['goal:1'], 'source_responsibility_refs': ['r1'],
-                              'delivery_phase': 'final', 'after_step_ids': ['body']}])
+                              'delivery_phase': 'final', 'after_step_ids': ['work']}])
     current = request(source_refs=[plan.plan_id], communication_needs=plan.communication_needs,
                       responsibilities=[CognitiveResponsibilityProposal(local_ref='r1',
-                          outcome='Tell a story after walking',  confidence=1)],
+                          outcome=outcome,  confidence=1)],
                       context={'canonical_plan_resolution': plan.prompt_projection()})
-    raw = response(text='Once upon a time...', function='respond', delivery_phase='final',
-                   addressed_need_ids=['story'], source_responsibility_refs=['r1'])
-    result = SocialCognitionResolution(**raw, need_outcomes={'story': 'covered'}, request_id=current.request_id,
+    raw = response(text=words, function='respond', delivery_phase='final',
+                   addressed_need_ids=['answer'], source_responsibility_refs=['r1'])
+    result = SocialCognitionResolution(**raw, need_outcomes={'answer': 'covered'}, request_id=current.request_id,
                                       snapshot_digest=current.snapshot_digest(), model_call_count=1)
-    adapter = CanonicalPlanRuntimeAdapter(FakeRuntime([walk_definition()]))
+    adapter = CanonicalPlanRuntimeAdapter(FakeRuntime([definition]))
     build_response = adapter.build_response
     async def capture(**kwargs):
         return kwargs['planner_response']
@@ -3856,7 +3885,7 @@ async def test_sc_requested_final_speech_can_wait_after_body_work_without_comple
                                                               session_id='sid', language='en')
     stage = projection.response_plan.activities[0]
     assert stage.delivery_phase == 'final'
-    assert stage.metadata['communication_after_step_ids'] == ['body']
+    assert stage.metadata['communication_after_step_ids'] == ['work']
     assert stage.metadata['communication_completion_goal_ids'] == ['goal:1']
     assert stage.must_not_claim_completion and stage.commitment_state == 'none'
     payload = projection.model_dump()
@@ -3871,7 +3900,7 @@ async def test_sc_requested_final_speech_can_wait_after_body_work_without_comple
     interaction = await adapter.build_social_cognition_response(plan=plan, request=current, resolution=result,
                                                                session_id='sid', language='en')
     assert interaction.speech[0].timing == 'after_capabilities'
-    assert interaction.speech[0].metadata['ordered_context_grounded_after_work'] is True
+    assert interaction.speech[0].metadata.get('ordered_context_grounded_after_work', False) is (not acquires_result)
     assert interaction.speech[0].metadata['communication_completion_goal_ids'] == ['goal:1']
 
 

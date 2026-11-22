@@ -657,6 +657,8 @@ class VoiceAssistant:
 
     def create_session(self) -> str:
         sid = self.sessions.create()
+        # Bind the new output scope before concurrent SC and Work capture it.
+        self._retire_previous_session_playback()
         schedule_accelerator_sample(self, reason="session_start", session_ids=[sid])
         return sid
 
@@ -766,7 +768,10 @@ class VoiceAssistant:
                     sentence,
                 )
                 return {"scheduled": False, "reason": "stale_playback"}
+            self._retire_previous_session_playback()
+            generation = self.playback_delivery.playback_generation
             order = self.playback_delivery.synthesis_order
+            self.playback_delivery.order_session_id = session_id
             self.playback_delivery.synthesis_order += 1
         if self.is_stale_playback(generation, session_id):
             return {"scheduled": False, "reason": "stale_playback"}
@@ -862,21 +867,15 @@ class VoiceAssistant:
                 input_session_runtime_for(self)._session_idle_sweeper()
             )
 
-    async def reset_playback_ordering(self):
+    def _retire_previous_session_playback(self) -> None:
+        playback = self.playback_delivery
+        if playback.synthesis_order and playback.order_session_id != self.session_id:
+            self._invalidate_output_state(cancel_cognitive_work=False)
+
+    async def reset_playback_ordering(self) -> None:
+        """Retire obsolete output while retaining the current session's order sequence."""
         async with self.playback_delivery.order_lock:
-            self.resolve_all_playback_start_waiters(
-                started=False,
-                reason="reset_playback_ordering",
-            )
-            self.playback_delivery.synthesis_order = 0
-            self.playback_delivery.next_playback_order = 0
-            self.playback_delivery.pending_audio.clear()
-            self.playback_delivery.cancelled_playback_orders.clear()
-            while not self.playback_delivery.playback_queue.empty():
-                try:
-                    self.playback_delivery.playback_queue.get_nowait()
-                except asyncio.QueueEmpty:
-                    break
+            self._retire_previous_session_playback()
         self.ensure_playback_worker()
 
     def _log_goal_list(
@@ -1760,12 +1759,11 @@ class VoiceAssistant:
         *,
         cancel_cognitive_work: bool = True,
     ) -> None:
-        self.playback_delivery.playback_generation += 1
-        self.playback_delivery.cancel_output_duck()
         self.resolve_all_playback_start_waiters(
             started=False,
             reason="interrupt",
         )
+        self.playback_delivery.begin_new_generation()
         if cancel_cognitive_work:
             input_session_runtime_for(self)._cancel_active_routed_turns(
                 excluding=asyncio.current_task(),
@@ -1775,15 +1773,11 @@ class VoiceAssistant:
         for task in list(self.playback_delivery.active_synthesis_tasks):
             if not task.done():
                 task.cancel()
-        self.playback_delivery.pending_audio.clear()
-        self.playback_delivery.cancelled_playback_orders.clear()
         while not self.playback_delivery.playback_queue.empty():
             try:
                 self.playback_delivery.playback_queue.get_nowait()
             except asyncio.QueueEmpty:
                 break
-        self.playback_delivery.next_playback_order = 0
-        self.playback_delivery.synthesis_order = 0
 
     def _schedule_output_abort(
         self,

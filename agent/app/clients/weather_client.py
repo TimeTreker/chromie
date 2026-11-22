@@ -452,6 +452,8 @@ def format_weather_brief(
 
     current = temp(report.current_temperature_c)
     apparent = temp(report.apparent_temperature_c)
+    low = temp(report.daily_low_c)
+    high = temp(report.daily_high_c)
     condition = weather_code_text(report.weather_code, zh=zh)
     unit_zh = "℉" if imperial else "℃"
     unit_en = "°F" if imperial else "°C"
@@ -460,30 +462,28 @@ def format_weather_brief(
         details: list[str] = []
         if current is not None:
             details.append(f"现在约{current:.0f}{unit_zh}")
+        elif low is not None and high is not None:
+            details.append(f"气温约{low:.0f}至{high:.0f}{unit_zh}")
         if apparent is not None and (
             current is None or abs(apparent - current) >= 2.0
         ):
             details.append(f"体感约{apparent:.0f}{unit_zh}")
         suffix = "，".join(details[:2])
-        return (
-            f"{report.location_name}今天{condition}，{suffix}。"
-            if suffix
-            else f"{report.location_name}今天{condition}。"
-        )
+        day = "今天" if current is not None else (report.date or "所请求日期")
+        return f"{report.location_name}{day}{condition}" + (f"，{suffix}。" if suffix else "。")
 
     details = []
     if current is not None:
         details.append(f"about {current:.0f}{unit_en} now")
+    elif low is not None and high is not None:
+        details.append(f"about {low:.0f} to {high:.0f}{unit_en}")
     if apparent is not None and (
         current is None or abs(apparent - current) >= 3.0
     ):
         details.append(f"feels like {apparent:.0f}{unit_en}")
     suffix = ", ".join(details[:2])
-    return (
-        f"Today in {report.location_name}: {condition}, {suffix}."
-        if suffix
-        else f"Today in {report.location_name}: {condition}."
-    )
+    day = "Today" if current is not None else f"On {report.date or 'the requested day'}"
+    return f"{day} in {report.location_name}: {condition}" + (f", {suffix}." if suffix else ".")
 
 
 class OpenMeteoWeatherClient:
@@ -842,6 +842,18 @@ class OpenMeteoWeatherClient:
                 return values[day_index]
             return None
 
+        date = daily_value("time")
+        if day_index and not date:
+            raise WeatherLookupError(
+                "weather provider did not return the requested forecast date",
+                reason_code="forecast_period_unavailable",
+            )
+        # Only today's whole-day report includes instantaneous observations.
+        observed_at = current.get("time")
+        if day_index or period != "day" or (
+            date and isinstance(observed_at, str) and observed_at.partition("T")[0] != date
+        ):
+            current = {}
         weather_code = daily_value("weather_code")
         if not isinstance(weather_code, int):
             raw_current_code = current.get("weather_code")
@@ -864,7 +876,7 @@ class OpenMeteoWeatherClient:
             location_name=location_name,
             country=str(country) if country else None,
             timezone=str(forecast.get("timezone")) if forecast.get("timezone") else None,
-            date=str(daily_value("time")) if daily_value("time") else None,
+            date=str(date) if date else None,
             current_temperature_c=self._number(current.get("temperature_2m")),
             apparent_temperature_c=self._number(current.get("apparent_temperature")),
             daily_high_c=self._number(daily_value("temperature_2m_max")),

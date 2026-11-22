@@ -1324,11 +1324,22 @@ class CanonicalPlanRuntimeAdapter:
                 or projected.get("communication_after_step_ids")
             ):
                 speech_metadata["wait_for_voice_release"] = True
+            # Ordering after a read is not authorization to deliver a draft
+            # that was written before that read supplied the Goal's Evidence.
+            response_goal_ids = set(projected.get("covers_goal_ids") or [])
+            answer_after_step_ids = set(projected.get("communication_after_step_ids") or [])
+            waits_for_same_goal_acquisition = any(
+                step.step_id in answer_after_step_ids
+                and step.step_purpose == "acquire_information"
+                and response_goal_ids.intersection(step.source_goal_ids)
+                for step in plan.steps
+            )
             ordered_context_grounded_after_work = (
                 phase == "final"
                 and set(speech_metadata["truth_stages"]) == {"context_grounded"}
+                and not waits_for_same_goal_acquisition
                 and (
-                    not set(projected.get("covers_goal_ids") or []).intersection(executable_goal_ids)
+                    not response_goal_ids.intersection(executable_goal_ids)
                     or (social_response and projected.get("must_not_claim_completion") is True
                         and bool(projected.get("communication_after_step_ids"))
                         and bool(projected.get("addressed_need_ids"))

@@ -4,6 +4,7 @@ import ast
 import contextlib
 import io
 import json
+import re
 import tempfile
 import unittest
 from pathlib import Path
@@ -70,6 +71,20 @@ class RuntimeStructureRatchetTests(unittest.TestCase):
         return "".join(lines)
 
     def test_size_growth_is_reported_for_review_without_blocking(self) -> None:
+        def measurements(output: str) -> dict[str, int]:
+            return {
+                name: int(count)
+                for name, count in re.findall(
+                    r"^  (\S+)=(\d+) baseline=0 delta=\+\d+$", output, re.MULTILINE
+                )
+            }
+
+        # Use a controlled baseline so this fixture measures growth even after
+        # the maintained source shrinks below its historical line count.
+        original = self.current_source()
+        baseline_status, baseline_output = self.probe(original, baseline=0)
+        self.assertEqual(baseline_status, 0, baseline_output)
+        before = measurements(baseline_output)
         variants = (
             ("init_lines", "        # Comment one.\n        # Comment two.\n", ""),
             ("init_self_attributes", "        self.probe_a = self.probe_b = self.probe_c = None\n", ""),
@@ -80,11 +95,15 @@ class RuntimeStructureRatchetTests(unittest.TestCase):
             with self.subTest(metric=metric):
                 source = self.current_source(init_text, methods)
                 if metric == "init_lines":
-                    self.assertEqual(ast.dump(ast.parse(source)), ast.dump(ast.parse(self.current_source())))
-                status, output = self.probe(source)
+                    self.assertEqual(ast.dump(ast.parse(source)), ast.dump(ast.parse(original)))
+                status, output = self.probe(source, baseline=0)
                 self.assertEqual(status, 0, output)
-                self.assertRegex(output, rf"size_baselines\.{metric}=\d+ baseline=\d+ delta=\+[1-9]\d*")
-                self.assertRegex(output, r"file_line_baselines\[orchestrator/orchestrator.py\]=\d+ baseline=\d+ delta=\+[1-9]\d*")
+                after = measurements(output)
+                for name in (
+                    f"voice_assistant.size_baselines.{metric}",
+                    "file_line_baselines[orchestrator/orchestrator.py]",
+                ):
+                    self.assertGreater(after[name], before[name], output)
 
     def test_size_at_or_below_baseline_passes(self) -> None:
         status, output = self.probe(self.current_source())

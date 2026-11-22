@@ -9,6 +9,7 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from types import MethodType
 from typing import Any
+from unittest.mock import AsyncMock, Mock, patch
 
 for module_name in ("aiohttp", "numpy", "sounddevice", "websockets"):
     if module_name not in sys.modules:
@@ -41,6 +42,82 @@ from orchestrator.runtime import tts_text
 
 
 class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
+    async def test_dispatch_reset_preserves_current_audio_and_its_release_identity(self) -> None:
+        assistant = bare_voice_assistant()
+        assistant.sessions = SessionTracker(enabled=False)
+        sid = assistant.sessions.create()
+        assistant.ensure_playback_worker = Mock()
+        assistant.session_log = Mock()
+        transport = playback_transport_for(assistant)
+        with patch.object(transport, "synthesize_one", AsyncMock()):
+            first = await assistant.schedule_tts_sentence("I'll check.", sid)
+            pending = await assistant.schedule_tts_sentence("I have the first result.", sid)
+            playback = assistant.playback_delivery
+            first_key = dict(generation=first["generation"], order=first["order"], session_id=sid)
+            pending_key = dict(generation=pending["generation"], order=pending["order"], session_id=sid)
+            playback.complete_turn_speech_order(**first_key, completed=True, reason="playback_completed")
+            await playback.playback_queue.put((
+                pending["generation"], pending["order"], b"pcm", 24000, sid, None,
+            ))
+
+            await assistant.reset_playback_ordering()
+            final = await assistant.schedule_tts_sentence("And here is the final result.", sid)
+
+            self.assertEqual(playback.playback_queue.qsize(), 1)
+            self.assertFalse(await playback.wait_for_playback_release(**pending_key, timeout_s=0.001))
+            self.assertEqual(final["generation"], first["generation"])
+            self.assertGreater(final["order"], pending["order"])
+            final_key = dict(generation=final["generation"], order=final["order"], session_id=sid)
+            self.assertFalse(await playback.wait_for_playback_release(**final_key, timeout_s=0.001))
+            playback.complete_turn_speech_order(**final_key, completed=True, reason="playback_completed")
+            self.assertTrue(await playback.wait_for_playback_release(**final_key, timeout_s=0.001))
+
+    async def test_late_worker_completion_cannot_advance_the_new_session_cursor(self) -> None:
+        assistant = bare_voice_assistant()
+        assistant.sessions = SessionTracker(enabled=False)
+        assistant.ensure_playback_worker = Mock()
+        assistant.session_log = Mock()
+        playback = assistant.playback_delivery
+        transport = playback_transport_for(assistant)
+        old_started = asyncio.Event()
+        finish_old = asyncio.Event()
+        played = []
+
+        async def play_order(generation, order, _audio, _rate, sid, _skip):
+            played.append((generation, order, sid))
+            if generation == 0:
+                old_started.set()
+                await finish_old.wait()
+            return True
+
+        with (
+            patch.object(transport, "synthesize_one", AsyncMock()),
+            patch.object(transport, "play_one_order", play_order),
+        ):
+            old_sid = assistant.sessions.create()
+            old = await assistant.schedule_tts_sentence("Old turn.", old_sid)
+            await playback.playback_queue.put((old["generation"], old["order"], b"pcm", 24000, old_sid, None))
+            worker = asyncio.create_task(transport.playback_worker())
+            try:
+                await asyncio.wait_for(old_started.wait(), timeout=1)
+                with patch.object(orchestrator_module, "schedule_accelerator_sample"):
+                    new_sid = assistant.create_session()
+                new_generation = playback.playback_generation
+                self.assertGreater(new_generation, old["generation"])
+                new = await assistant.schedule_tts_sentence("New turn.", new_sid)
+                self.assertEqual(new["generation"], new_generation)
+                await playback.playback_queue.put((new["generation"], new["order"], b"pcm", 24000, new_sid, None))
+                finish_old.set()
+                await playback.playback_queue.put((None,))
+                await asyncio.wait_for(worker, timeout=1)
+                self.assertEqual(played, [(0, 0, old_sid), (1, 0, new_sid)])
+                self.assertFalse(await playback.wait_for_playback_release(
+                    generation=0, order=0, session_id=old_sid, timeout_s=0.001,
+                ))
+            finally:
+                worker.cancel()
+                await asyncio.gather(worker, return_exceptions=True)
+
     async def test_rendered_speech_history_reuses_the_exact_playback_words(self) -> None:
         from orchestrator.runtime.interaction_coordinator import InteractionRuntimeCoordinator
         from orchestrator.runtime.interaction_ledger import InteractionLedger
@@ -769,6 +846,7 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
         assistant.playback_delivery.order_lock = asyncio.Lock()
         assistant.playback_delivery.synthesis_order = 1
         assistant.playback_delivery.playback_generation = 7
+        assistant.playback_delivery.order_session_id = current_session_id
         assistant.playback_delivery.active_synthesis_tasks = set()
         assistant.playback_delivery.playback_start_waiters = {}
         assistant.playback_delivery.tts_text_by_generation = {}
@@ -2460,6 +2538,23 @@ class SpeechIdentitySubmissionTests(unittest.IsolatedAsyncioTestCase):
         result = await assistant._schedule_interaction_speech(self.args())
         self.assertTrue(result["reused"])
         self.assertEqual(result["status"], "playback_interrupted")
+        self.assertEqual(len(calls), 1)
+
+    async def test_completed_activity_reuses_delivery_after_transport_invalidation(self):
+        assistant, calls = self.make_assistant()
+        playback = assistant.playback_delivery
+        playback.playback_generation = 1
+        args = self.args()
+        await assistant._schedule_interaction_speech(args)
+        playback.complete_turn_speech_order(
+            generation=1, order=0, session_id="sid", completed=True, reason="playback_completed",
+        )
+        playback.begin_new_generation()
+
+        args["metadata"]["wait_for_voice_release"] = True
+        reused = await assistant._schedule_interaction_speech(args)
+        self.assertTrue(reused["reused"])
+        self.assertTrue(reused["voice_released"])
         self.assertEqual(len(calls), 1)
 
     async def test_detached_playback_preserves_original_speech_owner(self):

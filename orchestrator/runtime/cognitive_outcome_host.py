@@ -605,13 +605,23 @@ async def close_cognitive_execution(
         if str(item).strip()
     }
     terminal_evidence_ids = {item.evidence_id for item in bundle.evidence}
+    reentry_failures = response.metadata.get("incremental_planner_reentry_failures") or {}
+    retained_failure = next(
+        (reentry_failures[item.evidence_id] for item in bundle.evidence
+         if item.evidence_id in reentry_failures),
+        None,
+    )
+    all_evidence_handled = bool(terminal_evidence_ids) and terminal_evidence_ids.issubset(
+        planner_handled_incremental_evidence
+    )
     completed_evidence_ids = {
         item.evidence_id
         for item in bundle.evidence
         if item.status == "completed"
     }
     if (
-        bundle.aggregate_status == "completed"
+        retained_failure is None
+        and bundle.aggregate_status == "completed"
         and completed_evidence_ids
         and completed_evidence_ids.issubset(delivered_incremental_evidence)
     ):
@@ -632,12 +642,7 @@ async def close_cognitive_execution(
             execution=execution,
         )
         return "incremental_result_delivery_completed"
-    if (
-        terminal_evidence_ids
-        and terminal_evidence_ids.issubset(
-            planner_handled_incremental_evidence
-        )
-    ):
+    if all_evidence_handled and retained_failure is None:
         host.session_log(
             session_id,
             "cognitive_outcome_response_suppressed: "
@@ -656,20 +661,30 @@ async def close_cognitive_execution(
         )
         return "incremental_planner_reentry_handled"
 
+    failure_notice = None
+    if retained_failure is not None:
+        failure_notice = host._cognitive_core_exception_safe_response(
+            execution_outcome_user_text(response, plan),
+            context={"user_turn_envelope": response.metadata.get("user_turn_envelope")},
+            **retained_failure,
+        )
     final_response = None
     try:
-        final_response = await host._plan_evidence_bound_capability_result_response(
-            source_response=response,
-            bundle=bundle,
-            plan=plan,
-            session_id=session_id,
-        )
+        if not all_evidence_handled:
+            final_response = await host._plan_evidence_bound_capability_result_response(
+                source_response=response,
+                bundle=bundle,
+                plan=plan,
+                session_id=session_id,
+            )
         schedule_outcome_reflection(
             host,
             response=response, plan=plan, bundle=bundle, opportunities=slow_opportunities,
             session_id=session_id, generation=generation,
         )
 
+        if final_response is None:
+            final_response = failure_notice
         if final_response is None:
             host.session_log(
                 session_id,
@@ -709,6 +724,11 @@ async def close_cognitive_execution(
                 failure_error=str(exc),
             )
 
+    separate_failure_notice = (
+        failure_notice if final_response is not failure_notice
+        and final_response.metadata.get("semantic_status") != "failed"
+        else None
+    )
     if defer_for_ordinary_overlap:
         goal_ids = tuple(
             str(item.goal_id)
@@ -760,18 +780,27 @@ async def close_cognitive_execution(
                 execution=execution,
             )
             return f"suppressed_{window.status}"
-        final_response.metadata["deferred_outcome_delivery"] = {
+        delivery_window = {
             "reason": "ordinary_overlap",
             "origin_session_id": session_id,
             "waited_for_session_ids": list(window.waited_for_session_ids),
             "source_goal_ids": list(goal_ids),
         }
+        final_response.metadata["deferred_outcome_delivery"] = delivery_window
+        if separate_failure_notice is not None:
+            separate_failure_notice.metadata["deferred_outcome_delivery"] = delivery_window
         host.session_log(
             session_id,
             "cognitive_outcome_response_delivery_ready: reason=ordinary_overlap waited_for=%s",
             ",".join(window.waited_for_session_ids),
         )
 
+    if separate_failure_notice is not None:
+        response.metadata["incremental_failure_notice_delivery_status"] = (
+            await host._apply_planner_reentry_response(
+                separate_failure_notice, session_id=session_id,
+            )
+        )
     delivery_status = await host._apply_planner_reentry_response(
         final_response,
         session_id=session_id,
