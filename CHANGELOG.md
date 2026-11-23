@@ -5,6 +5,13 @@ remains available in Git history.
 
 ## Unreleased
 
+### Diagnose the paired live regression
+
+- Trace 28 lost main successes through UMI, GA, Planner, Social Cognition and Runtime. Retain
+  the existing application after eight fixed-model trials and an unsuccessful full-cohort
+  candidate. Record the original episode, 207 simulator cases and the separate preflight
+  recovery window.
+
 ### Scope weather evidence to the requested forecast
 
 - Separate next-day and part-day forecasts from present conditions. Report a

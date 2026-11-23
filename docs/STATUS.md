@@ -11,16 +11,19 @@ The current focus remains Goal-driven single-authority architecture.
 
 | Axis | Current evidence |
 | --- | --- |
-| Implementation | The weather provider scopes instantaneous observations to the requested date and period. The branch also retains actual playback order, same-Goal read Evidence before speech, and single consumption of a rejected incremental result. The WHAT-only UMI, Planner, SC, models and 28 effective budgets retain their established contracts. |
-| Automatic verification | The canonical local suite passed 176 benchmarks, 4,424 main tests, 1,046 subtests and 20 legacy tests, with 5 skips and 3 warnings. Level A passed 45/45 and the offline workflow replay passed 6,000/6,000. |
-| Target validation | Open. The same 128 cases yielded 76/20/31/1 complete/partial/failed/insufficient and 111 automatic passes. Main recorded 94/12/21/1, the starting working tree 80/18/29/1, and the withdrawn Planner experiment 77/20/30/1. The final 79 additional functional probes yielded 42/17/20/0 and 51 automatic passes under full assertions. |
-| Deployment state | Branch diagnostic only. Evaluation used real model services, discarded TTS and MuJoCo. The test Agent image was restored and the simulator was stopped at safe idle. Physical voice, robot and release qualification remain open. |
+| Implementation | The application remains at the weather-provider baseline. Eight fixed-model engineering experiments qualified no runtime patch. An interpretation-ingress SC acknowledgement candidate was withdrawn after full review. WHAT-only UMI, GA identity, Planner work, SC wording and Host evidence checks keep their existing authority. |
+| Automatic verification | The candidate passed 176 benchmarks, 4,424 main tests, 1,046 subtests and 20 legacy tests, with 5 skips and 3 warnings. Level A passed 45/45. All 6,000 offline workflow checks met their expected outcomes with zero native calls. |
+| Target validation | Open. Of the 128 comparable cases, main historically passed 94 and the retained branch 76. The withdrawn candidate had 71 complete, 25 partial, 31 failed and one insufficient result, with 105 automatic passes and 13 runner integrity failures. The original ten each reached a terminal notification, but food help still caused unapproved milk delivery. |
+| Deployment state | Branch diagnosis only. The candidate ran with local model services, discarded TTS and MuJoCo. The initial Agent image was restored and the simulation finished at safe idle. Physical voice, robot and release qualification remain open. |
 
-`.chromie/acceptance/optimize-fixed-model-20261121/case-results.zh.md` records the individual verdicts. The original
-episode received all ten terminal notices. Two turns nevertheless converted finding
-food into delivering a drink. The 128 paired cases include ten functional Smoke and
-ten functional Core cases, with 10 and 4 complete respectively. The additional
-79 cases and the paired 128 represent 207 distinct retained live scenarios.
+Of the 28 main successes lost on the retained branch, the candidate recovered five, partially
+met eleven and failed twelve. At least three historical score differences involved asymmetric
+judging. On the candidate, the disjoint 79 cases scored 41/15/23/0
+complete/partial/failed/insufficient, with 49 automatic passes across two windows. The first
+window recorded 10/79 automatic passes: a timed-out case left a simulated fetch running and 64
+cases failed preflight before admission. Only those 64 ran in the second window. The
+uninterrupted gate remains failed. The paired reports, original episode, receipts and run
+identities are indexed in [Handoff](../HANDOFF.md).
 
 ## Social Cognition migration
 
@@ -59,34 +62,32 @@ This describes current intended ownership, not full conformance; see the open wo
 The [Roadmap](../ROADMAP.md#social-cognition-migration) owns delivery order.
 The [checkpoint](../DEVELOPMENT_CHECKPOINT.md) owns the active Issue and owner decisions.
 
-1. Bind inferred work to the requested outcome and its authorization. Original
-   turn 09 lost food in UMI, then GA replaced the food requirement with general
-   help. Turn 10 retained food all the way to Planner, which selected water
-   delivery. Contrast both failures with explicit requests for drinks and with
-   honest limitations when a food search is unavailable.
-2. Bound claims to evidence of the right subject, time and effect. Seeing the
-   speaker did not establish medication history in case 85. In case 124 UMI
-   omitted value review, Planner selected an immediate answer and SC agreed to
-   supervise a child without monitoring. In case 125 an immediate reply covered
-   a future reminder without a scheduled wake. Keep safety, provenance and
-   completion checks blocking.
-3. Improve GA identity, Planner source scope and staged handoff. GA explained
-   that the original compliment was independent but selected a split. Cases 42,
-   75 and 91 supplied invalid argument references. Case 45 read both forecasts
-   but its second Evidence continuation failed. Case 119 used today's evening
-   forecast for tomorrow morning. Case 120 exceeded the speech delivery budget.
-4. Preserve observed same-session and persistent-memory contrasts. A Planner
-   experiment recovered Lily and Max but used Beijing data to answer about
-   Shanghai. A shorter SC prompt remained schema-valid while making unsupported
-   claims. Both variants were withdrawn. Eight authorized iterations are complete.
+1. Qualify Planner evidence selection on the named person, property and time. Contrast
+   dialogue facts with current perception, verified durable memory and genuinely fresh
+   provider work. A speaker in view cannot establish birthdays, past medication, safety or a
+   future timer.
+2. Preserve the user's requested effect and permission. In original turn 9 UMI retained food,
+   GA continued the food Goal and Planner substituted milk delivery. Check that finding,
+   offering, accepting and executing stay distinct across food, drinks, pouring and coffee
+   preparation. A spoken acknowledgement cannot discharge the work.
+3. Qualify terminal communication and persistent facts. The scoped ingress change helped one
+   reminder but narrowed responses and left final false promises. Verify a single grounded
+   terminal reply, especially where the answer is unknown. Preserve allergy information across
+   the requested lifetime and keep safety/Value Judgment gates blocking.
+4. Align native output with Host contracts. Comparable cases 40/42 produced Fast plans
+   rejected during canonical construction. Case 115 omitted the conditional repair references
+   even under strict native Schema. Retain original validation and fix the earliest
+   representational mismatch. Keep provider timeouts and playback deadlines distinct from
+   semantic failures.
+5. At a simulator case timeout, establish safe-idle and no remaining provider work before
+   admitting the next independent case. Preserve the original failure. The 64 preflight
+   refusals generated no model-role input. Eight optimization rounds have ended. Reuse
+   retained evidence before any further live inference.
 
 ## Evidence interpretation
 
-The final comparable run had 7 runner integrity failures and
-2 additional manually identified safety failures. The
-additional 79 had 9 runner integrity failures. The reviewed comparison
-includes 111 automatic passes, 115/115 required playback releases joined to
-completion, and 0 early releases. Of 1,007 captured calls, 997 had schema-valid
-outputs and 10 were cancelled. SC peaked at 32,866 observed prompt tokens.
-Fixed-input tests and live failures identify role and engineering boundaries.
-The additional corpus retained 650 strict Schema-valid responses, five controlled cancellations and one raw tab accepted by the documented Planner parser. The evidence does not establish a new intrinsic Gemma4 12B limit.
+Functional judgments include provider receipts and actual playback. Current branch source is
+byte-equivalent to the pre-experiment application. Its retained comparable score is 76.
+Changing the role transaction moved decisions on fixed inputs, while different clocks,
+returned observations and preceding generated replies affected live results. No intrinsic
+model-weight limit was established. The candidate did not qualify.

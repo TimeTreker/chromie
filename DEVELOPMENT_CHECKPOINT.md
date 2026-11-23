@@ -9,48 +9,46 @@ The current focus remains Goal-driven single-authority architecture.
 
 ## Active Issue — everyday live-cohort root-cause repairs
 
-Recover the functional gap while preserving WHAT-only UMI, GA Goal identity,
-Planner ownership of work, SC wording, the model and the existing budgets.
-Eight optimization iterations are complete. The retained engineering fix is
-in the existing Open-Meteo provider.
+Retain the pre-experiment application at b8fcabb0e. A 28-case paired audit compared the main
+94/128 result with the branch 76/128 result. The two arms shared 66 successes. Twenty-eight
+were lost and ten gained. Keep WHAT-only UMI, GA identity, Planner ownership of work, SC
+wording and all 28 budget values.
 
-## Resume point — forecast evidence repaired, behavior qualification open
+## Resume point — evidence retained, candidate withdrawn
 
-The starting application was verified against the frozen 80/128 working baseline.
-The only additional runtime source file in the final snapshot is
-`agent/app/clients/weather_client.py`. Tomorrow's date and range now stay
-separate from current readings, and missing tomorrow data has a typed failure.
-The previous Host fixes preserve playback order, wait for same-Goal evidence,
-and consume a rejected opportunity once. The discarded Planner source patch
-and all eight iteration outcomes are retained under `.chromie/acceptance/optimize-fixed-model-20261121/`.
+Eight engineering trials used 37 frozen role probes. Reordering native Planner fields or
+changing the evidence prompt could recover known facts and still choose a clock for a dog name
+or substitute the wrong bottle. No Planner or UMI trial passed its controls. The only live
+candidate narrowed SC speech while all responsibilities awaited Planner. Its full score was
+71/128 and it was withdrawn. No new runtime patch ships in this delivery.
 
-The same common128 scored 76/20/31/1 complete/partial/failed/insufficient,
-against Main 94/12/21/1. An additional disjoint 79 scored 42/17/20/0.
-Both suites finished on stable application and service identities. Full
-assertions applied to the additional suite. The two scores have different
-contracts and only common128 has a paired Main control. Current source,
-identities and reproducible commands are in [Handoff](HANDOFF.md).
-
-## Earliest boundaries on the retained original episode
-
-- Turn 09 had hunger in its actual UMI input. Its output only requested help.
-  GA chose to replace the previous food requirement. Planner selected milk
-  delivery without agreement to the substitution. Simulated handover succeeded.
-- Turn 10 preserved the food request at UMI and Planner. Planner nevertheless
-  converted the question to water delivery. SC asked whether water was wanted,
-  and Runtime executed without a new answer. The current food-help behavior fails.
-- On turn 05, GA's reason described an independent compliment but its actual
-  relation split the hydration Goal. Host reported `multi_goal_transaction_not_implemented`.
-  A complete console notification is only evidence that a turn terminated.
-- In case 52 the reverted Planner experiment skipped the Shanghai lookup and
-  reused Beijing observations. The final code obtained distinct forecasts.
-  In case 76 the provider fix yielded only the requested next-day date/range.
-  A separate attempt failed its Planner grounding before reaching the provider.
-
-Canonical local checks, Level A 45/45 and offline replay 6,000/6,000 passed.
-The original ten and all 207 distinct live cases were attempted on the retained
-source. Hard failures, incomplete turns, physical evidence and release remain
-open. No new weight-capacity attribution or Main merge is authorized by this result.
+- The same-input SC change prevented a false promise in the 8 pm reminder. In the full suite,
+  the two-minute reminder still promised future work after Planner chose an immediate answer.
+  On 137 matched turns the two runs each emitted 137 ingress acts, with 60 distinct texts on
+  the retained branch and four on the candidate.
+- On the candidate's original ten, turn 8 explained it could not check food availability. Turn
+  9 preserved food through UMI and GA. Planner selected milk without agreement and the
+  simulator delivered it. Turn 10 explained the limitation without launching a search. Turn 4
+  played a future-tense water announcement after provider completion. All ten notifications
+  arrived.
+- Evidence from main shows 18 actual plans on the 28 affected turns would fail the branch's
+  current check against satisfying a declared work need by talking. Current rules still allow
+  a known fact to be answered with no external work need. Preserve the rule and fix the source
+  and effect decision.
+- Commit `a0e7524c6` removed the old output-mode filter from the Planner capability catalog
+  and changed the allowed evidence and work combinations. Across the 28 paired cases, the
+  median total message length per fast-path Planner request rose from 58,499 to 99,605 characters.
+  In case 16, the number of loaded detailed abilities rose from zero to 16 while the name Lily
+  was already available. Context size alone does not explain all the losses.
+- Case 81 attempted to remember a peanut allergy by answering from the visible speaker. The
+  later session gave unsafe advice. In case 115 the exact strict native Schema rejected its
+  own captured output offline because a repair omitted its required target activity IDs. These
+  failures have different owners.
+- The candidate ran the common 128 and the separate 79. All 207 cases reached real admission
+  across the retained windows. In the first additional window, case 15 timed out during turn 9
+  and the remaining 64 failed safe-idle preflight without inference. Only these 64 were
+  executed in a second window. Combined functional results on the 79 were 41/15/23/0. This is
+  segmented diagnostic evidence.
 
 ## Owner decisions in force
 
