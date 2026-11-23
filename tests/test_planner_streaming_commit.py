@@ -1614,11 +1614,73 @@ def test_a_conditional_plans_its_read_and_holds_the_action():
             FastPlannerAdvanceModelOutput.model_validate(_uncounted(output(activities))), capabilities=[weather, wave])
 
     assert [item.deferred for item in host([read, held]).activities] == [False, True]
+    # The ref names a single Goal. An edge orders Work but cannot grant the
+    # permission to run an effect in the read stage, in either array order.
+    from agent.app.clients.sglang_protocol import _openai_response_format
+    wire = Draft202012Validator(_openai_response_format(schema)["json_schema"]["schema"])
+    ready = {**held, "deferred": False}
+    now = {**ready, "depends_on": []}
+    answer = {"role": "complete_response", "activity_id": "answer", "source_responsibility_refs": ["r1"],
+              "timing": "ordered_with_work", "rationale": "Communicate the final result."}
+    for contract in (validator, wire):
+        assert contract.is_valid(output([read, held]))
+        assert contract.is_valid(output([now, answer]))
+        assert contract.is_valid(output([read, answer]))
+        for invalid in ([read, ready], [now, read], [read, held, answer], [answer, read, held],
+                        [read, {**held, "depends_on": []}]):
+            assert not contract.is_valid(output(invalid))
+    with pytest.raises(PlannerDTOContractError, match="separate Plans"):
+        host([read, ready])
+    with pytest.raises(PlannerDTOContractError, match="Ordered communication"):
+        host([read, held, answer])
     with pytest.raises(PlannerDTOContractError, match="waits on a read"):
         host([read, {**held, "depends_on": []}])
     with pytest.raises(PlannerDTOContractError, match="waits only on reads"):
         host([read, {**held, "activity_id": "act_wave_now", "deferred": False, "depends_on": []},
               {**held, "depends_on": ["act_wave_now"]}])
+
+
+def test_read_and_ready_effect_preserve_distinct_owners_and_dependencies():
+    from agent.app.clients.sglang_protocol import _openai_response_format
+    from agent.app.planner_fast_validation import normalize_fast_capability_activity_purpose
+
+    owners = [CognitiveResponsibilityProposal(local_ref=ref, outcome=text, confidence=1)
+              for ref, text in [("measurement", "read the temperature"), ("gesture", "wave to me")]]
+    capabilities = [{"capability_id": cap, "input_schema": {"type": "object", "properties": {}},
+                     "hints": hints, "can_run_parallel": True, "parallel_metadata_declared": True}
+                    for cap, hints in [("test.sensor", {"resource_contract": {"provider_role": "acquire_information"}}),
+                                       ("test.gesture", {})]]
+    refs = [owner.local_ref for owner in owners]
+    schema = fast_streaming_advance_response_schema(refs, responsibilities=owners, capabilities=capabilities)
+    wire = Draft202012Validator(_openai_response_format(schema)["json_schema"]["schema"])
+    read = {"role": "capability", "activity_id": "read", "capability_id": "test.sensor", "args": {},
+            "source_responsibility_refs": ["measurement"], "depends_on": [],
+            "deferred_requirement": "Report the measured temperature."}
+    wave = {"role": "capability", "activity_id": "wave", "capability_id": "test.gesture", "args": {},
+            "source_responsibility_refs": ["gesture"], "deferred": False, "depends_on": ["read"]}
+    payload = _counted({"responsibility_decisions": {ref: {"decision": "work", "missing": []} for ref in refs},
+                        "covered_responsibility_refs": refs, "disposition": "execute", "coverage": "complete",
+                        "activities": [read, wave], "confidence": 1.0, "unresolved": [], "reason_summary": "Read, then wave."})
+    assert wire.is_valid(payload)
+    def host(raw):
+        return normalize_fast_capability_activity_purpose(
+            FastPlannerAdvanceModelOutput.model_validate(_uncounted(raw)), capabilities=capabilities)
+    assert host(payload).activities[1].depends_on == ["read"]
+    # For one Goal the effect may instead be held for that Goal's read. An
+    # independent acknowledgement needs no order against the held step.
+    one = fast_streaming_advance_response_schema(refs[:1], responsibilities=owners[:1], capabilities=capabilities)
+    held = {**wave, "source_responsibility_refs": refs[:1], "deferred": True}
+    concurrent = {"role": "complete_response", "activity_id": "receipt", "source_responsibility_refs": refs[:1],
+                  "timing": "concurrent_with_work", "rationale": "Acknowledge without claiming a result."}
+    staged = {**payload, "responsibility_decisions": {"measurement": payload["responsibility_decisions"]["measurement"]},
+              "covered_responsibility_refs": refs[:1], "activity_count": 3, "activities": [read, held, concurrent]}
+    assert Draft202012Validator(_openai_response_format(one)["json_schema"]["schema"]).is_valid(staged)
+    assert host(staged).activities[1].deferred
+    # Shared Work gives both owners the read. The gesture owner now has an
+    # illegal mixed stage even though the two source lists are not equal.
+    payload["activities"][0]["source_responsibility_refs"] = refs
+    with pytest.raises(PlannerDTOContractError, match="separate Plans"):
+        host(payload)
 
 
 def test_a_mixed_limitation_gets_no_activity():

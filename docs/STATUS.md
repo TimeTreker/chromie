@@ -11,10 +11,10 @@ The current focus remains Goal-driven single-authority architecture.
 
 | Axis | Current evidence |
 | --- | --- |
-| Implementation | The application remains at the weather-provider baseline. Eight fixed-model engineering experiments qualified no runtime patch. An interpretation-ingress SC acknowledgement candidate was withdrawn after full review. WHAT-only UMI, GA identity, Planner work, SC wording and Host evidence checks keep their existing authority. |
-| Automatic verification | The candidate passed 176 benchmarks, 4,424 main tests, 1,046 subtests and 20 legacy tests, with 5 skips and 3 warnings. Level A passed 45/45. All 6,000 offline workflow checks met their expected outcomes with zero native calls. |
+| Implementation | Planner stage isolation now takes effect at provisional Work admission. Native decoding for a single possible Work owner excludes a ready effect alongside its read. Different owners can still compose ordered Work. Canonical checks, re-entry, confirmation and capability authorization retain their existing authority. |
+| Automatic verification | CPU XGrammar accepted the two archived failing Planner outputs under their original schemas and rejected them under the repaired schemas. A held effect with an explicit read dependency remains representable. The archived Host contrast covers 253 complete documents. Current offline checks and evidence are indexed in Handoff. |
 | Target validation | Open. Of the 128 comparable cases, main historically passed 94 and the retained branch 76. The withdrawn candidate had 71 complete, 25 partial, 31 failed and one insufficient result, with 105 automatic passes and 13 runner integrity failures. The original ten each reached a terminal notification, but food help still caused unapproved milk delivery. |
-| Deployment state | Branch diagnosis only. The candidate ran with local model services, discarded TTS and MuJoCo. The initial Agent image was restored and the simulation finished at safe idle. Physical voice, robot and release qualification remain open. |
+| Deployment state | Branch-only offline repair. The previous SC candidate ran with local model services, discarded TTS and MuJoCo. The stage repair has no new deployment, live functional score, physical voice or robot evidence. |
 
 Of the 28 main successes lost on the retained branch, the candidate recovered five, partially
 met eleven and failed twelve. At least three historical score differences involved asymmetric
@@ -74,8 +74,8 @@ The [checkpoint](../DEVELOPMENT_CHECKPOINT.md) owns the active Issue and owner d
    reminder but narrowed responses and left final false promises. Verify a single grounded
    terminal reply, especially where the answer is unknown. Preserve allergy information across
    the requested lifetime and keep safety/Value Judgment gates blocking.
-4. Align native output with Host contracts. Comparable cases 40/42 produced Fast plans
-   rejected during canonical construction. Case 115 omitted the conditional repair references
+4. Verify live selection of a legal staged plan after the offline repair for 40/42.
+   Case 115 separately omitted the conditional repair references
    even under strict native Schema. Retain original validation and fix the earliest
    representational mismatch. Keep provider timeouts and playback deadlines distinct from
    semantic failures.
@@ -86,8 +86,8 @@ The [checkpoint](../DEVELOPMENT_CHECKPOINT.md) owns the active Issue and owner d
 
 ## Evidence interpretation
 
-Functional judgments include provider receipts and actual playback. Current branch source is
-byte-equivalent to the pre-experiment application. Its retained comparable score is 76.
+Functional judgments include provider receipts and actual playback. The last measured
+comparable branch score of 76 predates this offline-only repair.
 Changing the role transaction moved decisions on fixed inputs, while different clocks,
 returned observations and preceding generated replies affected live results. No intrinsic
 model-weight limit was established. The candidate did not qualify.

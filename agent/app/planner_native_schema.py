@@ -356,7 +356,9 @@ def native_communication_parallel_contract(schema: dict[str, Any], capabilities:
             shared[identity] = name
         return {"$ref": f"#/$defs/{shared[identity]}"}
 
-    def select(slot: dict[str, Any], *, parallel: bool, need_timing: str | None, need_only: bool = False) -> dict[str, Any] | None:
+    def select(slot: dict[str, Any], *, parallel: bool, need_timing: str | None,
+               stage: str | None, can_wait: bool, need_only: bool = False,
+               work_only: bool = False) -> dict[str, Any] | None:
         choices = []
         for branch in slot.get("oneOf", [slot]):
             props = branch.get("properties", {})
@@ -365,22 +367,28 @@ def native_communication_parallel_contract(schema: dict[str, Any], capabilities:
                 if need_only:
                     continue
                 ids = props.get("capability_id", {}).get("enum", [])
-                if parallel:
-                    deferred = props.get("deferred")
-                    if isinstance(deferred, dict) and deferred.get("const") is not False:
-                        held = copy.deepcopy(branch)
-                        held["properties"]["deferred"] = {"type": "boolean", "enum": [True]}
-                        held["required"] = list(dict.fromkeys([*held.get("required", []), "deferred"]))
-                        choices.append(share(held))  # Held effects do not start with this Need.
-                    if not ids or not set(ids) <= safe:
-                        continue
                 variant = branch
-                if parallel:
-                    variant = copy.deepcopy(branch)
-                    variant["properties"]["depends_on"] = {"type": "array", "maxItems": 0, "items": {"type": "string"}}
-                    if "deferred" in props:
-                        variant["properties"]["deferred"] = {"type": "boolean", "enum": [False]}
+                if parallel or stage or "deferred" in props:
+                    dependencies = props["depends_on"]
+                    if ("deferred" in props and stage != "achieve_effect" and can_wait
+                            and dependencies.get("maxItems") != 0):
+                        held = {**props, "deferred": {"type": "boolean", "enum": [True]},
+                                "depends_on": {**dependencies, "minItems": 1}}
+                        required = list(dict.fromkeys([*branch.get("required", []), "deferred", "depends_on"]))
+                        choices.append(share({**branch, "properties": held, "required": required}))
+                    if stage and props["step_purpose"]["enum"] != [stage]:
+                        continue
+                    if parallel and (not ids or not set(ids) <= safe):
+                        continue
+                    ready = dict(props)
+                    if "deferred" in ready:
+                        ready["deferred"] = {"type": "boolean", "enum": [False]}
+                    if parallel:
+                        ready["depends_on"] = {**dependencies, "maxItems": 0}
+                    variant = {**branch, "properties": ready}
             elif roles and roles[0] in {"complete_response", "clarification"}:
+                if work_only:
+                    continue
                 variant = copy.deepcopy(branch)
                 if need_timing is not None:
                     offered = props.get("timing", {}).get("enum", list(NEED_TIMING_WIRE_VALUES))
@@ -405,20 +413,42 @@ def native_communication_parallel_contract(schema: dict[str, Any], capabilities:
         slots = [prefix[i] if i < len(prefix) else items for i in range(count)]
         branches = [branch for slot in slots for branch in slot.get("oneOf", [slot])]
         roles = {role for branch in branches for role in branch.get("properties", {}).get("role", {}).get("enum", [])}
-        if "capability" not in roles or not roles.intersection({"complete_response", "clarification"}):
+        work = [branch["properties"] for branch in branches
+                if branch.get("properties", {}).get("role", {}).get("enum") == ["capability"]]
+        owners = {ref for props in work for ref in props["source_responsibility_refs"].get("items", {}).get("enum", [])}
+        purposes = {tuple(props.get("step_purpose", {}).get("enum", [])) for props in work}
+        # With one possible Work owner, all ready steps share one stage.
+        # Separate owners may legitimately acquire and act in the same Plan.
+        split_stage = count > 1 and len(owners) == 1 and purposes == {("acquire_information",), ("achieve_effect",)}
+        has_need = bool(roles.intersection({"complete_response", "clarification"}))
+        can_hold = any("deferred" in props for props in work) and count > 1
+        if not work or not (has_need or split_stage or can_hold):
             continue
         variants = []
-        serial = [select(slot, parallel=False, need_timing="ordered_with_work") for slot in slots]
-        if all(serial):
-            variants.append({"type": "array", "minItems": count, "maxItems": count, "prefixItems": serial, "items": False})
-        for first in range(count):
-            parallel = [select(slot, parallel=True,
-                               need_timing="ordered_with_work" if i < first else "concurrent_with_work" if i == first else None,
-                               need_only=i == first) for i, slot in enumerate(slots)]
-            if all(parallel):
-                variants.append({"type": "array", "minItems": count, "maxItems": count, "prefixItems": parallel, "items": False})
+        stages: tuple[str | None, ...] = ("acquire_information", "achieve_effect") if split_stage else (None,)
+        def add_variant(selected: list[dict[str, Any] | None]) -> None:
+            if all(selected):
+                variants.append({"type": "array", "minItems": count, "maxItems": count,
+                                 "prefixItems": selected, "items": False})
+
+        for stage in stages:
+            add_variant([select(slot, parallel=False, need_timing="ordered_with_work",
+                                stage=stage, can_wait=False) for slot in slots])
+            for first in range(count) if has_need else ():
+                add_variant([select(slot, parallel=True,
+                                    need_timing="ordered_with_work" if i < first else "concurrent_with_work" if i == first else None,
+                                    stage=stage, can_wait=False, need_only=i == first) for i, slot in enumerate(slots)])
+            if can_hold and stage != "achieve_effect":
+                # An ordered Need binds to the surrounding executable step IDs.
+                # Held effects belong to evidence re-entry, outside that ordering.
+                add_variant([select(slot, parallel=False, need_timing=None, work_only=True,
+                                    stage=stage, can_wait=i > 0) for i, slot in enumerate(slots)])
+                if has_need:
+                    add_variant([select(slot, parallel=True, need_timing="concurrent_with_work",
+                                        stage=stage, can_wait=i > 0) for i, slot in enumerate(slots)])
         if variants:
-            state["properties"]["activities"] = {**activities, "oneOf": variants}
+            # A read without a held effect can belong to either array alternative.
+            state["properties"]["activities"] = {**activities, "anyOf" if can_hold or split_stage else "oneOf": variants}
 
 
 def share_planner_source_contracts(schema: dict[str, Any]) -> None:

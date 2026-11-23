@@ -5,6 +5,12 @@ remains available in Git history.
 
 ## Unreleased
 
+### Enforce acquisition stages before provisional Work
+
+- Constrain the Planner's native activity choices for a single Work owner and check
+  overlapping Responsibility refs before publishing a Plan. A dependent effect waits for
+  evidence re-entry. Ordered communication can bind only to executable Work.
+
 ### Diagnose the paired live regression
 
 - Trace 28 lost main successes through UMI, GA, Planner, Social Cognition and Runtime. Retain

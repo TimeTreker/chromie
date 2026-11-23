@@ -8,8 +8,8 @@ Replace current facts; history remains in Git and [CHANGELOG](CHANGELOG.md).
 ## Current snapshot
 
 - Checkout `/home/chromie/github/chromie`, feature branch
-  `codex/sc-context-budget-failure-notice`. Pre-delivery application revision
-  `b8fcabb0ebaf8bc8f69aa5d3a13ba3efa39270be`. The latest commit carrying these status owners
+  `codex/sc-context-budget-failure-notice`. The offline repair starts at
+  `e5ced6afcb3e5cb12fa25d0fdcf08bceff63027b`. The latest commit carrying these status owners
   is the resume revision. Main merge requires owner approval.
 - The retained weather provider separates forecast periods. The existing Host preserves
   playback order, waits for same-Goal evidence and consumes a rejected opportunity once.
@@ -31,6 +31,14 @@ All new private reports are in `.chromie/acceptance/paired28-20261123/`. The com
 main `55f5587d4` and the previous branch application frozen under
 `.chromie/acceptance/optimize-fixed-model-20261121/weather-only/`.
 
+- `offline-stages/离线验收.md` indexes the two original Planner calls, before/after contract
+  replay, CPU XGrammar membership results, focused checks, Level A and the archived Host audit.
+  Of 270 historical calls, 17 stopped during contract loading. Among 253 complete
+  documents, 251 kept the same result and the two late canonical failures were rejected early.
+  Level A passed 45/45. `offline-stages/workflow-final/summary.json` records all 6,000 expected
+  offline outcomes with stable source and zero model calls. `offline-stages/canonical-final.log`
+  records the local gate on the repair.
+  No service inference, redeployment, or new functional score was requested for this patch.
 - `逐例对照.md`, the 28 numbered JSON records and `main-plan-current-invariant.json` bind case,
   input, both original role records and earliest error. `八轮同输入验证.md` records all 37 role
   probes. `现场专项.md` records the six-case live gate.
@@ -57,7 +65,8 @@ proof=.chromie/acceptance/paired28-20261123
 cat "$proof/regression-totals.json" "$proof/115-native-host.json"
 cat "$proof/site/full/exits.json" "$proof/site/library79/exits.json" "$proof/recovery64/library79/exits.json"
 cat "$proof/recovery64/library79/post-status.json" "$proof/recovery64/post-agent-image.txt"
-git diff --exit-code b8fcabb0e HEAD -- agent orchestrator shared scripts tests scenarios
+cat "$proof/offline-stages/native.json" "$proof/offline-stages/archived-host-audit.json"
+python -m pytest -q tests/test_planner_streaming_commit.py tests/test_planner_staged_progress.py tests/test_planner_reentry_policy.py
 python scripts/check_repository_policies.py
 ./scripts/run_tests.sh
 python scripts/check_docs.py
@@ -65,4 +74,4 @@ python scripts/check_docs.py
 
 No further model rounds are pending under the eight-round allowance. Any future comparison
 should preserve the existing hashes, fixture sets, strict validators, model and budgets. The
-previous branch baseline remains the live reference for the retained application.
+previous branch baseline remains the live reference until a separately authorized trial.

@@ -36,6 +36,7 @@ from shared.chromie_contracts.plan import (
     FastPlannerProgressAct,
     PlannerInformationGap,
     responsibility_outcome_source_tokens,
+    validate_acquisition_stage_isolation,
     validate_communicative_activity_identity,
 )
 
@@ -273,6 +274,20 @@ def validate_deferred_activities(activities: list[Any]) -> None:
                 raise PlannerDTOContractError(
                     "a deferred Activity waits only on reads of its own Responsibility: "
                     f"{activity.activity_id} -> {ref}")
+    # GA may merge distinct refs later, but Work citing the same ref already
+    # belongs to the same Goal(s). Check before publishing the provisional Plan.
+    try:
+        validate_acquisition_stage_isolation([
+            (activity.source_responsibility_refs, activity.step_purpose)
+            for activity in activities if activity.role == "capability" and not activity.deferred
+        ])
+    except ValueError as exc:
+        raise PlannerDTOContractError(str(exc)) from exc
+    if any(activity.deferred for activity in by_id.values()) and any(
+        activity.role in {"complete_response", "clarification"} and activity.timing == "sequential"
+        for activity in activities
+    ):
+        raise PlannerDTOContractError("Ordered communication cannot bind to a deferred Work step")
 
 
 def _contains_exact_material_value(container: Any, expected: Any) -> bool:

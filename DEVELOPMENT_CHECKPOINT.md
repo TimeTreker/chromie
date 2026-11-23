@@ -9,18 +9,29 @@ The current focus remains Goal-driven single-authority architecture.
 
 ## Active Issue — everyday live-cohort root-cause repairs
 
-Retain the pre-experiment application at b8fcabb0e. A 28-case paired audit compared the main
+The most recent live reference is the application at b8fcabb0e. A 28-case paired audit compared the main
 94/128 result with the branch 76/128 result. The two arms shared 66 successes. Twenty-eight
 were lost and ten gained. Keep WHAT-only UMI, GA identity, Planner ownership of work, SC
 wording and all 28 budget values.
 
-## Resume point — evidence retained, candidate withdrawn
+## Resume point — acquisition-stage contract repaired offline
+
+The two archived outputs for cases 40 and 42 both put acquisition and ready effects on
+the same Responsibility. Case 40 authored no dependency. Case 42 depended on the weather
+read but explicitly left the subsequent blink executable. Canonical rejection was correct.
+The native activity grammar now separates executable stages when there is one possible
+Work owner. The Agent checks every overlapping Responsibility before publishing the advance.
+GA can still join different refs to one Goal, so canonical validation remains necessary.
+The read-plus-held path preserves its dependency, and ordering a current answer against
+a held step is rejected. Fresh evidence, Planner re-entry and execution authorization still
+govern release. A single Goal requiring a ready effect followed by a new read still cannot
+place both in one executable stage. No hidden split or new inference was introduced.
 
 Eight engineering trials used 37 frozen role probes. Reordering native Planner fields or
 changing the evidence prompt could recover known facts and still choose a clock for a dog name
 or substitute the wrong bottle. No Planner or UMI trial passed its controls. The only live
 candidate narrowed SC speech while all responsibilities awaited Planner. Its full score was
-71/128 and it was withdrawn. No new runtime patch ships in this delivery.
+71/128 and it was withdrawn. Those ratings predate the offline acquisition-stage repair.
 
 - The same-input SC change prevented a false promise in the 8 pm reminder. In the full suite,
   the two-minute reminder still promised future work after Planner chose an immediate answer.
