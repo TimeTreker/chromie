@@ -1269,20 +1269,6 @@
     },
     {
       "path": "orchestrator/runtime/memory.py",
-      "symbol": "ProtectedDurableMemoryStore.load",
-      "ordinal": 1,
-      "classification": "fail_closed_boundary",
-      "owner": "orchestrator",
-      "contract": "Reject malformed or unreadable durable profile state, clear in-memory entries, and retain a diagnostic without exposing unvalidated content.",
-      "review_status": "reviewed",
-      "body_sha256": "4ee327e79def70c3eb38a5b2ed8e4268a25ba49b786dddff6495d27bcfdaa479",
-      "failure_signals": [
-        "diagnostic",
-        "state_update"
-      ]
-    },
-    {
-      "path": "orchestrator/runtime/memory.py",
       "symbol": "ProtectedDurableMemoryStore.persist",
       "ordinal": 1,
       "classification": "diagnostic_cleanup",

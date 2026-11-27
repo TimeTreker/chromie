@@ -15,6 +15,8 @@ common-suite runtime identity was `2c0febc91fcee4a4e1cebd270f4268727bc4c3b9bb396
 The Gemma4 12B revision was `707f0a3b8a3c7ad586ed01e27eafbad8a27dd0f7`, Soridormi
 `a49a87f68`, with unchanged SGLang and XGrammar builds and 28 unchanged role budgets.
 The original Agent image `sha256:f9138d8641f0` was restored following simulation.
+`30bf180d7` binds the Planner delivery. The separate profile-store change has local
+regression evidence. The experimental close-time summarizer did not qualify for integration.
 
 ## Retained evidence
 
@@ -37,6 +39,17 @@ The local evidence root is `.chromie/acceptance/planner-memory-sources-20261127/
 - `canonical.log`, `level-a/summary.json` and `strict6000-local/summary.json` contain the
   offline verification. The earlier restricted-loopback attempt is retained separately.
 
+The local independent memory report is `.chromie/acceptance/conversation-close-20261127/验证报告.md`.
+The terminal review, final candidate patch against `30bf180d7`, exact-input replay and
+storage before/after tests are under `.chromie/acceptance/conversation-close-adjudicated-20261127/`.
+All 19 fixed requests have native model outputs. Seven came from the earlier identical
+source-classification run and twelve from its held-out cases. The final Host replay did
+not call the model. It excluded the withdrawn parrot name and protected other speakers.
+The profile oracle passed 16/19. No substantive summary survived its privacy signal.
+The current feature keeps the tested storage improvements and ordinary at-turn write path.
+Its `branch-canonical.log` records 4,433 main tests, 1,046 subtests and 20 legacy checks.
+`concurrent-store.json` records 12 concurrent owner processes and six correctly scoped deletions.
+
 ## Resume and verify
 
 ```bash
@@ -45,7 +58,9 @@ cd /home/chromie/github/chromie
 proof=.chromie/acceptance/planner-memory-sources-20261127
 cat "$proof/site/full/exits.json" "$proof/site/library79/exits.json" "$proof/site/post-agent-image.txt"
 cat "$proof/与main剩余21例.md"
-python -m pytest -q tests/test_intent_only_handoff.py
+memory=.chromie/acceptance/conversation-close-adjudicated-20261127
+cat "$memory/逐例判定.md" "$memory/store-after.log"
+python -m pytest -q tests/test_intent_only_handoff.py tests/test_durable_profile_memory.py
 python scripts/check_repository_policies.py
 ./scripts/run_tests.sh
 python scripts/check_docs.py

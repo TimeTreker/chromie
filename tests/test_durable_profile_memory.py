@@ -359,6 +359,52 @@ class PersonalFactTests(unittest.TestCase):
             [kept] = manager.snapshot()["durable_profile_memory"]["entries"]
             self.assertEqual(kept["text"], "The person works in Hangzhou.")
 
+    def test_two_people_can_update_and_forget_the_same_attribute_independently(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            first, second = self.manager(directory), self.manager(directory)
+            second.speaker_person_refs = ["person:second"]
+            for state, text in [(first, "I work in Leeds."), (second, "I work in Bath.")]:
+                state.record_interaction_response("source", _updates({**self.FACT, "text": text}))
+            self.assertEqual(["I work in Leeds."], [v["text"] for v in self.kept(first)])
+            self.assertEqual(["I work in Bath."], [v["text"] for v in self.kept(second)])
+            self.assertEqual(2, len({v["id"] for v in self.manager(directory)._durable_memory.snapshot()}))
+            self.assertEqual(1, second.forget_durable_memory(key="workplace"))
+            self.assertEqual(["I work in Leeds."], [v["text"] for v in self.kept(self.manager(directory))])
+            self.assertEqual([], self.kept(second))
+
+    def test_clear_preserves_another_person_and_correction_preserves_a_legacy_identifier(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            state = self.manager(directory)
+            state.record_interaction_response("old", _updates(self.FACT))
+            path = Path(directory) / "profile.json"
+            payload = json.loads(path.read_text())
+            payload["entries"][0]["id"] = "old-profile-id"
+            path.write_text(json.dumps(payload))
+            state.record_interaction_response("new", _updates({**self.FACT, "text": "I moved."}))
+            self.assertEqual(["old-profile-id"], [e["id"] for e in self.kept(state)])
+            state.speaker_person_refs = ["person:second"]
+            state.record_interaction_response("theirs", _updates({**self.FACT, "text": "I work in Bath."}))
+            self.assertEqual(1, state.clear_durable_memory())
+            self.assertEqual(["I moved."], [e["text"] for e in self.kept(self.manager(directory))])
+
+    def test_an_unresolved_speaker_cannot_clear_a_persons_profile(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            state = self.manager(directory)
+            state.record_interaction_response("source", _updates(self.FACT))
+            state.speaker_person_refs = ["person:first", "person:second"]
+            self.assertEqual(0, state.clear_durable_memory())
+            self.assertEqual(0, state.forget_durable_memory(key="workplace"))
+            self.assertEqual(1, len(self.kept(self.manager(directory))))
+
+    def test_a_failed_disk_write_does_not_appear_as_a_successful_update(self) -> None:
+        from unittest.mock import patch
+        with tempfile.TemporaryDirectory() as directory:
+            state = self.manager(directory)
+            state.record_interaction_response("initial", _updates(self.FACT))
+            with patch("orchestrator.runtime.memory.atomic_write_json", side_effect=OSError), self.assertRaises(OSError):
+                state.record_interaction_response("correction", _updates({**self.FACT, "text": "I moved."}))
+            self.assertEqual([self.FACT["text"]], [r["text"] for r in state._durable_memory.snapshot()])
+
     def test_without_profile_memory_it_lasts_for_the_conversation(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             manager = self.manager(directory, enabled=False)

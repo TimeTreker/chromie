@@ -5,6 +5,12 @@ remains available in Git history.
 
 ## Unreleased
 
+### Preserve personal facts across household profiles
+
+- Scope updates and forget operations to the established person. Serialize profile-file
+  updates across managers and roll back failed writes. Retain the independent
+  conversation-close evaluation and its summary-quality blocker.
+
 ### Ground Planner answers in identifiable source records
 
 - Carry selected dialogue, activated personal memory and distinct observed objects into

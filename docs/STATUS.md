@@ -11,10 +11,10 @@ The current focus remains Goal-driven single-authority architecture.
 
 | Axis | Current evidence |
 | --- | --- |
-| Implementation | The feature branch retains WHAT-only UMI. Planner selects identifiable dialogue, activated Memory or established scene records. The Host carries their identifiers into the SC need. The existing acquisition-stage rules and possessive-insensitive catalog search apply. |
-| Automatic verification | The local gate passed 176 benchmark tests, 4,429 main tests, 1,046 subtests and 20 legacy checks. Five tests were skipped. Level A passed 45/45 and all 6,000 frozen offline outcomes matched expectations. |
+| Implementation | The feature branch retains WHAT-only UMI. Planner selects identifiable dialogue, activated Memory or established scene records. The Host carries their identifiers into the SC need. The existing acquisition-stage rules and possessive-insensitive catalog search apply. Personal profile corrections and deletions respect the identified speaker and synchronize shared on-disk edits. |
+| Automatic verification | The branch local gate passed 176 benchmark tests, 4,433 main tests, 1,046 subtests and 20 legacy checks. 5 tests were skipped. Level A passed 45/45. The Planner revision matched all 6,000 frozen offline outcomes. All 14 current profile tests passed. |
 | Target validation | Seven identical Planner inputs improved from one to five complete results. Same-session dog recall and bottle counting also passed in simulation. The common 128 scored 85 complete, 16 partial, 26 failed and one insufficient. Main historically scored 94 complete. The additional 79 scored 45 complete, 13 partial and 21 failed. |
-| Deployment state | A temporary local Agent ran the original ten utterances and both cohorts with Gemma4 12B, unchanged role budgets, discarded audio and MuJoCo. The original Agent image was restored. Physical and release qualification remain open. |
+| Deployment state | A temporary local Agent ran the original ten utterances and both cohorts with Gemma4 12B, unchanged role budgets, discarded audio and MuJoCo. The original Agent image was restored. The independent conversation-close candidate stays outside the runtime. Physical and release qualification remain open. |
 
 The common suite passed all 22 must-pass scenarios, 60 of 96 core and three of ten
 challenge cases. The runner marked 112 automatic successes and nine integrity failures.
@@ -66,8 +66,10 @@ The [checkpoint](../DEVELOPMENT_CHECKPOINT.md) owns the active Issue and owner d
    retained hunger through UMI and substituted milk in Planner. Inspect ingress and terminal
    speech against executed Work and eliminate duplicate playback.
 3. Inspect cross-conversation personal facts at their first write. The simulated Chinese dog
-   and English allergy cases reached a new conversation with an empty profile. Review
-   independently qualified close-conversation consolidation before claiming persistent recall.
+   and English allergy cases reached a new conversation with an empty profile. The separate
+   close-time candidate retained the expected volunteered fact in five cases across a reload, including
+   Hapi. Three of 19 final profiles were wrong or missing. All 19 substantive summaries
+   were withheld by the privacy contract. Resolving this remains a qualification requirement.
 4. Check compound effect coverage and actual dependency order. Existing contracts reject
    illegal dependencies. The same-Goal sequence that needs a ready effect before a fresh
    read remains open. Keep provider timeouts, SC generation limits and playback deadlines

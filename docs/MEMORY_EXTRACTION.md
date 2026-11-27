@@ -17,6 +17,11 @@ fails closed. No `memory` route, separate memory agent, vector database, or retr
 owns Memory semantics. Raw transcript and non-projectable retained Memory remain bounded
 internal state rather than default model context.
 
+An existing personal fact is updated by its attribute and the identified person's scope.
+A person's forget or clear applies to that person's records. Original schema-version-1
+identifiers survive correction. Managers sharing the local profile reread it under a
+lock before writing, so interleaved edits preserve both people's entries.
+
 ## Principle
 
 Chromie should not treat raw chat history as memory.

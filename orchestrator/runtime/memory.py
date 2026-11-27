@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import copy
+import fcntl
 import hashlib
 import json
 import logging
@@ -7,6 +9,7 @@ import os
 import re
 import time
 from collections import deque
+from contextlib import contextmanager
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Deque, Iterable, Literal, cast
@@ -297,7 +300,10 @@ class MemoryEntry:
                 if semantic_identity.strip("|")
                 else self.text
             )
-            self.id = _memory_id(self.scope, self.kind, identity_text, self.key)
+            scoped_key = self.key
+            if self.key and self.relation == SELF_FACT_RELATION:
+                scoped_key = json.dumps([self.key, self.subject_refs, self.audience_refs], separators=(",", ":"))
+            self.id = _memory_id(self.scope, self.kind, identity_text, scoped_key)
 
     @property
     def is_relational(self) -> bool:
@@ -415,7 +421,11 @@ class MemoryStore:
                     existing.scope == entry.scope
                     and existing.kind == entry.kind
                     and existing.key == entry.key
+                    and (SELF_FACT_RELATION not in (existing.relation, entry.relation)
+                         or (existing.relation == entry.relation and existing.subject_refs == entry.subject_refs
+                             and existing.audience_refs == entry.audience_refs))
                 ):
+                    entry.id = existing.id
                     entry.created_ms = existing.created_ms
                     entry.source_sids = [*existing.source_sids, *entry.source_sids][-8:]
                     entry.source_turn_ids = [*existing.source_turn_ids, *entry.source_turn_ids][-8:]
@@ -519,12 +529,53 @@ class ProtectedDurableMemoryStore:
         self.path = Path(path).expanduser()
         self.store = MemoryStore(max_entries=max_entries)
         self.last_error: str | None = None
-        if self.enabled:
-            self.load()
+        self._read_failed = False
+        self._disk_stamp: tuple[int, int, int] | None = None
+        self.load()
 
     def load(self) -> None:
-        if not self.enabled or not self.path.is_file():
+        if not self.enabled:
             return
+        try:
+            if self.path.is_file():
+                self._disk_stamp = None
+                with self._locked_profile():
+                    pass
+        except (OSError, ValueError, TypeError) as exc:
+            self.store.clear()
+            self._read_failed = True
+            self.last_error = f"{type(exc).__name__}: {exc}"
+            logger.warning("durable_memory_load_failed: %s", self.last_error)
+
+    def _stamp(self) -> tuple[int, int, int] | None:
+        try:
+            stat = self.path.stat()
+        except FileNotFoundError:
+            return None
+        return (stat.st_ino, stat.st_mtime_ns, stat.st_size)
+
+    @contextmanager
+    def _locked_profile(self):
+        # The directory descriptor remains valid across atomic profile-file replacement.
+        self.path.parent.mkdir(parents=True, exist_ok=True)
+        descriptor = os.open(self.path.parent, os.O_RDONLY)
+        try:
+            fcntl.flock(descriptor, fcntl.LOCK_EX)
+            stamp = self._stamp()
+            if stamp != self._disk_stamp or self._read_failed:
+                if stamp is None:
+                    self.store.clear()
+                    self._read_failed = False
+                else:
+                    self._load_locked()
+                self._disk_stamp = self._stamp()
+            if self._read_failed:
+                raise ValueError("Protected profile could not be decoded")
+            yield
+        finally:
+            os.close(descriptor)
+
+    def _load_locked(self) -> None:
         try:
             payload = json.loads(self.path.read_text(encoding="utf-8"))
             if not isinstance(payload, dict) or payload.get("schema_version") != self.schema_version:
@@ -579,15 +630,30 @@ class ProtectedDurableMemoryStore:
                     entries.append(entry)
             self.store.replace(entries)
             self.store.prune_expired()
-            self.persist()
+            if payload.get("entries") != self.store.snapshot():
+                self.persist()
+            else:
+                os.chmod(self.path, 0o600)
+            self._read_failed = False
             self.last_error = None
-        except Exception as exc:
+        except (OSError, ValueError, TypeError) as exc:
+            self._read_failed = True
             self.store.clear()
             self.last_error = f"{type(exc).__name__}: {exc}"
             logger.warning("durable_memory_load_failed: %s", self.last_error)
 
     def add_many(self, entries: Iterable[MemoryEntry]) -> int:
+        if not self.enabled:
+            return 0
+        entries = list(entries)
+        if not entries:
+            return 0
+        with self._locked_profile():
+            return self._add_locked(entries)
+
+    def _add_locked(self, entries: list[MemoryEntry]) -> int:
         accepted = 0
+        before = copy.deepcopy(self.store.entries())
         for entry in entries:
             if (
                 entry.scope != "profile"
@@ -605,21 +671,57 @@ class ProtectedDurableMemoryStore:
             self.store.add(entry)
             accepted += 1
         if accepted:
-            self.persist()
+            try:
+                self.persist()
+            except (OSError, ValueError, TypeError):
+                self.store.replace(before)
+                self._disk_stamp = None
+                raise
         return accepted
 
-    def remove(self, *, key: str | None = None, entry_id: str | None = None) -> int:
-        removed = self.store.remove(key=key, entry_id=entry_id)
-        if removed:
-            self.persist()
-        return removed
+    def remove(self, *, key: str | None = None, entry_id: str | None = None, person: str | None = None) -> int:
+        return self._forget(key=key, entry_id=entry_id, person=person)
 
-    def clear(self) -> int:
-        count = len(self.store.entries())
-        self.store.clear()
-        if self.enabled:
-            self.persist()
-        return count
+    def clear(self, *, person: str | None = None) -> int:
+        return self._forget(clear=True, person=person)
+
+    def _forget(self, *, key: str | None = None, entry_id: str | None = None,
+                clear: bool = False, person: str | None = None) -> int:
+        if not self.enabled:
+            return 0
+        normalized_key = compact_text(key, limit=120) if key else None
+        with self._locked_profile():
+            before = self.store.entries()
+            retained = []
+            for row in before:
+                legacy_owner = not row.is_relational and person == "person:primary"
+                own_entry = person is None or row.audience_refs == [person] or legacy_owner
+                matches = clear or (normalized_key and row.key == normalized_key) or (entry_id and row.id == entry_id)
+                if not (own_entry and matches):
+                    retained.append(row)
+            if len(before) == len(retained):
+                return 0
+            self.store.replace(retained)
+            try:
+                self.persist()
+            except (OSError, ValueError, TypeError):
+                self.store.replace(before)
+                self._disk_stamp = None
+                raise
+            return len(before) - len(retained)
+
+    def _readable(self) -> bool:
+        if not self.enabled:
+            return False
+        try:
+            if self._read_failed or self._stamp() != self._disk_stamp:
+                with self._locked_profile():
+                    pass
+            return True
+        except (OSError, ValueError) as exc:
+            self.last_error = f"{type(exc).__name__}: {exc}"
+            logger.warning("durable_memory_refresh_failed: %s", self.last_error)
+            return False
 
     def prompt_entries(
         self,
@@ -636,12 +738,12 @@ class ProtectedDurableMemoryStore:
                 activation_subject_refs=activation_subject_refs,
                 audience_refs=audience_refs,
             )
-            if self.enabled
+            if self._readable()
             else []
         )
 
     def snapshot(self) -> list[dict[str, Any]]:
-        return self.store.snapshot() if self.enabled else []
+        return self.store.snapshot() if self._readable() else []
 
     def persist(self) -> None:
         if not self.enabled:
@@ -652,6 +754,7 @@ class ProtectedDurableMemoryStore:
         }
         try:
             atomic_write_json(self.path, payload, mode=0o600)
+            self._disk_stamp = self._stamp()
             self.last_error = None
         except Exception as exc:
             self.last_error = f"{type(exc).__name__}: {exc}"

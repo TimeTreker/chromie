@@ -10,7 +10,8 @@ The current focus remains Goal-driven single-authority architecture.
 ## Active Issue — everyday live-cohort root-cause repairs
 
 The fixed-model simulator comparison used feature baseline `5368d2cab` plus the retained
-catalog fix and Planner evidence-source selection. Preserve WHAT-only UMI, Goal identity,
+catalog fix and Planner evidence-source selection. The later personal-profile store fix
+was verified separately. Preserve WHAT-only UMI, Goal identity,
 Planner ownership of work, SC wording and all 28 role-budget settings.
 
 ## Resume point — Planner evidence and memory
@@ -31,8 +32,19 @@ facts and unapproved food substitution remain open. A timeout in the additional 
 case left eight terminal summaries and did not prevent later cases from entering the Host.
 [Handoff](HANDOFF.md) points to actual deliveries, per-case judgments and runtime identities.
 
+The protected store now preserves two people's records with the same attribute, rechecks the
+disk when managers share the file, respects the requester when forgetting, and rolls back
+failed writes. Three new reproductions failed before the fix. All 14 profile tests passed
+on the delivery branch, including a fourth check for retained legacy identifiers. Existing schema-version-1
+entries retain their original identifiers. The approved close-time experiment remains
+outside the runtime. Its fixed native outputs gave correct profile contents in 16/19 cases,
+but the model marked every overview private. Honouring that output withheld every
+substantive summary. Hapi survived a restart and remained visible only to the bound speaker.
+
 ## Owner decisions in force
 
+- One close-time summary may recover a missed enduring self-fact from the original user
+  utterance. Validate this independently, retain provenance and respect withdrawals.
 - Keep complete WHAT-only UMI, Planner HOW/Skills, SC expression and model/budgets/rules.
   Branch-only diagnostic commit/push is authorized; never merge Main without approval.
 - Pure action demonstrations are functional tests and remain in Smoke; artificial

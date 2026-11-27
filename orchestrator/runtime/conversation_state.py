@@ -307,10 +307,14 @@ class ConversationStateManager:
         return [entry.to_dict() for entry in entries]
 
     def forget_durable_memory(self, *, key: str) -> int:
-        return self._durable_memory.remove(key=key)
+        if len(self.speaker_person_refs) != 1:
+            return 0
+        return self._durable_memory.remove(key=key, person=self.speaker_person_refs[0])
 
     def clear_durable_memory(self) -> int:
-        return self._durable_memory.clear()
+        if len(self.speaker_person_refs) != 1:
+            return 0
+        return self._durable_memory.clear(person=self.speaker_person_refs[0])
 
     @staticmethod
     def _authorized_durable_mutation(value: Any, *, operation: str) -> bool:
