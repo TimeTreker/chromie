@@ -11,19 +11,16 @@ The current focus remains Goal-driven single-authority architecture.
 
 | Axis | Current evidence |
 | --- | --- |
-| Implementation | Planner stage isolation now takes effect at provisional Work admission. Native decoding for a single possible Work owner excludes a ready effect alongside its read. Different owners can still compose ordered Work. Canonical checks, re-entry, confirmation and capability authorization retain their existing authority. |
-| Automatic verification | CPU XGrammar accepted the two archived failing Planner outputs under their original schemas and rejected them under the repaired schemas. A held effect with an explicit read dependency remains representable. The archived Host contrast covers 253 complete documents. Current offline checks and evidence are indexed in Handoff. |
-| Target validation | Open. Of the 128 comparable cases, main historically passed 94 and the retained branch 76. The withdrawn candidate had 71 complete, 25 partial, 31 failed and one insufficient result, with 105 automatic passes and 13 runner integrity failures. The original ten each reached a terminal notification, but food help still caused unapproved milk delivery. |
-| Deployment state | Branch-only offline repair. The previous SC candidate ran with local model services, discarded TTS and MuJoCo. The stage repair has no new deployment, live functional score, physical voice or robot evidence. |
+| Implementation | The feature branch retains WHAT-only UMI. Planner selects identifiable dialogue, activated Memory or established scene records. The Host carries their identifiers into the SC need. The existing acquisition-stage rules and possessive-insensitive catalog search apply. |
+| Automatic verification | The local gate passed 176 benchmark tests, 4,429 main tests, 1,046 subtests and 20 legacy checks. Five tests were skipped. Level A passed 45/45 and all 6,000 frozen offline outcomes matched expectations. |
+| Target validation | Seven identical Planner inputs improved from one to five complete results. Same-session dog recall and bottle counting also passed in simulation. The common 128 scored 85 complete, 16 partial, 26 failed and one insufficient. Main historically scored 94 complete. The additional 79 scored 45 complete, 13 partial and 21 failed. |
+| Deployment state | A temporary local Agent ran the original ten utterances and both cohorts with Gemma4 12B, unchanged role budgets, discarded audio and MuJoCo. The original Agent image was restored. Physical and release qualification remain open. |
 
-Of the 28 main successes lost on the retained branch, the candidate recovered five, partially
-met eleven and failed twelve. At least three historical score differences involved asymmetric
-judging. On the candidate, the disjoint 79 cases scored 41/15/23/0
-complete/partial/failed/insufficient, with 49 automatic passes across two windows. The first
-window recorded 10/79 automatic passes: a timed-out case left a simulated fetch running and 64
-cases failed preflight before admission. Only those 64 ran in the second window. The
-uninterrupted gate remains failed. The paired reports, original episode, receipts and run
-identities are indexed in [Handoff](../HANDOFF.md).
+The common suite passed all 22 must-pass scenarios, 60 of 96 core and three of ten
+challenge cases. The runner marked 112 automatic successes and nine integrity failures.
+One additional serious safety failure was visible in actual speech: Chromie accepted
+sole responsibility for watching a child without any monitoring Work. Original food help
+also caused unapproved milk delivery. These prevent target qualification. See [Handoff](../HANDOFF.md).
 
 ## Social Cognition migration
 
@@ -62,32 +59,23 @@ This describes current intended ownership, not full conformance; see the open wo
 The [Roadmap](../ROADMAP.md#social-cognition-migration) owns delivery order.
 The [checkpoint](../DEVELOPMENT_CHECKPOINT.md) owns the active Issue and owner decisions.
 
-1. Qualify Planner evidence selection on the named person, property and time. Contrast
-   dialogue facts with current perception, verified durable memory and genuinely fresh
-   provider work. A speaker in view cannot establish birthdays, past medication, safety or a
-   future timer.
-2. Preserve the user's requested effect and permission. In original turn 9 UMI retained food,
-   GA continued the food Goal and Planner substituted milk delivery. Check that finding,
-   offering, accepting and executing stay distinct across food, drinks, pouring and coffee
-   preparation. A spoken acknowledgement cannot discharge the work.
-3. Qualify terminal communication and persistent facts. The scoped ingress change helped one
-   reminder but narrowed responses and left final false promises. Verify a single grounded
-   terminal reply, especially where the answer is unknown. Preserve allergy information across
-   the requested lifetime and keep safety/Value Judgment gates blocking.
-4. Verify live selection of a legal staged plan after the offline repair for 40/42.
-   Case 115 separately omitted the conditional repair references
-   even under strict native Schema. Retain original validation and fix the earliest
-   representational mismatch. Keep provider timeouts and playback deadlines distinct from
-   semantic failures.
-5. At a simulator case timeout, establish safe-idle and no remaining provider work before
-   admitting the next independent case. Preserve the original failure. The 64 preflight
-   refusals generated no model-role input. Eight optimization rounds have ended. Reuse
-   retained evidence before any further live inference.
+1. Preserve the distinction between evidence about a speaker and the requested property or effect.
+   The new source choice fixes same-session Max and two visible bottles. It still permits a
+   false visual claim about a drawing and an unsupported child-supervision promise.
+2. Keep acquisition, offering a substitute and authorized delivery separate. The food replay
+   retained hunger through UMI and substituted milk in Planner. Inspect ingress and terminal
+   speech against executed Work and eliminate duplicate playback.
+3. Inspect cross-conversation personal facts at their first write. The simulated Chinese dog
+   and English allergy cases reached a new conversation with an empty profile. Review
+   independently qualified close-conversation consolidation before claiming persistent recall.
+4. Check compound effect coverage and actual dependency order. Existing contracts reject
+   illegal dependencies. The same-Goal sequence that needs a ready effect before a fresh
+   read remains open. Keep provider timeouts, SC generation limits and playback deadlines
+   separate from interpretation errors.
 
 ## Evidence interpretation
 
-Functional judgments include provider receipts and actual playback. The last measured
-comparable branch score of 76 predates this offline-only repair.
-Changing the role transaction moved decisions on fixed inputs, while different clocks,
-returned observations and preceding generated replies affected live results. No intrinsic
-model-weight limit was established. The candidate did not qualify.
+The 94/128 main, 76/128 older branch and 71/128 withdrawn experiment are retained historical
+reviews. The same model and budgets yielded different source selections after changes to the
+transaction. Read the paired cases, actual playback and provider receipts before attributing
+remaining failures to model weights. No current hardware or release evidence is claimed.

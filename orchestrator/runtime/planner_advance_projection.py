@@ -312,12 +312,18 @@ def canonical_plan_from_fast_advance(
         phase = ("final" if capability_indexes and index > max(capability_indexes)
                  else "immediate" if capability_indexes and index > min(capability_indexes)
                  else "pre_action" if capability_indexes else "immediate") if activity.timing == "sequential" else "immediate"
+        facts = activity.model_dump(mode="json", exclude={"activity_id"})
+        context_sources = advance.metadata.get("context_source_ids", {})
+        if isinstance(activity, FastPlannerResponseNeed) and isinstance(context_sources, dict):
+            selected = {ref: context_sources[ref] for ref in activity.source_responsibility_refs if ref in context_sources}
+            if selected:
+                facts["context_source_ids"] = selected
         needs.append(SocialCommunicationNeed(
             need_id=communication_need_id(plan_id, activity.activity_id), owner="planner",
             kind="input" if activity.role == "clarification" else "answer",
             source_goal_ids=activity_goal_ids, source_responsibility_refs=list(activity.source_responsibility_refs),
             reference_id=plan_id, delivery_phase=phase,
-            facts=activity.model_dump(mode="json", exclude={"activity_id"}),
+            facts=facts,
             before_step_ids=[item.activity_id for item in advance.activities[index+1:] if item.role == "capability"] if activity.timing == "sequential" else [],
             after_step_ids=[item.activity_id for item in advance.activities[:index] if item.role == "capability"] if activity.timing == "sequential" else [],
         ))

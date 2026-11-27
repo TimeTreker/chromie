@@ -21,6 +21,7 @@ from shared.chromie_contracts.plan import (
 
 from .planner_native_schema import REENTRY_DECISION_STATE_MAX_GOALS, reentry_assignment_states, _responsibility_refs_first, native_need_timing_schema, native_communication_parallel_contract
 from .planner_native_schema import share_planner_source_contracts
+from .planner_context import PlannerFactSources
 from .planner_validation import _capability_acquires_information
 from .planner_fast_validation import fast_capability_acquires_information
 from .planner_grounding import (
@@ -1769,6 +1770,7 @@ def fast_advance_response_schema(
     source_token_refs: list[str] | None = None,
     original_user_text: str = "",
     situation_source_refs: list[str] | None = None,
+    fact_sources: PlannerFactSources | None = None,
     committed_communicative: bool = False,
     suppress_new_communicative: bool = False,
     suppress_new_progress: bool = False,
@@ -2173,6 +2175,22 @@ def fast_advance_response_schema(
                                             **branch["properties"]}
                     branch["required"] = ["answer_source", "observed_refs", *branch["required"]]
                 branches = [*branches, observed]
+                if fact_sources is not None:
+                    for branch in branches:
+                        properties = branch["properties"]
+                        source = properties.pop("answer_source")
+                        citations = properties.pop("observed_refs")
+                        if source["const"] == PERCEIVED_ANSWER_SOURCE:
+                            eligible = set(citations["items"]["enum"])
+                            keys = [key for key, ref_id in fact_sources.observation_ids.items() if ref_id in eligible]
+                            basis = {**citations, "items": {"type": "string", "enum": keys}}
+                        else:
+                            basis = {"type": "array", "minItems": 1, "maxItems": 1, "items": {
+                                "type": "string", "enum": [*fact_sources.context_ids, "other"]}}
+                        branch["properties"] = {"supporting_facts": basis, **properties}
+                        branch["required"] = [
+                            "supporting_facts", *[k for k in branch["required"] if k not in {"answer_source", "observed_refs"}],
+                        ]
             per_ref[ref] = copy.deepcopy(branches[0]) if len(branches) == 1 else {"oneOf": copy.deepcopy(branches)}
         decisions_schema.clear()
         decisions_schema.update({
@@ -2606,6 +2624,7 @@ def fast_streaming_advance_response_schema(
     source_token_refs: list[str] | None = None,
     original_user_text: str = "",
     situation_source_refs: list[str] | None = None,
+    fact_sources: PlannerFactSources | None = None,
     trusted_target_ref: str = "",
 ) -> dict[str, Any]:
     """One complete Work result; independent SC owns communication latency."""
@@ -2613,7 +2632,7 @@ def fast_streaming_advance_response_schema(
         responsibility_refs, responsibilities=responsibilities, capabilities=capabilities,
         meaning_uncertainties=meaning_uncertainties, source_token_refs=source_token_refs,
         original_user_text=original_user_text, situation_source_refs=situation_source_refs,
-        trusted_target_ref=trusted_target_ref,
+        trusted_target_ref=trusted_target_ref, fact_sources=fact_sources,
     )
     compiled = _ollama_streaming_schema(schema, retain_value_constraints=True)
     compiled["title"] = "FastPlannerWorkAdvanceOutput"

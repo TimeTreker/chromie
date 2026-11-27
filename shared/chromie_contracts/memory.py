@@ -131,7 +131,9 @@ class MemoryUpdateProposal(BaseModel):
         return normalized or None
 
 
-def role_memory_context(context: dict[str, Any], *, role: Literal["umi", "ga", "planner"]) -> str:
+def role_memory_entries(
+    context: dict[str, Any], *, role: Literal["umi", "ga", "planner"],
+) -> list[dict[str, Any]]:
     """Project whole entries already activated and privacy-filtered by Memory.
 
     Cognitive scope and persistence remain independent. Never read raw stores or
@@ -170,6 +172,11 @@ def role_memory_context(context: dict[str, Any], *, role: Literal["umi", "ga", "
             selected.append(item)
         if len(selected) >= (4 if role == "umi" else 8):
             break
+    return selected
+
+
+def role_memory_context(context: dict[str, Any], *, role: Literal["umi", "ga", "planner"]) -> str:
+    selected = role_memory_entries(context, role=role)
     if not selected:
         return ""
     purpose = {

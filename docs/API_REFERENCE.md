@@ -374,13 +374,15 @@ serve, which Host validation also requires. When an information read's cited tur
 its free-text value but the value occurs verbatim exactly once in the outcome of a
 Responsibility it serves and in earlier conversation, Host re-anchors the citation to that
 outcome span before validation (`metadata.citation_reanchoring`). Identical idempotent reads merge only when
-they wait for the same state-changing Activities. An information
-Responsibility that current established perception already answers first names those
-`situation.interpretations` IDs in its decision's `observed_refs`, then decides
-`answer_from_perception`; only a non-empty `observed_refs` opens that decision, which
-carries no authored Activity: the Host binds it as a word-free response Need whose
-`situation_interpretation_refs` are those IDs (it admits only current established
-perception). Every other decision of such a Responsibility states `observed_refs: []`. Each uniform disposition
+they wait for the same state-changing Activities. When established perception is available, the streaming Planner selects the supporting records for
+each eligible Responsibility in `supporting_facts`. Local references identify recent admitted user
+statements, role-visible activated memory entries, or established perception interpretations.
+A perceptual answer selects one to eight distinct observations and decides `answer_from_perception`.
+For other decisions the model selects one context record or `other` for work, knowledge or an
+evidence gap. The Host resolves these references within the same request after native validation.
+The canonical decision carries the exact observation IDs in `observed_refs`. An ordinary answer
+carries an empty observation list. When a selected context record has a source ID, the Host retains
+it by Responsibility in the response Need's `facts.context_source_ids`. Each uniform disposition
 state admits only its matching decision; the authored disposition must equal the one
 the decisions imply, and a contradiction fails closed without rewriting. An
 acquire-information read serving a non-information Responsibility (for example a

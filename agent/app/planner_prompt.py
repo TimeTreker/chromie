@@ -23,6 +23,7 @@ from shared.chromie_contracts.user_turn import user_turn_source_tokens
 from .prompt_projection import bounded_json, required_json
 from .planner_grounding import provider_resolves_required_source
 from .planner_context import (
+    PlannerFactSources,
     PlannerGoalContext,
     canonical_goal_grounding,
     evidence_bound_dialogue,
@@ -174,11 +175,11 @@ UNRESOLVED_MEANING_PROMPT = (
 FAST_PERCEIVED_ANSWER_PROMPT = (
     "When a current situation.interpretations entry already observes what an information "
     "Responsibility asks (for example whether something is here, or where it is), that observation "
-    "is its Evidence: list it in that Responsibility's observed_refs and decide answer_from_perception. "
+    "is its Evidence: cite each observation used and decide answer_from_perception. "
     "No Capability is needed to check, fetch or confirm an already observed fact. Beside executable "
     "Work, still author that Responsibility's complete_response Need with its position and explicit "
     "timing relative to Work; Host carries the cited observations, never chooses that order. "
-    "Otherwise leave observed_refs empty: perception "
+    "Otherwise choose a source that establishes the requested fact. Perception "
     "shows things and people around Chromie, never the time, the weather or other facts. Offering "
     "further help with what was found is Social Cognition's; plan that help only when the person "
     "asked for it. "
@@ -894,6 +895,7 @@ def fast_plan_prompt(
 def fast_advance_layered_prompt(
     request: CognitiveWorkRequest, *, responsibilities: list[CognitiveResponsibilityProposal],
     capabilities: list[dict[str, Any]], response_schema: dict[str, Any] | None = None,
+    fact_sources: PlannerFactSources | None = None,
 ) -> LayeredPrompt:
     context = request.context if isinstance(request.context, dict) else {}
     # Source guidance only where it can apply: the output-mode-qualified catalog has a
@@ -929,10 +931,10 @@ def fast_advance_layered_prompt(
         "activity_id is unique. List each Responsibility once in covered_responsibility_refs; "
         "several necessary Activities may share that ref to realize its complete outcome. When one Activity "
         "establishes what several Responsibilities ask, list each of them in its source_responsibility_refs. "
-        "When the person asks for information (a fact to establish, a question to answer), your Work is the "
-        "one read Activity that establishes it; telling or answering them is Social Cognition's job once its "
-        "Evidence arrives and needs no Activity of yours, so never add a second read, a response or a delivery "
-        "Activity for it. One requested effect or read is one Activity, never written twice. "
+        "If information is missing and a provider can establish it, author the matching read once, with the "
+        "outstanding result in deferred_requirement. If the supplied material already establishes the answer, "
+        "plan its delivery from that material. Social Cognition owns the wording. "
+        "One requested effect or read is one Activity, never written twice. "
         "The top disposition is "
         "execute for capability-only Work, respond for response-only Work, clarify for input-only "
         "needs, mixed when distinct Responsibilities require different roles, or unavailable. "
@@ -1057,6 +1059,16 @@ def fast_advance_layered_prompt(
         + "\n" + immutable_source_turn_prompt(request, what_authority="UMI Responsibilities")
         + "\n" + CAPABILITY_NEED_PROMPT
     )
+    if fact_sources is not None and fact_sources.observation_ids:
+        rendered += (
+            "\nEvidence available for the current decision (quoted source records):\n"
+            + json.dumps(fact_sources.descriptions, ensure_ascii=False)
+            + "\nIn supporting_facts select the record(s) that supply the requested fact. A dialogue record "
+            "supplies what the person actually said. An observation supplies only its stated property and "
+            "value. For an aggregate select every observation used. Use other for information from "
+            "general knowledge, insufficient evidence or new provider work. Do not count reviewing "
+            "supplied records as an external ability.\n"
+        )
     return LayeredPrompt.promote(rendered, operating_contract=(contract,))
 
 
@@ -1231,6 +1243,19 @@ def fast_advance_capability_prompt_projection(
 def fast_streaming_advance_system_prompt() -> str:
     return PLANNER_WORK_AUTHORITY_PROMPT + (
         "Return one complete Work JSON object, with no extra text.\n"
+        "The first field, ability_needs, lists operations a provider must perform outside this prompt. Work "
+        "out whether any such operation is necessary before choosing a Capability. Consider the same parcel in "
+        "four situations. (1) The sender told you its tracking code and now asks what code they gave you: "
+        "ability_needs=[], decision=answer, ground the response in their statement. (2) Its current label is "
+        "visible and the observations supply the requested code: ability_needs=[], "
+        "decision=answer_from_perception, cite the observations that establish the code. (3) They ask whether "
+        "it has arrived and a tracking provider can check: request that read, decision=work, with the parcel "
+        "and time scoped to their question. (4) They ask what was inside yesterday, but only the outside is "
+        "visible and there is no record: the contents are unknown. Answer with that evidence gap, without "
+        "claiming a check. Reading and reasoning over your supplied material do not need a provider. Seeing a "
+        "related entity does not establish another fact about it. Apply the same distinction to each actual "
+        "Responsibility. A read yields evidence; performing a separate effect requires the person to have "
+        "requested that effect.\n"
         "Serialize each Capability args object in the lexicographic property order shown in "
         "args_schema, including nested objects. Decide all needed arguments before writing "
         "that object: after emitting a later property, the constrained decoder cannot return "

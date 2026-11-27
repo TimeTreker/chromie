@@ -17,6 +17,8 @@ from shared.chromie_contracts.core_interpretation import CognitiveWorkRequest, P
 from shared.chromie_contracts.control import GoalCancellationEvidence
 from shared.chromie_contracts.execution_outcome import ExecutionEvidence, ExecutionOutcomeBundle
 from shared.chromie_contracts.goal import ActiveGoalSnapshot, GoalAssociationResolution
+from shared.chromie_contracts.memory import role_memory_entries
+from shared.chromie_contracts.plan import OTHER_ANSWER_SOURCE, PERCEIVED_ANSWER_SOURCE
 from shared.chromie_contracts.interaction import (
     MEDIA_CAPABILITY_IDS,
     reject_forbidden_low_level_fields,
@@ -1071,6 +1073,53 @@ def recent_dialogue_prompt_projection(history: list[dict[str, Any]]) -> list[dic
     return records
 
 
+@dataclass
+class PlannerFactSources:
+    """Request-local names for records already visible to this Planner invocation."""
+
+    descriptions: dict[str, Any]
+    observation_ids: dict[str, str]
+    context_ids: dict[str, str]
+
+    @classmethod
+    def from_request(cls, request: CognitiveWorkRequest) -> PlannerFactSources:
+        descriptions: dict[str, Any] = {}
+        context_ids: dict[str, str] = {}
+        dialogue = recent_dialogue_prompt_projection(request.history)
+        for i, row in enumerate((r for r in dialogue if r["role"] == "user"), 1):
+            key = f"dialogue{i}"
+            descriptions[key] = row["text"]
+            context_ids[key] = str(row.get("sid") or "")
+        for i, entry in enumerate(role_memory_entries(request.context, role="planner"), 1):
+            key = f"memory{i}"
+            descriptions[key] = entry["text"]
+            context_ids[key] = str(entry.get("id") or "")
+        allowed = situation_source_observations(request.context)
+        observation_ids = {}
+        for i, entry in enumerate(situation_prompt_projection(request.context).get("interpretations", []), 1):
+            ref = entry["interpretation_id"]
+            if ref in allowed:
+                key = f"observation{i}"
+                descriptions[key] = {"property": entry["relation"], "value": entry["value"]}
+                observation_ids[key] = ref
+        return cls(descriptions, observation_ids, context_ids)
+
+    def restore_decisions(self, raw: dict[str, Any]) -> dict[str, list[str]]:
+        """Restore canonical fields from wire-validated choices; retain known context source IDs."""
+        context_sources = {}
+        for ref, decision in raw.get("responsibility_decisions", {}).items():
+            selected = decision.pop("supporting_facts", None)
+            if selected is None:
+                continue
+            observed = [self.observation_ids[key] for key in selected if key in self.observation_ids]
+            decision["observed_refs"] = observed
+            decision["answer_source"] = PERCEIVED_ANSWER_SOURCE if observed else OTHER_ANSWER_SOURCE
+            sources = [self.context_ids[key] for key in selected if self.context_ids.get(key)]
+            if sources:
+                context_sources[ref] = sources
+        return context_sources
+
+
 def evidence_bound_dialogue(
     context: dict[str, Any] | None,
     *,
@@ -1344,7 +1393,8 @@ def _library_search_stem(word: str) -> str:
 
 
 def _library_search_terms(text: str) -> list[str]:
-    words = re.findall(r"[a-z]+", text.lower().replace("_", " ").replace(".", " "))
+    # Consume the possessive with its owner so unrelated contracts cannot match on "s".
+    words = re.findall(r"([a-z]+)(?:['’]s\b)?", text.lower().replace("_", " "))
     return [_library_search_stem(word) for word in words if word not in _LIBRARY_SEARCH_STOP_WORDS]
 
 

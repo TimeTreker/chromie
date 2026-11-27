@@ -401,6 +401,7 @@ def declared_needed_abilities_fit(reply: Any, response_format: Any) -> Any:
     """
     refs = _fit_decision_refs(response_format)
     source_refs = _fit_decision_refs(response_format, "answer_source")
+    fact_refs = _fit_decision_refs(response_format, "supporting_facts")
     decisions = reply.get("responsibility_decisions") if isinstance(reply, dict) else None
     if not refs or not isinstance(decisions, dict):
         return reply
@@ -411,9 +412,12 @@ def declared_needed_abilities_fit(reply: Any, response_format: Any) -> Any:
                 and "answer_source" not in item):
             from shared.chromie_contracts.plan import OTHER_ANSWER_SOURCE
             item = {"answer_source": OTHER_ANSWER_SOURCE, "observed_refs": [], **item}
+        if (ref in fact_refs and isinstance(item, dict) and item.get("decision") in {"work", "clarify", "unavailable"}
+                and not {"supporting_facts", "answer_source", "observed_refs"}.intersection(item)):
+            item = {"supporting_facts": ["other"], **item}
         if (ref in refs and isinstance(item, dict) and "needed_abilities_fit" not in item
                 and item.get("decision") != "answer_from_perception"):
-            head = {key: value for key, value in item.items() if key in {"answer_source", "observed_refs"}}
+            head = {key: value for key, value in item.items() if key in {"answer_source", "observed_refs", "supporting_facts"}}
             item = {**head, "needed_abilities_fit": item.get("decision") != "unavailable",
                     **{key: value for key, value in item.items() if key not in head}}
         declared[ref] = item

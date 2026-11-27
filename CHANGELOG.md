@@ -5,6 +5,17 @@ remains available in Git history.
 
 ## Unreleased
 
+### Ground Planner answers in identifiable source records
+
+- Carry selected dialogue, activated personal memory and distinct observed objects into
+  the formal answer. Verify same-session dog recall and visible-object counting on fixed
+  inputs and in the simulator. Preserve the failed outcomes from both regression cohorts.
+
+### Prevent unrelated Planner capability lookups
+
+- Strip English possessive suffixes when matching Planner needs against capability contracts.
+  Unrelated descriptions previously matched on the suffix alone.
+
 ### Enforce acquisition stages before provisional Work
 
 - Constrain the Planner's native activity choices for a single Work owner and check

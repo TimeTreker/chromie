@@ -46,6 +46,7 @@ from .planner_schema import (
 )
 from .planner_native_schema import native_goal_outcome_branches
 from .planner_context import (
+    PlannerFactSources,
     gap_answered_goal_ids,
     planner_provider_vocal_goal_ids,
     provider_media_goal_ids_without_capability,
@@ -60,7 +61,6 @@ from .planner_context import (
     planner_effectful_goal_ids,
     planner_goal_context,
     search_capability_library,
-    situation_source_observations,
 )
 from .planner_validation import (
     capability_ids_acquiring_information,
@@ -229,19 +229,20 @@ class PlannerResolver:
                 if len(capabilities) > self.max_capabilities + len(loaded_ids):
                     raise PlannerDTOContractError("Common capability contracts exceed the configured context budget")
                 loaded_capability_ids = [item["capability_id"] for item in capabilities]
+                fact_sources = PlannerFactSources.from_request(current)
                 schema = need_first_response_schema(fast_streaming_advance_response_schema(
                     [item.local_ref for item in responsibilities], responsibilities=responsibilities,
                     capabilities=capabilities, meaning_uncertainties=list(request.meaning_uncertainties),
                     language=str(request.language or ""),
                     source_token_refs=[item["ref"] for item in user_turn_source_tokens(current.original_user_text)],
                     original_user_text=current.original_user_text,
-                    situation_source_refs=list(situation_source_observations(current.context)),
+                    situation_source_refs=list(fact_sources.observation_ids.values()), fact_sources=fact_sources,
                     trusted_target_ref=target_ref,
                 ), loaded_capability_ids,
                     retained_need_texts=[item.need for item in first_needs] if invocation else None,
                 )
                 prompt = fast_advance_layered_prompt(current, responsibilities=responsibilities,
-                    capabilities=capabilities, response_schema=schema)
+                    capabilities=capabilities, response_schema=schema, fact_sources=fact_sources)
                 raw_text = ""
                 searched: list[str] = []
                 async with aclosing(self.ollama.generate_stream(
@@ -278,6 +279,7 @@ class PlannerResolver:
                 from jsonschema import Draft202012Validator
                 raw = parse_fast_work_document(raw_text)
                 Draft202012Validator(schema).validate(raw)
+                context_sources = fact_sources.restore_decisions(raw)
                 final_needs = take_ability_needs(
                     raw, loaded_capability_ids=loaded_capability_ids,
                     retained_need_texts=[item.need for item in first_needs] if invocation else None,
@@ -343,6 +345,7 @@ class PlannerResolver:
             advance = FastPlannerAdvance(turn_id=turn_id, **output.model_dump(exclude={"responsibility_decisions"}), metadata={
                 "semantic_authority": "planner_model", "phase": "responsibility_work_plan",
                 "responsibility_decisions": authored_decisions,
+                **({"context_source_ids": context_sources} if context_sources else {}),
                 **({"repeated_activity_normalization": repeated_activity_repairs} if repeated_activity_repairs else {}),
                 **({"citation_reanchoring": citation_repairs} if citation_repairs else {}),
                 "execution_authority": "trusted_capability_runtime", "semantic_result_call_count": 1,

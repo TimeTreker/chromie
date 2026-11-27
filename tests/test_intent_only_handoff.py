@@ -17,7 +17,7 @@ from agent.app.goal_association import GoalAssociationResolver
 from orchestrator.runtime.cognitive_runtime import GoalDrivenRuntimeCoordinator
 from shared.chromie_contracts.core_interpretation import CognitiveWorkRequest
 from shared.chromie_contracts.plan import (
-    OTHER_ANSWER_SOURCE, PERCEIVED_ANSWER_SOURCE, FastPlannerStreamFailure, FastPlannerStreamTerminal,
+    FastPlannerStreamFailure, FastPlannerStreamTerminal,
 )
 from benchmarks.datasets.fast_planner_daily_life.qualification import declared_ability_needs, declared_activity_count, declared_ability_needs_text
 from orchestrator.runtime import planner_advance_projection
@@ -1269,11 +1269,9 @@ def test_host_rejects_observed_values_cited_to_the_persons_words():
     validate({"status": "known", "bindings": {"distance": 50}}, "fifty meters away")
 
 
-def perceived_answer(observed, decision="answer_from_perception", authored=False, source=None):
-    """Answer source and evidence before the decision; Host writes the cited response itself."""
-    basis = {"answer_source": source} if source else {}
-    return {"responsibility_decisions": {"r1": {**basis, "observed_refs": observed, "decision": decision,
-                                                "missing": []}},
+def perceived_answer(selected, decision, authored=False):
+    basis = {"supporting_facts": selected} if selected is not None else {}
+    return {"responsibility_decisions": {"r1": {**basis, "decision": decision, "missing": []}},
         "disposition": "respond", "coverage": "complete", "covered_responsibility_refs": ["r1"],
         "activities": [{"role": "complete_response", "activity_id": "answer_water",
                         "source_responsibility_refs": ["r1"],
@@ -1282,22 +1280,18 @@ def perceived_answer(observed, decision="answer_from_perception", authored=False
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("seen, source, observed, decision, authored, decoder_ok, host_ok", [
-    (True, PERCEIVED_ANSWER_SOURCE, [SEEN_WATER], "answer_from_perception", False, True, True),
-    # an information answer cites what Chromie sees
-    (True, PERCEIVED_ANSWER_SOURCE, [], "answer_from_perception", False, False, False),
-    (True, PERCEIVED_ANSWER_SOURCE, [SEEN_JUICE], "answer_from_perception", False, False, False),  # provisional
-    (False, None, [SEEN_WATER], "answer_from_perception", False, False, False),  # nothing perceived: no path
-    # The basis comes before the decision: a bare answer let "what time is it?" cite a milk bottle.
-    (True, OTHER_ANSWER_SOURCE, [], "answer", False, False, False),
-    (True, PERCEIVED_ANSWER_SOURCE, [SEEN_WATER], "answer_from_perception", True, False, False),  # Host writes it
-    # Live 2026-10-20: a time question beside a fetch cited the scene; an answer whose source is not
-    # an observation cannot cite one, and the source is always said before any observation.
-    (True, OTHER_ANSWER_SOURCE, [SEEN_WATER], "answer_from_perception", False, False, False),
-    (True, None, [SEEN_WATER], "answer_from_perception", False, False, False),
+@pytest.mark.parametrize("seen, selected, decision, authored, decoder_ok, host_ok", [
+    (True, ["observation1"], "answer_from_perception", False, True, True),
+    (True, [], "answer_from_perception", False, False, False),
+    (True, ["observation2"], "answer_from_perception", False, False, False),  # provisional
+    (False, ["observation1"], "answer_from_perception", False, False, False),
+    (True, ["other"], "answer", False, False, False),  # ordinary answer needs its delivery activity
+    (True, ["observation1"], "answer_from_perception", True, False, False),  # Host writes it
+    (True, ["other", "observation1"], "answer_from_perception", False, False, False),
+    (True, None, "answer_from_perception", False, False, False),
 ])
 async def test_information_already_perceived_is_answered_from_the_cited_observation(
-    seen, source, observed, decision, authored, decoder_ok, host_ok,
+    seen, selected, decision, authored, decoder_ok, host_ok,
 ):
     # Live 2026-10-16: "家里还有水吗？" had no answer path, so the Planner fetched the water.
     text = "Is there any water at home?"
@@ -1308,7 +1302,7 @@ async def test_information_already_perceived_is_answered_from_the_cited_observat
         responsibilities=meaning.responsibilities, interpretation_confidence=1.0)
     if seen:
         request.context["situation"] = observed_scene()
-    raw = perceived_answer(observed, decision, authored, source)
+    raw = perceived_answer(selected, decision, authored)
     model = Model([raw])
     frames = [frame async for frame in PlannerResolver(
         model, Catalog([provider_source_capability()])).stream_advance(request)]
@@ -1326,7 +1320,37 @@ async def test_information_already_perceived_is_answered_from_the_cited_observat
     assert isinstance(frames[0], FastPlannerStreamTerminal) is host_ok, frames[0]
     if host_ok:
         [answer] = frames[0].advance.activities
-        assert (answer.role, answer.situation_interpretation_refs) == ("complete_response", observed)
+        assert (answer.role, answer.situation_interpretation_refs) == ("complete_response", [SEEN_WATER])
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(("selected", "source_id"), [
+    ("dialogue1", "turn-earlier"), ("memory1", "fact-owned"),
+])
+async def test_selected_context_fact_survives_in_normal_response_advance(selected, source_id):
+    request = request_for("Which instrument did I tell you I play?")
+    request.history = [
+        {"role": "user", "sid": "turn-earlier", "text": "I play the cello."},
+        {"role": "user", "text": "Suppressed turn.", "metadata": {"cognitive_gateway_admission": "suppress"}},
+    ]
+    request.context["situation"] = observed_scene()
+    request.context["session_memory"] = {"active_memory": {"entries": [
+        {"id": "fact-owned", "kind": "fact", "text": "The speaker plays the cello.", "cognitive_roles": ["planner"]},
+        {"id": "fact-umi", "kind": "fact", "text": "UMI-only entry.", "cognitive_roles": ["umi"]},
+    ]}}
+    reply = perceived_answer([selected], "answer", authored=True)
+    reply["activities"][0]["rationale"] = "The speaker previously identified the cello."
+    reply["activities"][0]["timing"] = "concurrent_with_work"
+    model = Model([reply])
+    [frame] = [f async for f in PlannerResolver(model, Catalog([provider_source_capability()])).stream_advance(request)]
+    assert isinstance(frame, FastPlannerStreamTerminal), frame
+    assert frame.advance.metadata["context_source_ids"] == {"r1": [source_id]}
+    assert frame.advance.activities[0].situation_interpretation_refs == []
+    menu = model.packets[0][0].split("Evidence available for the current decision (quoted source records):\n")[1]
+    records, _ = json.JSONDecoder().raw_decode(menu)
+    assert set(records) == {"dialogue1", "memory1", "observation1"}
+    assert records["dialogue1"] == "I play the cello."
+    assert records["memory1"] == "The speaker plays the cello."
 
 
 UNSETTLED_THAT = "Which object '那个' means is not singled out: several objects are perceived."
@@ -1519,6 +1543,17 @@ def test_library_search_ranks_need_wording_and_never_returns_restricted_entries(
     assert search_capability_library(["perform a bow gesture"], entries, loaded_ids=set()) == ["test.bow"]
     assert search_capability_library(["read the current local time"], entries, loaded_ids={"test.clock"})[0] != "test.clock"
     assert search_capability_library(["open the kitchen window"], entries, loaded_ids=set()) == []
+
+
+@pytest.mark.parametrize("apostrophe", ["'", "’"])
+def test_library_search_does_not_match_on_a_possessive_suffix(apostrophe):
+    from agent.app.planner_context import search_capability_library
+
+    curve = capability("curve", {}, tier="rare").model_copy(update={
+        "description": "Walk along a curve using the provider's orientation convention.",
+    })
+    assert search_capability_library([f"recall the visitor{apostrophe}s preference"], [curve], loaded_ids=set()) == []
+    assert search_capability_library(["walk along a curve"], [curve], loaded_ids=set()) == [curve.capability_id]
 
 
 @pytest.mark.asyncio
