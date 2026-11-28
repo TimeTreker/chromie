@@ -5,6 +5,12 @@ remains available in Git history.
 
 ## Unreleased
 
+### Ground speech-only delivery in Planner evidence decisions
+
+- Identify missing providers for requested effects when an ordinary answer cannot fulfill
+  the request. Standalone singing and reminders recovered in fixed-input and simulator
+  runs. Compound-work coverage and early SC promises remain open.
+
 ### Preserve personal facts across household profiles
 
 - Scope updates and forget operations to the established person. Serialize profile-file

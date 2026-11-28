@@ -9,28 +9,28 @@ The current focus remains Goal-driven single-authority architecture.
 
 ## Active Issue — everyday live-cohort root-cause repairs
 
-The fixed-model simulator comparison used feature baseline `5368d2cab` plus the retained
-catalog fix and Planner evidence-source selection. The later personal-profile store fix
-was verified separately. Preserve WHAT-only UMI, Goal identity,
-Planner ownership of work, SC wording and all 28 role-budget settings.
+The evaluated feature revision is based on `e3307868b`. Preserve WHAT-only UMI,
+Goal identity, Planner ownership of Work, SC wording and all 28 role-budget settings.
 
 ## Resume point — Planner evidence and memory
 
-The archived dog-name and bottle-count requests both supplied the needed information.
-For recall, the old Planner had chosen new work or cited the current speaker. For counting,
-its ordinary response form forced an empty observation list. The Planner now selects actual
-dialogue, activated Memory and established scene records from the same candidate set. The
-existing validators resolve exact source identifiers before generating an SC communication
-need. Capability ranking strips English possessive suffixes while preserving the other
-20 of 24 archived unmet-need rankings. No example words route a task.
+In the main C30 trace the retired media output category excluded scene-based answers and
+Planner identified the missing singing provider. On the branch UMI preserved the same
+requested effect. Planner instead listed no ability needs and cited the current speaker.
+The established observation ID passed Host validation and SC promised a performance.
+The current Planner prompt states the delivery scope of ordinary words where it selects
+evidence. Catalog search, validation, decision Schema and model profiles are unchanged.
 
-The integrated fixed-input cohort passed five of seven. The original ten and all 207
-simulator cases ran on the frozen Planner application. On the common 128, 85 were complete
-and 13 of the original 28 regressions recovered. On the disjoint 79, 45 were complete.
-The unshown drawing, date provenance, unavailable care and reminder promises, cross-session
-facts and unapproved food substitution remain open. A timeout in the additional nine-turn
-case left eight terminal summaries and did not prevent later cases from entering the Host.
-[Handoff](HANDOFF.md) points to actual deliveries, per-case judgments and runtime identities.
+The two archived failures now identify missing performance and reminder providers.
+Five controls remained correct, including same-session recall of Max and counting two
+bottles. The unshown drawing remains wrong. Both repaired cases passed focused simulation
+and the subsequent common suite. The common suite improved from 85 to 93 complete and
+the additional suite declined from 45 to 43. Main had 94 on the common suite. The
+original food follow-up now answered, but the prior turn retrieved milk without the
+user asking for delivery. Separate reminders and child supervision still attracted
+unsupported early promises. For a new compound-work failure and an arithmetic error,
+reverting just the prompt on identical requests also produced incorrect plans.
+[Handoff](HANDOFF.md) points to the paired outputs and every case judgment.
 
 The protected store now preserves two people's records with the same attribute, rechecks the
 disk when managers share the file, respects the requester when forgetting, and rolls back

@@ -8,36 +8,39 @@ Replace current facts; history remains in Git and [CHANGELOG](CHANGELOG.md).
 ## Current snapshot
 
 Feature branch `codex/sc-context-budget-failure-notice` in `/home/chromie/github/chromie`.
-The source comparison began at `5368d2cab`; the latest commit carrying these three status
-owners is the resume revision. Historical main was `55f5587d4`. The Agent source digest
-was `38834b8c3f35efbe344c4d72d0ff752d90e23ef7fe33828e8e0fe46b6fe5538f` and the
-common-suite runtime identity was `2c0febc91fcee4a4e1cebd270f4268727bc4c3b9bb396608f978fc3e6ff38231`.
-The Gemma4 12B revision was `707f0a3b8a3c7ad586ed01e27eafbad8a27dd0f7`, Soridormi
-`a49a87f68`, with unchanged SGLang and XGrammar builds and 28 unchanged role budgets.
-The original Agent image `sha256:f9138d8641f0` was restored following simulation.
-`30bf180d7` binds the Planner delivery. The separate profile-store change has local
-regression evidence. The experimental close-time summarizer did not qualify for integration.
+The singing comparison used feature baseline `e3307868b` and historical main
+`55f5587d4`. The evaluated Agent source digest was
+`8b87dab24dd721379f97c463b3f1b6cf28a45bea54ad31a3dd76459718465850`.
+The common-suite runtime identity was
+`a91063b4d84bd4889fb0dcd49f48b130c978a0a41f0e12bde6ffbe6c6cb7a5a0`.
+Gemma4 12B revision `707f0a3b8a3c7ad586ed01e27eafbad8a27dd0f7`, Soridormi
+`a49a87f68` and 28 role budgets were held fixed. The simulator restored the original
+Agent image `sha256:f9138d8641f0`. The feature candidate remains unqualified overall.
 
 ## Retained evidence
 
-The local evidence root is `.chromie/acceptance/planner-memory-sources-20261127/`.
+The current evidence root is `.chromie/acceptance/planner-effect-c30-20261128/`.
 
-- `验证报告.md`, `product-manifest.json`, `product-focus-host.private.json` and
-  `product-rest-host.private.json` contain the archived input fingerprints, real model
-  output, canonical projection and source records. Seven identical requests improved from
-  1/7 to 5/7. The separate catalog contrast is in `.chromie/acceptance/planner-first-need-fix/lexical.json`.
-- `site/original/original/episode-summary.json` and the adjacent dialogue and playback
-  logs retain ten terminal notifications. Food became an unapproved milk delivery,
-  the follow-up claimed ongoing search without Work, and several replies played twice.
-- `full-逐例结果.md`, `full-review.json`, `原28例本次结果.md`, `与main剩余21例.md` and
-  `library79-逐例结果.md` cover every case. Common 128 had 85/16/26/1 complete/partial/
-  failed/insufficient. Extra 79 had 45/13/21/0. The runner recorded 9 and 13 integrity
-  failures respectively. The unsafe child-supervision promise was a separate manual failure.
-- `site/{original,full,library79}/exits.json`, the adjacent post-status files and the
-  single debug bundle for each window bind identity, exits and safe idle. The complete
-  earlier main/branch comparison is in `.chromie/acceptance/paired28-20261123/逐例对照.md`.
-- `canonical.log`, `level-a/summary.json` and `strict6000-local/summary.json` contain the
-  offline verification. The earlier restricted-loopback attempt is retained separately.
+- `C30验证.md`, `c30-comparison.json` and `manifest.json` bind the main and
+  feature traces, the eight archived requests and their criteria. The two diagnostic
+  changes to ordering or general instructions still failed singing. The delivery-scope
+  prompt passed singing and reminders and preserved dog recall and object counting.
+- `site/focused/exits.json` and its two case summaries bind the realized answers.
+  Both also passed in the full run. The earlier baseline is under
+  `.chromie/acceptance/planner-memory-sources-20261127/`.
+- `site/original/original/episode-summary.json` records ten terminal notifications.
+  Milk delivery was still substituted for food help. The last reply mentioned only
+  a water bottle. Some earlier replies repeated.
+- `full-逐例结果.md`, `library79-逐例结果.md` and `失败清单.md` index all judgments.
+  The common set scored 93/12/23 complete/partial/failed and the extra set scored
+  43/13/23. Eight common and twelve extra cases registered integrity failures.
+  `adverse-cases.json` and `adverse-before.private.jsonl` compare the two
+  newly failing requests with the previous prompt on the same inputs.
+- `site/{original,full,library79}/exits.json`, each debug bundle path in `bundle.log`
+  and the service and runtime identities retain execution and restoration evidence.
+  `canonical-local.log`, `level-a/summary.json` and `strict6000/summary.json` contain
+  the successful local gate, 45 ability cases and 6,000 offline workflow variants.
+  `canonical.log` records the separate attempt where local test sockets were disabled.
 
 The local independent memory report is `.chromie/acceptance/conversation-close-20261127/验证报告.md`.
 The terminal review, final candidate patch against `30bf180d7`, exact-input replay and
@@ -55,9 +58,9 @@ Its `branch-canonical.log` records 4,433 main tests, 1,046 subtests and 20 legac
 ```bash
 set -e
 cd /home/chromie/github/chromie
-proof=.chromie/acceptance/planner-memory-sources-20261127
+proof=.chromie/acceptance/planner-effect-c30-20261128
 cat "$proof/site/full/exits.json" "$proof/site/library79/exits.json" "$proof/site/post-agent-image.txt"
-cat "$proof/与main剩余21例.md"
+cat "$proof/C30验证.md" "$proof/失败清单.md"
 memory=.chromie/acceptance/conversation-close-adjudicated-20261127
 cat "$memory/逐例判定.md" "$memory/store-after.log"
 python -m pytest -q tests/test_intent_only_handoff.py tests/test_durable_profile_memory.py

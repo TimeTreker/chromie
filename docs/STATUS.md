@@ -11,16 +11,17 @@ The current focus remains Goal-driven single-authority architecture.
 
 | Axis | Current evidence |
 | --- | --- |
-| Implementation | The feature branch retains WHAT-only UMI. Planner selects identifiable dialogue, activated Memory or established scene records. The Host carries their identifiers into the SC need. The existing acquisition-stage rules and possessive-insensitive catalog search apply. Personal profile corrections and deletions respect the identified speaker and synchronize shared on-disk edits. |
+| Implementation | The feature branch retains WHAT-only UMI. Planner selects identifiable dialogue, activated Memory or established scene records. The Host carries their identifiers into the SC need. At the point where Planner chooses evidence, its prompt now states which effects an ordinary spoken answer can deliver. The existing acquisition-stage rules and possessive-insensitive catalog search apply. Personal profile corrections and deletions respect the identified speaker and synchronize shared on-disk edits. |
 | Automatic verification | The branch local gate passed 176 benchmark tests, 4,433 main tests, 1,046 subtests and 20 legacy checks. 5 tests were skipped. Level A passed 45/45. The Planner revision matched all 6,000 frozen offline outcomes. All 14 current profile tests passed. |
-| Target validation | Seven identical Planner inputs improved from one to five complete results. Same-session dog recall and bottle counting also passed in simulation. The common 128 scored 85 complete, 16 partial, 26 failed and one insufficient. Main historically scored 94 complete. The additional 79 scored 45 complete, 13 partial and 21 failed. |
-| Deployment state | A temporary local Agent ran the original ten utterances and both cohorts with Gemma4 12B, unchanged role budgets, discarded audio and MuJoCo. The original Agent image was restored. The independent conversation-close candidate stays outside the runtime. Physical and release qualification remain open. |
+| Target validation | Eight frozen Planner requests improved from 5/8 to 7/8. The simulator twice delivered an honest limitation for both standalone singing and an unspecified reminder. The common 128 scored 93 complete, 12 partial and 23 failed, against 85 complete on the previous branch run and 94 on historical main. The additional 79 scored 43 complete, 13 partial and 23 failed, down from 45 complete. |
+| Deployment state | The original ten utterances and all 207 simulator scenarios ran with the fixed Gemma4 12B, the same role budgets, discarded audio and MuJoCo. The original Agent image was restored. Physical and release qualification remain open. |
 
-The common suite passed all 22 must-pass scenarios, 60 of 96 core and three of ten
-challenge cases. The runner marked 112 automatic successes and nine integrity failures.
-One additional serious safety failure was visible in actual speech: Chromie accepted
-sole responsibility for watching a child without any monitoring Work. Original food help
-also caused unapproved milk delivery. These prevent target qualification. See [Handoff](../HANDOFF.md).
+The common suite passed 22/22 must-pass, 68/96 core and 3/10 challenge cases.
+Common and additional runs recorded eight and twelve integrity failures respectively.
+Early speech still promised medication reminders and child supervision before later
+disclosing the limitation. Food help still triggered unrequested milk delivery.
+The combined walking and singing cases also dropped supported Work. The feature revision
+retains this evidence for diagnosis. See [Handoff](../HANDOFF.md).
 
 ## Social Cognition migration
 
@@ -60,8 +61,9 @@ The [Roadmap](../ROADMAP.md#social-cognition-migration) owns delivery order.
 The [checkpoint](../DEVELOPMENT_CHECKPOINT.md) owns the active Issue and owner decisions.
 
 1. Preserve the distinction between evidence about a speaker and the requested property or effect.
-   The new source choice fixes same-session Max and two visible bottles. It still permits a
-   false visual claim about a drawing and an unsupported child-supervision promise.
+   Max and both visible bottles were grounded correctly. An unshown drawing still elicited
+   invented visual details. For child supervision, Planner identified the limitation but
+   early SC speech already accepted responsibility.
 2. Keep acquisition, offering a substitute and authorized delivery separate. The food replay
    retained hunger through UMI and substituted milk in Planner. Inspect ingress and terminal
    speech against executed Work and eliminate duplicate playback.

@@ -1063,7 +1063,13 @@ def fast_advance_layered_prompt(
         rendered += (
             "\nEvidence available for the current decision (quoted source records):\n"
             + json.dumps(fact_sources.descriptions, ensure_ascii=False)
-            + "\nIn supporting_facts select the record(s) that supply the requested fact. A dialogue record "
+            + "\nDelivery contract: complete_response delivers ordinary spoken words in this turn. "
+            "It can deliver a description, advice, or the actual requested spoken text. It provides no musical audio, "
+            "playback, change of volume, scheduled event, movement or persistent write. For a requested effect beyond "
+            "ordinary speech, put the effect in ability_needs, even if the closest loaded provider is none. "
+            "Only a matching contract can realize it; without one return unavailable and identify the missing effect. "
+            "Use supporting_facts only as evidence of the fact being answered. Seeing the requester cannot support a performance. "
+            "A dialogue record "
             "supplies what the person actually said. An observation supplies only its stated property and "
             "value. For an aggregate select every observation used. Use other for information from "
             "general knowledge, insufficient evidence or new provider work. Do not count reviewing "
